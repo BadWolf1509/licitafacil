@@ -4,10 +4,11 @@ Rotas para gerenciamento e status dos provedores de IA.
 
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any
-from ..auth import get_current_active_user
-from ..models import Usuario
-from ..services.ai_provider import ai_provider
-from ..services.processing_queue import processing_queue
+
+from auth import get_current_active_user
+from models import Usuario
+from services.ai_provider import ai_provider
+from services.processing_queue import processing_queue
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
