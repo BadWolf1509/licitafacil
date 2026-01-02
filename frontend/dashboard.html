@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Estilos específicos do dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-lg);
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: var(--spacing-xl);
+        }
+
+        .stat-number {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: var(--spacing-sm);
+        }
+
+        .action-card {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-lg);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .action-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .action-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--radius-lg);
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .action-content h3 {
+            font-size: 1.125rem;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .action-content p {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .recent-list {
+            list-style: none;
+        }
+
+        .recent-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md) 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .recent-item:last-child {
+            border-bottom: none;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .upload-zone input {
+            display: none;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+        <nav class="header-nav">
+            <a href="dashboard.html" class="active">Dashboard</a>
+            <a href="atestados.html">Atestados</a>
+            <a href="analises.html">Análises</a>
+            <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">🌓</button>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Sair</button>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Boas-vindas -->
+        <div class="card mb-3">
+            <h1>Bem-vindo, <span id="userName">Usuário</span>!</h1>
+            <p class="text-muted">Gerencie seus atestados e analise licitações de forma inteligente.</p>
+        </div>
+
+        <!-- Estatísticas -->
+        <div class="dashboard-grid mb-3">
+            <div class="card stat-card">
+                <div class="stat-number" id="totalAtestados">0</div>
+                <div class="stat-label">Atestados Cadastrados</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="totalAnalises">0</div>
+                <div class="stat-label">Análises Realizadas</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="licitacoesAtendidas">0</div>
+                <div class="stat-label">Licitações Atendidas</div>
+            </div>
+        </div>
+
+        <!-- Ações rápidas -->
+        <h2 class="mb-2">Ações Rápidas</h2>
+        <div class="dashboard-grid mb-3">
+            <div class="card action-card" onclick="abrirModalAtestado()">
+                <div class="action-icon">📄</div>
+                <div class="action-content">
+                    <h3>Cadastrar Atestado</h3>
+                    <p>Adicione um novo atestado de capacidade técnica</p>
+                </div>
+            </div>
+            <div class="card action-card" onclick="window.location.href='analises.html'">
+                <div class="action-icon">🔍</div>
+                <div class="action-content">
+                    <h3>Nova Análise</h3>
+                    <p>Analise uma licitação e veja quais atestados usar</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Análises recentes -->
+        <div class="card">
+            <div class="card-header d-flex justify-between align-center">
+                <h2 class="card-title">Análises Recentes</h2>
+                <a href="analises.html" class="btn btn-outline btn-sm">Ver todas</a>
+            </div>
+            <ul class="recent-list" id="recentAnalises">
+                <li class="recent-item text-muted">Carregando...</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro de Atestado -->
+    <div class="modal" id="modalAtestado">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cadastrar Atestado</h2>
+                <button class="modal-close" onclick="fecharModal('modalAtestado')">&times;</button>
+            </div>
+            <form id="formAtestado">
+                <div class="form-group">
+                    <label class="form-label">Descrição do Serviço *</label>
+                    <input type="text" class="form-input" id="atDescricao" required
+                        placeholder="Ex: Execução de pavimentação asfáltica">
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">Quantidade *</label>
+                        <input type="number" class="form-input" id="atQuantidade" step="0.01" required
+                            placeholder="1000">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Unidade *</label>
+                        <input type="text" class="form-input" id="atUnidade" required
+                            placeholder="m², m³, un...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contratante</label>
+                    <input type="text" class="form-input" id="atContratante"
+                        placeholder="Nome do órgão/empresa contratante">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data de Emissão</label>
+                    <input type="date" class="form-input" id="atDataEmissao">
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Cadastrar</button>
+                    <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

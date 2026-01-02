@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Atestados</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .upload-zone input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: var(--spacing-md);
+        }
+
+        .atestado-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--spacing-lg);
+        }
+
+        .atestado-info {
+            flex: 1;
+        }
+
+        .atestado-quantidade {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .atestado-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl);
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-md);
+        }
+
+        /* Estilos para serviços detalhados */
+        .servicos-toggle {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            padding: var(--spacing-xs) 0;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .servicos-toggle:hover {
+            text-decoration: underline;
+        }
+
+        .servicos-toggle .chevron {
+            display: inline-block;
+            transition: transform 0.2s ease;
+            font-size: 0.75rem;
+        }
+
+        .servicos-lista {
+            display: none;
+            margin-top: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+        }
+
+        .servicos-lista.active {
+            display: block;
+        }
+
+        .servico-item {
+            display: flex;
+            justify-content: space-between;
+            padding: var(--spacing-sm) 0;
+            border-bottom: 1px solid var(--border);
+            gap: var(--spacing-md);
+        }
+
+        .servico-item:last-child {
+            border-bottom: none;
+        }
+
+        .servico-descricao {
+            flex: 1;
+        }
+
+        .servico-quantidade {
+            font-weight: 600;
+            color: var(--primary);
+            white-space: nowrap;
+        }
+
+        /* Modal de relatório */
+        .modal-lg {
+            max-width: 800px;
+        }
+
+        .modal-xl {
+            max-width: 1000px;
+        }
+
+        /* Relatório */
+        .relatorio-header {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .relatorio-header h3 {
+            margin-bottom: var(--spacing-sm);
+            color: var(--primary);
+        }
+
+        .relatorio-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+        }
+
+        .relatorio-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .relatorio-info-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .relatorio-info-value {
+            font-weight: 600;
+        }
+
+        .relatorio-section {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .relatorio-section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-sm);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .relatorio-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .relatorio-table th,
+        .relatorio-table td {
+            padding: var(--spacing-sm) var(--spacing-md);
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .relatorio-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .relatorio-table td.numero {
+            text-align: right;
+            font-family: monospace;
+            white-space: nowrap;
+        }
+
+        .relatorio-table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Badge de contagem */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: var(--primary);
+            color: white;
+        }
+
+        .badge-secondary {
+            background: var(--text-secondary);
+        }
+
+        /* Toolbar de ações globais */
+        .toolbar {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+        }
+
+        /* Atestado card no relatório global */
+        .relatorio-atestado {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-lg);
+            overflow: hidden;
+        }
+
+        .relatorio-atestado-header {
+            background: var(--bg-secondary);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .relatorio-atestado-body {
+            padding: var(--spacing-lg);
+        }
+
+        .relatorio-atestado-numero {
+            font-weight: 700;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+        <nav class="header-nav">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="atestados.html" class="active">Atestados</a>
+            <a href="analises.html">Análises</a>
+            <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">&#127763;</button>
+            <button class="btn btn-outline btn-sm" onclick="logout()">Sair</button>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <div class="d-flex justify-between align-center mb-3">
+            <h1>Meus Atestados</h1>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline" onclick="abrirRelatorioGeral()" id="btnRelatorioGeral" style="display: none;">
+                    Relatorio Geral
+                </button>
+                <button class="btn btn-primary" onclick="abrirModalAtestado()">+ Novo Atestado</button>
+            </div>
+        </div>
+
+        <!-- Upload de arquivo -->
+        <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">&#128196;</div>
+            <h3>Arraste um PDF ou imagem aqui</h3>
+            <p class="text-muted">ou clique para selecionar um arquivo</p>
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg">
+        </div>
+
+        <!-- Lista de atestados -->
+        <div id="listaAtestados">
+            <div class="card empty-state">
+                <div class="empty-state-icon">&#128203;</div>
+                <h3>Carregando atestados...</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Resultado Consolidado (Individual) -->
+    <div class="modal" id="modalResultado">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Resultado Consolidado</h2>
+                <button class="modal-close" onclick="fecharModal('modalResultado')">&times;</button>
+            </div>
+            <div id="resultadoContent">
+                Carregando...
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Relatório Geral (Todos os Atestados) -->
+    <div class="modal" id="modalRelatorioGeral">
+        <div class="modal-content modal-xl">
+            <div class="modal-header">
+                <h2>Relatorio Consolidado - Todos os Atestados</h2>
+                <button class="modal-close" onclick="fecharModal('modalRelatorioGeral')">&times;</button>
+            </div>
+            <div id="relatorioGeralContent">
+                Carregando...
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Cadastro/Edição de Atestado -->
+    <div class="modal" id="modalAtestado">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalAtestadoTitle">Cadastrar Atestado</h2>
+                <button class="modal-close" onclick="fecharModal('modalAtestado')">&times;</button>
+            </div>
+            <form id="formAtestado">
+                <input type="hidden" id="atId">
+                <div class="form-group">
+                    <label class="form-label">Descricao do Servico *</label>
+                    <input type="text" class="form-input" id="atDescricao" required
+                        placeholder="Ex: Execucao de pavimentacao asfaltica">
+                </div>
+                <div class="d-flex gap-2">
+                    <div class="form-group" style="flex: 2;">
+                        <label class="form-label">Quantidade *</label>
+                        <input type="number" class="form-input" id="atQuantidade" step="0.01" required
+                            placeholder="1000">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label class="form-label">Unidade *</label>
+                        <input type="text" class="form-input" id="atUnidade" required
+                            placeholder="m2, m3, un...">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contratante</label>
+                    <input type="text" class="form-input" id="atContratante"
+                        placeholder="Nome do orgao/empresa contratante">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data de Emissao</label>
+                    <input type="date" class="form-input" id="atDataEmissao">
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar</button>
+                    <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script>
+        // Cache de atestados para relatório geral
+        let atestadosCache = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarAtestados();
+            setupUpload();
+            setupFormAtestado();
+        });
+
+        async function carregarAtestados() {
+            try {
+                const atestados = await api.get('/atestados/');
+                atestadosCache = atestados;
+                const container = document.getElementById('listaAtestados');
+                const btnRelatorioGeral = document.getElementById('btnRelatorioGeral');
+
+                // Mostrar botão de relatório geral se houver atestados
+                btnRelatorioGeral.style.display = atestados.length > 0 ? 'inline-block' : 'none';
+
+                if (atestados.length === 0) {
+                    container.innerHTML = `
+                        <div class="card empty-state">
+                            <div class="empty-state-icon">&#128203;</div>
+                            <h3>Nenhum atestado cadastrado</h3>
+                            <p class="text-muted">Cadastre seu primeiro atestado de capacidade tecnica</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = atestados.map(a => `
+                    <div class="card">
+                        <div class="atestado-card">
+                            <div class="atestado-info">
+                                <h3>${a.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
+                                ${a.contratante ? `<p class="text-muted">Contratante: ${a.contratante}</p>` : ''}
+                                ${a.data_emissao ? `<p class="text-muted">Emitido em: ${formatarDataSemHora(a.data_emissao)}</p>` : ''}
+                                ${a.servicos_json && a.servicos_json.length > 0 ?
+                                    `<span class="badge">${a.servicos_json.length} servico(s) identificado(s)</span>` :
+                                    '<span class="badge badge-secondary">Sem servicos detalhados</span>'
+                                }
+                            </div>
+                            <div class="atestado-actions">
+                                <button class="btn btn-primary btn-sm" onclick="verResultadoConsolidado(${a.id})">Resultado Consolidado</button>
+                                <button class="btn btn-outline btn-sm" onclick="editarAtestado(${a.id})">Editar</button>
+                                <button class="btn btn-danger btn-sm" onclick="excluirAtestado(${a.id})">Excluir</button>
+                            </div>
+                        </div>
+                        ${renderizarServicosPreview(a)}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                ui.showAlert('Erro ao carregar atestados', 'error');
+            }
+        }
+
+        // Formata data sem horário
+        function formatarDataSemHora(dataStr) {
+            if (!dataStr) return '';
+            const data = new Date(dataStr);
+            return data.toLocaleDateString('pt-BR');
+        }
+
+        function setupUpload() {
+            const zone = document.getElementById('uploadZone');
+            const input = document.getElementById('fileInput');
+
+            zone.addEventListener('click', () => input.click());
+
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) uploadFile(file);
+            });
+
+            input.addEventListener('change', () => {
+                if (input.files[0]) {
+                    uploadFile(input.files[0]);
+                    input.value = '';
+                }
+            });
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                ui.showAlert('Enviando arquivo...', 'info');
+                const result = await api.upload('/atestados/upload', formData);
+                ui.showAlert(result.mensagem || 'Arquivo enviado com sucesso!', 'success');
+                carregarAtestados();
+            } catch (error) {
+                ui.showAlert(error.message || 'Erro ao enviar arquivo', 'error');
+            }
+        }
+
+        function setupFormAtestado() {
+            document.getElementById('formAtestado').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const id = document.getElementById('atId').value;
+                const dados = {
+                    descricao_servico: document.getElementById('atDescricao').value,
+                    quantidade: parseFloat(document.getElementById('atQuantidade').value),
+                    unidade: document.getElementById('atUnidade').value,
+                    contratante: document.getElementById('atContratante').value || null,
+                    data_emissao: document.getElementById('atDataEmissao').value || null
+                };
+
+                try {
+                    if (id) {
+                        await api.put(`/atestados/${id}`, dados);
+                        ui.showAlert('Atestado atualizado com sucesso!', 'success');
+                    } else {
+                        await api.post('/atestados/', dados);
+                        ui.showAlert('Atestado cadastrado com sucesso!', 'success');
+                    }
+                    fecharModal('modalAtestado');
+                    carregarAtestados();
+                } catch (error) {
+                    ui.showAlert(error.message || 'Erro ao salvar atestado', 'error');
+                }
+            });
+        }
+
+        function abrirModalAtestado() {
+            document.getElementById('modalAtestadoTitle').textContent = 'Cadastrar Atestado';
+            document.getElementById('formAtestado').reset();
+            document.getElementById('atId').value = '';
+            document.getElementById('modalAtestado').classList.add('active');
+        }
+
+        async function editarAtestado(id) {
+            try {
+                const atestado = await api.get(`/atestados/${id}`);
+                document.getElementById('modalAtestadoTitle').textContent = 'Editar Atestado';
+                document.getElementById('atId').value = atestado.id;
+                document.getElementById('atDescricao').value = atestado.descricao_servico || '';
+                document.getElementById('atQuantidade').value = atestado.quantidade || '';
+                document.getElementById('atUnidade').value = atestado.unidade || '';
+                document.getElementById('atContratante').value = atestado.contratante || '';
+                document.getElementById('atDataEmissao').value = atestado.data_emissao ? atestado.data_emissao.split('T')[0] : '';
+                document.getElementById('modalAtestado').classList.add('active');
+            } catch (error) {
+                ui.showAlert('Erro ao carregar atestado', 'error');
+            }
+        }
+
+        async function excluirAtestado(id) {
+            if (!confirm('Tem certeza que deseja excluir este atestado?')) return;
+
+            try {
+                await api.delete(`/atestados/${id}`);
+                ui.showAlert('Atestado excluido com sucesso!', 'success');
+                carregarAtestados();
+            } catch (error) {
+                ui.showAlert(error.message || 'Erro ao excluir atestado', 'error');
+            }
+        }
+
+        // Renderiza lista completa de serviços com chevron expansível
+        function renderizarServicosPreview(atestado) {
+            if (!atestado.servicos_json || atestado.servicos_json.length === 0) {
+                return '';
+            }
+
+            const servicosHtml = atestado.servicos_json.map(s => `
+                <div class="servico-item">
+                    <span class="servico-descricao">${s.descricao}</span>
+                    <span class="servico-quantidade">${formatarNumero(s.quantidade)} ${s.unidade}</span>
+                </div>
+            `).join('');
+
+            return `
+                <div style="margin-top: var(--spacing-md);">
+                    <button class="servicos-toggle" onclick="toggleServicos(this)">
+                        <span class="chevron">&#9654;</span>
+                        Ver detalhes (${atestado.servicos_json.length} servico(s))
+                    </button>
+                    <div class="servicos-lista">
+                        ${servicosHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Toggle para expandir/recolher lista de serviços
+        function toggleServicos(btn) {
+            const lista = btn.nextElementSibling;
+            const chevron = btn.querySelector('.chevron');
+
+            lista.classList.toggle('active');
+            chevron.innerHTML = lista.classList.contains('active') ? '&#9660;' : '&#9654;';
+        }
+
+        // Abre modal com resultado consolidado do atestado
+        async function verResultadoConsolidado(id) {
+            try {
+                const atestado = await api.get(`/atestados/${id}`);
+                const content = document.getElementById('resultadoContent');
+
+                content.innerHTML = gerarRelatorioAtestado(atestado);
+                document.getElementById('modalResultado').classList.add('active');
+            } catch (error) {
+                ui.showAlert('Erro ao carregar resultado', 'error');
+            }
+        }
+
+        // Remove código do item (ex: "001.03.11 " -> "")
+        function removerCodigoItem(descricao) {
+            // Padrão: 3 dígitos + separador + 2 dígitos + separador + 2 dígitos + espaço
+            // Ex: "001.03.11 PORTÃO..." -> "PORTÃO..."
+            return descricao.replace(/^\d{3}[\.\s]+\d{2}[\.\s]+\d{2}\s*/, '').trim();
+        }
+
+        // Agrupa serviços por descrição (sem código) e soma quantidades
+        function agruparServicosPorDescricao(servicos) {
+            const agrupados = {};
+            servicos.forEach(s => {
+                // Remover código do item para agrupar serviços similares
+                const descricaoSemCodigo = removerCodigoItem(s.descricao);
+                // Chave: descrição (sem código) + unidade (para não misturar unidades diferentes)
+                const chave = `${descricaoSemCodigo.toUpperCase()}|||${s.unidade.toUpperCase()}`;
+                if (!agrupados[chave]) {
+                    agrupados[chave] = {
+                        descricao: descricaoSemCodigo,
+                        unidade: s.unidade,
+                        quantidade: 0
+                    };
+                }
+                agrupados[chave].quantidade += parseFloat(s.quantidade) || 0;
+            });
+            // Ordenar por descrição
+            return Object.values(agrupados).sort((a, b) => a.descricao.localeCompare(b.descricao));
+        }
+
+        // Gera HTML do relatório de um atestado
+        function gerarRelatorioAtestado(atestado) {
+            const servicos = atestado.servicos_json || [];
+            const servicosConsolidados = agruparServicosPorDescricao(servicos);
+
+            return `
+                <div class="relatorio-header">
+                    <h3>${atestado.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
+                    <div class="relatorio-info">
+                        ${atestado.contratante ? `
+                            <div class="relatorio-info-item">
+                                <span class="relatorio-info-label">Contratante</span>
+                                <span class="relatorio-info-value">${atestado.contratante}</span>
+                            </div>
+                        ` : ''}
+                        ${atestado.data_emissao ? `
+                            <div class="relatorio-info-item">
+                                <span class="relatorio-info-label">Data de Emissao</span>
+                                <span class="relatorio-info-value">${formatarDataSemHora(atestado.data_emissao)}</span>
+                            </div>
+                        ` : ''}
+                        <div class="relatorio-info-item">
+                            <span class="relatorio-info-label">Itens Originais</span>
+                            <span class="relatorio-info-value">${servicos.length}</span>
+                        </div>
+                        <div class="relatorio-info-item">
+                            <span class="relatorio-info-label">Itens Consolidados</span>
+                            <span class="relatorio-info-value">${servicosConsolidados.length}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relatorio-section">
+                    <h4 class="relatorio-section-title">Servicos Consolidados (agrupados por descricao)</h4>
+                    ${servicosConsolidados.length > 0 ? `
+                        <table class="relatorio-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Descricao do Servico</th>
+                                    <th style="width: 80px;">Unidade</th>
+                                    <th style="width: 120px;">Quantidade Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servicosConsolidados.map((s, i) => `
+                                    <tr>
+                                        <td>${i + 1}</td>
+                                        <td>${s.descricao}</td>
+                                        <td>${s.unidade}</td>
+                                        <td class="numero">${formatarNumero(s.quantidade)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p class="text-muted">Nenhum servico detalhado foi extraido deste documento.</p>'}
+                </div>
+
+            `;
+        }
+
+        // Abre relatório geral de todos os atestados
+        function abrirRelatorioGeral() {
+            const content = document.getElementById('relatorioGeralContent');
+            content.innerHTML = gerarRelatorioGeral(atestadosCache);
+            document.getElementById('modalRelatorioGeral').classList.add('active');
+        }
+
+        // Gera HTML do relatório geral
+        function gerarRelatorioGeral(atestados) {
+            // Contar total de serviços e consolidar
+            let totalServicos = 0;
+            let todosServicos = [];
+            atestados.forEach(a => {
+                if (a.servicos_json && a.servicos_json.length > 0) {
+                    totalServicos += a.servicos_json.length;
+                    todosServicos = todosServicos.concat(a.servicos_json);
+                }
+            });
+
+            const servicosConsolidadosGeral = agruparServicosPorDescricao(todosServicos);
+
+            return `
+                <div class="relatorio-header">
+                    <h3>Consolidado de Todos os Atestados</h3>
+                    <div class="relatorio-info">
+                        <div class="relatorio-info-item">
+                            <span class="relatorio-info-label">Total de Atestados</span>
+                            <span class="relatorio-info-value">${atestados.length}</span>
+                        </div>
+                        <div class="relatorio-info-item">
+                            <span class="relatorio-info-label">Itens Originais</span>
+                            <span class="relatorio-info-value">${totalServicos}</span>
+                        </div>
+                        <div class="relatorio-info-item">
+                            <span class="relatorio-info-label">Itens Consolidados</span>
+                            <span class="relatorio-info-value">${servicosConsolidadosGeral.length}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relatorio-section">
+                    <h4 class="relatorio-section-title">Servicos Consolidados de Todos os Atestados</h4>
+                    ${servicosConsolidadosGeral.length > 0 ? `
+                        <table class="relatorio-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40px;">#</th>
+                                    <th>Descricao do Servico</th>
+                                    <th style="width: 80px;">Unidade</th>
+                                    <th style="width: 120px;">Quantidade Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${servicosConsolidadosGeral.map((s, i) => `
+                                    <tr>
+                                        <td>${i + 1}</td>
+                                        <td>${s.descricao}</td>
+                                        <td>${s.unidade}</td>
+                                        <td class="numero">${formatarNumero(s.quantidade)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p class="text-muted">Nenhum servico encontrado.</p>'}
+                </div>
+
+                <div class="relatorio-section">
+                    <h4 class="relatorio-section-title">Detalhamento por Atestado</h4>
+                    ${atestados.map((a, index) => {
+                        const servicosConsolidados = agruparServicosPorDescricao(a.servicos_json || []);
+                        return `
+                        <div class="relatorio-atestado">
+                            <div class="relatorio-atestado-header">
+                                <div>
+                                    <span class="relatorio-atestado-numero">Atestado ${index + 1}</span>
+                                    ${a.contratante ? ` - ${a.contratante}` : ''}
+                                </div>
+                                <span class="badge">${servicosConsolidados.length} servico(s) consolidado(s)</span>
+                            </div>
+                            <div class="relatorio-atestado-body">
+                                ${servicosConsolidados.length > 0 ? `
+                                    <table class="relatorio-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Descricao</th>
+                                                <th style="width: 80px;">Unidade</th>
+                                                <th style="width: 120px;">Quantidade Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${servicosConsolidados.map(s => `
+                                                <tr>
+                                                    <td>${s.descricao}</td>
+                                                    <td>${s.unidade}</td>
+                                                    <td class="numero">${formatarNumero(s.quantidade)}</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                ` : '<p class="text-muted">Nenhum servico detalhado extraido.</p>'}
+                            </div>
+                        </div>
+                    `}).join('')}
+                </div>
+            `;
+        }
+
+    </script>
+</body>
+</html>

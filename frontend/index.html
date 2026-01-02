@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <h1>LicitaFácil</h1>
+                <p>Sistema de Análise de Capacidade Técnica</p>
+            </div>
+
+            <div id="alertContainer"></div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Entrar</button>
+                <button class="auth-tab" data-tab="registro">Cadastrar</button>
+            </div>
+
+            <!-- Formulário de Login -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label class="form-label" for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginSenha">Senha</label>
+                    <input type="password" id="loginSenha" class="form-input" placeholder="Sua senha" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                    <span id="loginBtnText">Entrar</span>
+                    <span id="loginSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+
+            <!-- Formulário de Registro -->
+            <form id="registroForm" class="auth-form">
+                <div class="form-group">
+                    <label class="form-label" for="registroNome">Nome</label>
+                    <input type="text" id="registroNome" class="form-input" placeholder="Seu nome ou empresa" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="registroEmail">Email</label>
+                    <input type="email" id="registroEmail" class="form-input" placeholder="seu@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="registroSenha">Senha</label>
+                    <input type="password" id="registroSenha" class="form-input" placeholder="Mínimo 6 caracteres" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="registroConfirmarSenha">Confirmar Senha</label>
+                    <input type="password" id="registroConfirmarSenha" class="form-input" placeholder="Repita a senha" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                    <span id="registroBtnText">Cadastrar</span>
+                    <span id="registroSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+
+            <p class="text-center text-muted mt-3" style="font-size: 0.875rem;">
+                Ao continuar, você concorda com nossos termos de uso.
+            </p>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>
