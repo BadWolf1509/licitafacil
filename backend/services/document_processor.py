@@ -279,14 +279,37 @@ class DocumentProcessor:
     def _normalize_description(self, desc: str) -> str:
         """
         Normaliza descrição para comparação.
-        Remove acentos, espaços extras e converte para maiúsculas.
+        Remove acentos, espaços extras, pontuação e converte para maiúsculas.
+        Também corrige erros comuns de OCR.
         """
         import unicodedata
+        import re
+
+        if not desc:
+            return ""
+
         # Remover acentos
         nfkd = unicodedata.normalize('NFKD', desc)
         ascii_text = nfkd.encode('ASCII', 'ignore').decode('ASCII')
-        # Remover espaços extras e converter para maiúsculas
-        return ' '.join(ascii_text.upper().split())
+
+        # Converter para maiúsculas
+        text = ascii_text.upper()
+
+        # Normalizar pontuação (OCR pode confundir ; com , ou .)
+        text = text.replace(';', ',').replace(':', ',')
+
+        # Remover toda pontuação para comparação mais robusta
+        text = re.sub(r'[^\w\s]', ' ', text)
+
+        # Corrigir erros comuns de OCR em números/letras
+        # I no meio de números geralmente é 1
+        # Exemplo: 9X19XI9CM -> 9X19X19CM
+        text = re.sub(r'(\d)I(\d)', r'\g<1>1', text)
+        text = re.sub(r'(\d)l(\d)', r'\g<1>1', text)  # l minúsculo
+        text = re.sub(r'(\d)O(\d)', r'\g<1>0', text)  # O -> 0
+
+        # Remover espaços extras
+        return ' '.join(text.split())
 
     def _normalize_unit(self, unit: str) -> str:
         """
@@ -631,36 +654,72 @@ class DocumentProcessor:
 
     def _remove_duplicate_services(self, servicos: list) -> list:
         """
-        Remove serviços duplicados baseado em item + descrição + quantidade + unidade.
+        Remove serviços duplicados do OCR que não têm código de item.
 
-        Mantém apenas a primeira ocorrência de cada serviço único.
+        Mantém serviços com código de item (mesmo que tenham mesma descrição,
+        pois podem ser itens diferentes em etapas diferentes da obra).
+
+        Remove serviços SEM código que têm descrição similar (>50%) a algum serviço COM código.
         """
         if not servicos:
             return []
 
-        seen = set()
-        unique = []
-
+        # Separar serviços com e sem código de item
+        com_item = []
+        sem_item = []
         for servico in servicos:
-            # Criar chave única baseada nos campos principais
-            item = str(servico.get("item", "") or "").strip().upper()
-            desc = str(servico.get("descricao", "") or "").strip().upper()[:50]
-            qtd = servico.get("quantidade", 0)
-            un = str(servico.get("unidade", "") or "").strip().upper()
+            if servico.get("item"):
+                com_item.append(servico)
+            else:
+                sem_item.append(servico)
 
-            # Normalizar quantidade para comparação
-            try:
-                qtd_norm = round(float(qtd), 2) if qtd else 0
-            except (ValueError, TypeError):
-                qtd_norm = 0
+        # Criar lista de palavras-chave dos serviços COM item
+        com_item_keywords = []
+        for servico in com_item:
+            desc = str(servico.get("descricao", "") or "").strip()
+            if desc:
+                keywords = self._extract_keywords(desc)
+                com_item_keywords.append(keywords)
 
-            key = (item, desc, qtd_norm, un)
+        def is_similar_to_any_com_item(desc: str, threshold: float = 0.5) -> bool:
+            """Verifica se descrição é similar a algum serviço COM item."""
+            keywords = self._extract_keywords(desc)
+            if not keywords:
+                return False
+            for com_kw in com_item_keywords:
+                if not com_kw:
+                    continue
+                # Calcular Jaccard similarity
+                intersection = len(keywords & com_kw)
+                union = len(keywords | com_kw)
+                similarity = intersection / union if union > 0 else 0
+                if similarity >= threshold:
+                    return True
+            return False
 
-            if key not in seen:
-                seen.add(key)
-                unique.append(servico)
+        # Filtrar serviços SEM item - remover similares a COM item
+        sem_item_filtrado = []
+        desc_sem_item_vistos = set()
+        for servico in sem_item:
+            desc = str(servico.get("descricao", "") or "").strip()
+            desc_norm = self._normalize_description(desc)[:50] if desc else ""
 
-        return unique
+            if not desc_norm:
+                continue
+
+            # Se já vimos essa descrição em outro serviço SEM item, pular
+            if desc_norm in desc_sem_item_vistos:
+                continue
+
+            # Se é similar a algum serviço COM item (>50% palavras em comum), pular
+            if is_similar_to_any_com_item(desc):
+                continue
+
+            desc_sem_item_vistos.add(desc_norm)
+            sem_item_filtrado.append(servico)
+
+        # Retornar todos COM item + os SEM item que não são duplicatas
+        return com_item + sem_item_filtrado
 
     def _filter_servicos_by_item_length(self, servicos: list) -> tuple[list, dict]:
         if not servicos:
