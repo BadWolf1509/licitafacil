@@ -6,8 +6,7 @@ Suporta Gemini Vision para análise direta de imagens.
 
 import os
 import json
-import base64
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,19 +17,30 @@ class GeminiAnalyzer:
 
     def __init__(self):
         api_key = os.getenv("GOOGLE_API_KEY")
+        self._types = None
+        self._use_new = False
         if not api_key or api_key == "sua-chave-google-aqui":
             self._client = None
             self._model = None
         else:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=api_key)
-                self._client = genai
-                self._model = "gemini-2.0-flash"  # Modelo mais rápido e econômico
-                self._pro_model = "gemini-2.0-flash"  # Usar Flash para tudo (mais barato)
+                from google import genai
+                from google.genai import types
+                self._client = genai.Client(api_key=api_key)
+                self._types = types
+                self._use_new = True
+                self._model = "gemini-2.0-flash"  # Modelo mais rapido e economico
+                self._pro_model = "gemini-2.0-flash"
             except ImportError:
-                self._client = None
-                self._model = None
+                try:
+                    import google.generativeai as genai_old
+                    genai_old.configure(api_key=api_key)
+                    self._client = genai_old
+                    self._model = "gemini-2.0-flash"
+                    self._pro_model = "gemini-2.0-flash"
+                except ImportError:
+                    self._client = None
+                    self._model = None
 
     @property
     def is_configured(self) -> bool:
@@ -39,19 +49,33 @@ class GeminiAnalyzer:
 
     def _call_gemini(self, system_prompt: str, user_prompt: str) -> str:
         """
-        Faz uma chamada à API do Gemini para texto.
+        Faz uma chamada a API do Gemini para texto.
 
         Args:
-            system_prompt: Instrução do sistema
-            user_prompt: Prompt do usuário
+            system_prompt: Instrucao do sistema
+            user_prompt: Prompt do usuario
 
         Returns:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API Google não configurada. Defina GOOGLE_API_KEY no arquivo .env")
+            raise Exception("API Google nao configurada. Defina GOOGLE_API_KEY no arquivo .env")
 
         try:
+            if self._use_new:
+                config = self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0,
+                    max_output_tokens=16000,
+                    response_mime_type="application/json"
+                )
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=user_prompt,
+                    config=config
+                )
+                return response.text
+
             model = self._client.GenerativeModel(
                 model_name=self._model,
                 system_instruction=system_prompt
@@ -71,35 +95,58 @@ class GeminiAnalyzer:
 
     def _call_gemini_vision(self, system_prompt: str, images: List[bytes], user_text: str = "") -> str:
         """
-        Faz uma chamada à API do Gemini com imagens.
+        Faz uma chamada a API do Gemini com imagens.
 
         Args:
-            system_prompt: Instrução do sistema
+            system_prompt: Instrucao do sistema
             images: Lista de imagens em bytes (PNG/JPEG)
-            user_text: Texto adicional do usuário (opcional)
+            user_text: Texto adicional do usuario (opcional)
 
         Returns:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API Google não configurada. Defina GOOGLE_API_KEY no arquivo .env")
+            raise Exception("API Google nao configurada. Defina GOOGLE_API_KEY no arquivo .env")
 
         try:
             from PIL import Image
             import io
+
+            if self._use_new:
+                parts: List[Any] = []
+                if user_text:
+                    parts.append(user_text)
+
+                for img_bytes in images:
+                    parts.append(self._types.Part.from_bytes(
+                        data=img_bytes,
+                        mime_type="image/png"
+                    ))
+
+                config = self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0,
+                    max_output_tokens=16000,
+                    response_mime_type="application/json"
+                )
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=parts,
+                    config=config
+                )
+                return response.text
 
             model = self._client.GenerativeModel(
                 model_name=self._model,
                 system_instruction=system_prompt
             )
 
-            # Preparar conteúdo multimodal
-            content_parts = []
+            # Preparar conteudo multimodal
+            content_parts: List[Any] = []
 
             if user_text:
                 content_parts.append(user_text)
 
-            # Adicionar imagens
             for img_bytes in images:
                 img = Image.open(io.BytesIO(img_bytes))
                 content_parts.append(img)
@@ -284,7 +331,7 @@ REGRAS:
 
             data = json.loads(response.strip())
             return data.get("exigencias", [])
-        except:
+        except Exception:
             return []
 
 

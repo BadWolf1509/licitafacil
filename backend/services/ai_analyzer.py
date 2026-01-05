@@ -7,7 +7,7 @@ Suporta GPT-4o Vision para análise direta de imagens.
 import os
 import json
 import base64
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -31,6 +31,66 @@ class AIAnalyzer:
     def is_configured(self) -> bool:
         """Verifica se a API está configurada."""
         return self._client is not None
+
+    def _filter_invalid_services(self, servicos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filtra serviços inválidos da extração.
+
+        Remove itens que são classificações/categorias em vez de serviços reais.
+
+        Args:
+            servicos: Lista de serviços extraídos
+
+        Returns:
+            Lista de serviços filtrada
+        """
+        if not servicos:
+            return []
+
+        filtered = []
+        for servico in servicos:
+            descricao = servico.get("descricao", "") or ""
+
+            # Ignorar itens vazios
+            if not descricao.strip():
+                continue
+
+            # Ignorar itens que contêm ">" (caminho de classificação)
+            if ">" in descricao:
+                continue
+
+            # Ignorar itens que começam com padrão de classificação
+            desc_upper = descricao.upper().strip()
+
+            # Prefixos que SEMPRE indicam classificação (não serviços reais)
+            invalid_prefixes = [
+                "DIRETA OBRAS",
+                "1 - DIRETA",
+                "2 - DIRETA",
+                "ATIVIDADE TÉCNICA",
+                "CLASSIFICAÇÃO",
+            ]
+            is_invalid = False
+            for prefix in invalid_prefixes:
+                if desc_upper.startswith(prefix):
+                    is_invalid = True
+                    break
+
+            # "EXECUÇÃO" é inválido APENAS se seguido de ">" (classificação)
+            # mas é VÁLIDO se for serviço real como "EXECUÇÃO DE PAVIMENTO"
+            if desc_upper.startswith("EXECUÇÃO") and ">" in desc_upper:
+                is_invalid = True
+
+            if is_invalid:
+                continue
+
+            # Ignorar itens muito curtos (provavelmente não são serviços reais)
+            if len(descricao.strip()) < 5:
+                continue
+
+            filtered.append(servico)
+
+        return filtered
 
     def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
         """
@@ -77,7 +137,7 @@ class AIAnalyzer:
 
         try:
             # Construir conteúdo com imagens
-            content = []
+            content: List[Dict[str, Any]] = []
 
             if user_text:
                 content.append({"type": "text", "text": user_text})
@@ -125,77 +185,82 @@ Analise CUIDADOSAMENTE as imagens do documento e extraia as seguintes informaç�
 2. contratante: Nome da empresa/órgão contratante
 3. servicos: Lista COMPLETA de ABSOLUTAMENTE TODOS os serviços executados com quantidades
 
-ESTRUTURA DO DOCUMENTO "RELATÓRIO DE SERVIÇOS EXECUTADOS":
-O documento contém uma tabela com as seguintes COLUNAS (da esquerda para direita):
+ESTRUTURA DO DOCUMENTO - RELATÓRIO/TABELA DE SERVIÇOS:
+O documento geralmente contém uma tabela com colunas como:
 
-| Item/Código | Descrição do Serviço | Unid | Custo Unitário | Qtd Executada | Valor Acumulado | Desvio |
-|-------------|---------------------|------|----------------|---------------|-----------------|--------|
-| 001.03.01   | EXECUÇÃO DE...      | M3   | 1.843,84       | 6,85          | 12.630,30       | 100,00 |
-| 001.03.02   | ALVENARIA...        | M2   | 55,30          | 490,75        | 27.138,48       | 98,78  |
-| 001.03.13   | GRADIL...           | M2   | 576,16         | 187,59        | 108.081,85      | 100,00 |
-| 001.04.01   | MURO CONTORNO       | M2   | 719,23         | 102,95        | 74.044,73       | 60,85  |
+| Código | Descrição do Serviço | Unid | Custo Unit. | Qtd Executada | Valor Total | ... |
+|--------|---------------------|------|-------------|---------------|-------------|-----|
 
-REGRA MATEMÁTICA PARA IDENTIFICAR A COLUNA CORRETA:
-Valor Acumulado ≈ Custo Unitário × Quantidade Executada
-Exemplo: 12.630,30 ≈ 1.843,84 × 6,85
+COMO IDENTIFICAR A QUANTIDADE EXECUTADA (não confundir com custo!):
+1. Use a verificação matemática: Valor Total ≈ Custo Unitário × Quantidade
+2. Custos unitários costumam ser valores monetários (R$/unidade)
+3. Quantidades são valores físicos (m², m³, metros, unidades)
+4. Se em dúvida, a quantidade física faz mais sentido contextualmente
 
-EXEMPLOS ESPECÍFICOS DO DOCUMENTO (use como referência):
-- 001.03.01 EXECUÇÃO DE ESTRUTURAS: Qtd = 6,85 M3 (NÃO 1.843,84 que é custo)
-- 001.03.02 ALVENARIA DE VEDAÇÃO: Qtd = 490,75 M2 (NÃO 55,30 que é custo)
-- 001.03.13 GRADIL COM BARRAS: Qtd = 187,59 M2 (NÃO 576,16 que é custo)
-- 001.04.01 MURO DE CONTORNO: Qtd = 102,95 M2 (NÃO 719,23 que é custo)
+SÉRIES E CÓDIGOS DE ITENS:
+- Documentos podem ter múltiplas séries: 001.01, 001.02, 001.03, 001.04, 001.05, etc.
+- Extraia TODAS as séries que aparecerem no documento
+- Itens com mesma descrição em séries diferentes são ITENS DISTINTOS (não duplicatas!)
+  Exemplo: "001.03.06 PORTÃO" e "001.04.08 PORTÃO" são dois itens diferentes
 
-MÚLTIPLAS SÉRIES - EXTRAIR TODAS:
-- Série 001.01: 1 item (Mobilização)
-- Série 001.02: 1 item (Administração)
-- Série 001.03: ~22 itens (EEE3, EEE4, EEE5, EEE7, EEE8, EEE15) - códigos 01-19 e 22-24
-- Série 001.04: ~14 itens (EEE-14) - códigos 01-14
+REGRAS CRÍTICAS:
+- Extraia ABSOLUTAMENTE TODOS os itens da tabela de quantitativos
+- Inclua o código na descrição quando disponível (ex: "001.03.11 PORTÃO DE FERRO")
+- NÃO ignore nenhuma série ou seção do documento
+- Continue até o final da última página
 
-TOTAL ESPERADO: 38 itens
+O QUE IGNORAR (não são serviços da tabela):
+- Seção "Atividade Técnica" da CAT/ART - contém classificação, não serviços individuais
+- Textos com ">" que indicam caminho de classificação (ex: "EXECUÇÃO > OBRAS E SERVIÇOS > ...")
+- Cabeçalhos, carimbos, assinaturas
+- Qualquer linha que pareça categoria/classificação em vez de item da planilha
 
-ATENÇÃO - ITENS SIMILARES EM SÉRIES DIFERENTES NÃO SÃO DUPLICATAS:
-- 001.03.11 PORTÃO DE FERRO (68,31 M2) ← série 03
-- 001.04.08 PORTÃO DE FERRO (10,12 M2) ← série 04 - DIFERENTE!
-- 001.03.14 LIMPEZA MECANIZADA (279,00 M2) ← série 03
-- 001.04.09 LIMPEZA MECANIZADA (222,00 M2) ← série 04 - DIFERENTE!
+DESCRICAO COMPLETA DA LINHA:
+- Transcreva a descricao completa da linha (nao abreviar)
+- Se a descricao continuar na linha seguinte, una as partes
+- Nao corte o texto apos poucas palavras
 
 FORMATO DE NÚMEROS BRASILEIRO:
 - "1.843,84" = 1843.84 (ponto separa milhar, vírgula separa decimal)
 - Sempre CONVERTA para formato numérico padrão (ponto decimal) no JSON
 
-Retorne APENAS um JSON válido com TODOS os 38 itens:
+ESTRUTURA DO JSON DE SERVIÇOS:
+Cada serviço DEVE ter os campos:
+- "item": número/código do item da planilha (ex: "1.1", "2.3", "001.03.11")
+- "descricao": descrição completa do serviço (SEM o número/código)
+- "quantidade": valor numérico da quantidade executada
+- "unidade": unidade de medida (M2, M3, UN, M, KG, etc.)
+
+Retorne APENAS um JSON válido:
 {
     "descricao_servico": "Descrição resumida da obra",
-    "quantidade": 474487.96,
+    "quantidade": null,
     "unidade": "R$",
-    "contratante": "CAGEPA - Companhia de Água e Esgotos da Paraíba",
-    "data_emissao": "2022-04-11",
+    "contratante": "Nome do contratante",
+    "data_emissao": "YYYY-MM-DD",
     "servicos": [
-        {"descricao": "001.01.01 MOBILIZAÇÃO E DESMOBILIZAÇÃO DE EQUIPAMENTOS", "quantidade": 1.00, "unidade": "UN"},
-        {"descricao": "001.02.01 ADMINISTRAÇÃO LOCAL", "quantidade": 0.87, "unidade": "UN"},
-        {"descricao": "001.03.01 EXECUÇÃO DE ESTRUTURAS DE CONCRETO ARMADO", "quantidade": 6.85, "unidade": "M3"},
-        {"descricao": "001.03.13 GRADIL COM BARRAS CHATAS", "quantidade": 187.59, "unidade": "M2"},
-        {"descricao": "001.04.01 MURO DE CONTORNO", "quantidade": 102.95, "unidade": "M2"}
+        {"item": "1.1", "descricao": "PLACA DE OBRA EM CHAPA DE ACO GALVANIZADO", "quantidade": 10.00, "unidade": "M2"},
+        {"item": "2.1", "descricao": "ESCAVAÇÃO MANUAL DE VALA", "quantidade": 0.69, "unidade": "M3"}
     ]
 }"""
 
-        user_text = """Analise as imagens do RELATÓRIO DE SERVIÇOS EXECUTADOS e extraia ABSOLUTAMENTE TODOS os 38 serviços.
+        user_text = """Analise as imagens e extraia ABSOLUTAMENTE TODOS os serviços listados.
 
 INSTRUÇÕES CRÍTICAS:
-1. A tabela tem 6 colunas numéricas - use apenas "Quantidade Executada" (5ª coluna)
-2. NÃO confunda com "Custo Unitário" (4ª coluna) - os valores são diferentes!
-3. Verifique: Valor Acumulado ≈ Custo × Quantidade
-4. Extraia TODAS as séries: 001.01 (1), 001.02 (1), 001.03 (22), 001.04 (14)
-5. Inclua o código do item na descrição (ex: "001.03.11 PORTÃO DE FERRO")
-6. Série 001.03 vai de 01-19 e depois 22-24 (sem 20 e 21)
-7. Série 001.04 vai de 01-14 completa
+1. Percorra TODAS as páginas e TODAS as séries de códigos (1.1, 1.2, 2.1, etc.)
+2. Para cada linha da tabela, extraia SEPARADAMENTE:
+   - "item": o número/código do item (ex: "1.1", "2.3", "3.1")
+   - "descricao": a descrição do serviço (sem o número)
+   - "quantidade": quantidade executada
+   - "unidade": unidade de medida
+3. NÃO confunda "Quantidade Executada" com "Custo Unitário" - use verificação matemática
+4. Verifique: Valor Total ≈ Custo Unitário × Quantidade
+5. Itens em séries diferentes são ITENS DISTINTOS
+6. NÃO omita nenhum item - extraia a lista COMPLETA
+7. Escreva a descrição completa da linha; não abrevie nem corte
+8. Se a descrição estiver quebrada em duas linhas, una as partes
 
-EXEMPLOS DE QUANTIDADES CORRETAS:
-- GRADIL: 187,59 M2 (não 576,16)
-- MURO DE CONTORNO: 102,95 M2 (não 719,23)
-- ALVENARIA: 490,75 M2 (não 55,30)
-- CONCERTINA série 03: 777,00 M
-- CONCERTINA série 04: 144,15 M"""
+CONTA FINAL: Ao terminar, verifique se extraiu todos os itens de todas as séries."""
 
         try:
             response = self._call_openai_vision(system_prompt, images, user_text)
@@ -208,7 +273,13 @@ EXEMPLOS DE QUANTIDADES CORRETAS:
             if response.endswith("```"):
                 response = response[:-3]
 
-            return json.loads(response.strip())
+            result = json.loads(response.strip())
+
+            # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
+            if "servicos" in result and result["servicos"]:
+                result["servicos"] = self._filter_invalid_services(result["servicos"])
+
+            return result
         except json.JSONDecodeError:
             return {
                 "descricao_servico": None,
@@ -242,11 +313,22 @@ Campos opcionais (extrair se disponível, senão usar null):
 - data_emissao: Data de emissão (formato YYYY-MM-DD, opcional)
 
 PRIORIDADE DE EXTRAÇÃO DOS SERVIÇOS:
-1. PROCURE por "Relatório de Serviços Executados" - é uma tabela detalhada
-2. IGNORE COMPLETAMENTE a seção "Atividade Técnica" da ART (geralmente na primeira ou última página)
-   - Essa seção mostra apenas categorias resumidas (ex: "ALVENARIA 581.41 m²")
-   - Os valores reais estão no Relatório de Serviços Executados
-3. Se NÃO houver relatório detalhado, então use os serviços do resumo
+1. PROCURE por "Planilha de Quantitativos Executados" ou "Relatório de Serviços Executados" - tabela com itens numerados
+2. Os itens da tabela geralmente são numerados (ex: 1.1, 1.2, 1.3 ou ITEM 1, ITEM 2, etc.)
+3. FOQUE APENAS nos itens da tabela de quantitativos, não em metadados do documento
+
+O QUE IGNORAR COMPLETAMENTE (não são serviços):
+- Seção "Atividade Técnica" da CAT/ART - contém classificação, não serviços individuais
+- Textos com ">" que indicam caminho de classificação (ex: "EXECUÇÃO > OBRAS E SERVIÇOS > ...")
+- Cabeçalhos do documento, carimbos, assinaturas
+- Texto genérico descritivo que não seja item da tabela de quantitativos
+- Qualquer linha que pareça ser uma categoria/classificação em vez de item de serviço
+
+IDENTIFICAÇÃO DE ITEM VÁLIDO:
+- Itens válidos são LINHAS NUMERADAS da planilha de quantitativos
+- Cada item tem: número/código, descrição do SERVIÇO ESPECÍFICO, quantidade, unidade
+- Exemplos VÁLIDOS: "Mistura Betuminosa (Pmf)", "Enchimento e Compactação", "Retirada de Pavimentação"
+- Exemplos INVÁLIDOS: "EXECUÇÃO > OBRAS E SERVIÇOS > ...", "1 - DIRETA OBRAS E SERVIÇOS"
 
 TRATAMENTO DE OCR CORROMPIDO - MUITO IMPORTANTE:
 O texto vem de OCR e pode ter ERROS GRAVES nos códigos dos itens. NÃO confie nos códigos!
@@ -308,6 +390,14 @@ ITENS FREQUENTEMENTE OMITIDOS (verificar se existem no texto e incluir):
 - Muro de contorno (série 04 - 700+ M2)
 
 Retorne APENAS um JSON válido. Se alguma informação não estiver disponível, use null.
+
+ESTRUTURA DO JSON DE SERVIÇOS:
+Cada serviço DEVE ter os campos:
+- "item": número/código do item da planilha (ex: "1.1", "2.3", "3.1.1")
+- "descricao": descrição completa do serviço (sem o número)
+- "quantidade": valor numérico da quantidade executada
+- "unidade": unidade de medida (M2, M3, UN, M, KG, etc.)
+
 Exemplo de resposta:
 {
     "descricao_servico": "Descrição resumida da obra/serviço principal",
@@ -316,13 +406,13 @@ Exemplo de resposta:
     "contratante": "Nome do órgão contratante",
     "data_emissao": "2022-04-11",
     "servicos": [
-        {"descricao": "Mobilização e desmobilização", "quantidade": 1.00, "unidade": "UN"},
-        {"descricao": "Execução de alvenaria", "quantidade": 55.30, "unidade": "M3"},
-        {"descricao": "Gradil metálico", "quantidade": 576.16, "unidade": "M2"}
+        {"item": "1.1", "descricao": "Mobilização e desmobilização", "quantidade": 1.00, "unidade": "UN"},
+        {"item": "2.1", "descricao": "Execução de alvenaria", "quantidade": 55.30, "unidade": "M3"},
+        {"item": "3.1", "descricao": "Gradil metálico", "quantidade": 576.16, "unidade": "M2"}
     ]
 }"""
 
-        user_prompt = f"Analise o seguinte atestado de capacidade técnica. PRIORIZE extrair os serviços do 'Relatório de Serviços Executados' (tabela detalhada) em vez do resumo da CAT/ART:\n\n{texto}"
+        user_prompt = f"Analise o seguinte atestado de capacidade técnica. Extraia APENAS os itens da 'Planilha de Quantitativos Executados' ou 'Relatório de Serviços Executados'. NÃO extraia classificações ou caminhos com '>':\n\n{texto}"
 
         try:
             response = self._call_openai(system_prompt, user_prompt)
@@ -335,7 +425,13 @@ Exemplo de resposta:
             if response.endswith("```"):
                 response = response[:-3]
 
-            return json.loads(response.strip())
+            result = json.loads(response.strip())
+
+            # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
+            if "servicos" in result and result["servicos"]:
+                result["servicos"] = self._filter_invalid_services(result["servicos"])
+
+            return result
         except json.JSONDecodeError:
             return {
                 "descricao_servico": texto[:500] if texto else None,

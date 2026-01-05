@@ -22,6 +22,7 @@ class JobStatus(str, Enum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -35,10 +36,15 @@ class ProcessingJob:
     created_at: str = ""
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    canceled_at: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     attempts: int = 0
     max_attempts: int = 3
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_stage: Optional[str] = None
+    progress_message: Optional[str] = None
 
     def __post_init__(self):
         if not self.created_at:
@@ -68,6 +74,8 @@ class ProcessingQueue:
         self._is_running = False
         self._worker_task = None
         self._callbacks: Dict[str, Callable] = {}
+        self._callbacks_by_type: Dict[str, Callable] = {}
+        self._cancel_requested: set = set()
 
         # Configurações
         self._max_concurrent = int(os.getenv("QUEUE_MAX_CONCURRENT", "3"))
@@ -90,14 +98,35 @@ class ProcessingQueue:
                 created_at TEXT NOT NULL,
                 started_at TEXT,
                 completed_at TEXT,
+                canceled_at TEXT,
                 result TEXT,
                 error TEXT,
                 attempts INTEGER DEFAULT 0,
-                max_attempts INTEGER DEFAULT 3
+                max_attempts INTEGER DEFAULT 3,
+                progress_current INTEGER DEFAULT 0,
+                progress_total INTEGER DEFAULT 0,
+                progress_stage TEXT,
+                progress_message TEXT
             )
         """)
+        self._ensure_columns(cursor)
         conn.commit()
         conn.close()
+
+    def _ensure_columns(self, cursor):
+        """Garante que colunas novas existem (compatibilidade com DB antigo)."""
+        cursor.execute("PRAGMA table_info(processing_jobs)")
+        existing = {row[1] for row in cursor.fetchall()}
+        columns = {
+            "canceled_at": "TEXT",
+            "progress_current": "INTEGER DEFAULT 0",
+            "progress_total": "INTEGER DEFAULT 0",
+            "progress_stage": "TEXT",
+            "progress_message": "TEXT"
+        }
+        for name, col_type in columns.items():
+            if name not in existing:
+                cursor.execute(f"ALTER TABLE processing_jobs ADD COLUMN {name} {col_type}")
 
     def _save_job(self, job: ProcessingJob):
         """Salva job no banco de dados."""
@@ -106,8 +135,9 @@ class ProcessingQueue:
         cursor.execute("""
             INSERT OR REPLACE INTO processing_jobs
             (id, user_id, file_path, job_type, status, created_at, started_at,
-             completed_at, result, error, attempts, max_attempts)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             completed_at, canceled_at, result, error, attempts, max_attempts,
+             progress_current, progress_total, progress_stage, progress_message)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             job.id,
             job.user_id,
@@ -117,10 +147,15 @@ class ProcessingQueue:
             job.created_at,
             job.started_at,
             job.completed_at,
+            job.canceled_at,
             json.dumps(job.result) if job.result else None,
             job.error,
             job.attempts,
-            job.max_attempts
+            job.max_attempts,
+            job.progress_current,
+            job.progress_total,
+            job.progress_stage,
+            job.progress_message
         ))
         conn.commit()
         conn.close()
@@ -131,7 +166,9 @@ class ProcessingQueue:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, result, error, attempts, max_attempts
+                   started_at, completed_at, canceled_at, result, error,
+                   attempts, max_attempts, progress_current, progress_total,
+                   progress_stage, progress_message
             FROM processing_jobs
             WHERE status IN ('pending', 'processing')
             ORDER BY created_at ASC
@@ -150,10 +187,15 @@ class ProcessingQueue:
                 created_at=row[5],
                 started_at=row[6],
                 completed_at=row[7],
-                result=json.loads(row[8]) if row[8] else None,
-                error=row[9],
-                attempts=row[10],
-                max_attempts=row[11]
+                canceled_at=row[8],
+                result=json.loads(row[9]) if row[9] else None,
+                error=row[10],
+                attempts=row[11],
+                max_attempts=row[12],
+                progress_current=row[13] or 0,
+                progress_total=row[14] or 0,
+                progress_stage=row[15],
+                progress_message=row[16]
             )
             jobs.append(job)
         return jobs
@@ -164,7 +206,9 @@ class ProcessingQueue:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, result, error, attempts, max_attempts
+                   started_at, completed_at, canceled_at, result, error,
+                   attempts, max_attempts, progress_current, progress_total,
+                   progress_stage, progress_message
             FROM processing_jobs
             WHERE id = ?
         """, (job_id,))
@@ -183,10 +227,15 @@ class ProcessingQueue:
             created_at=row[5],
             started_at=row[6],
             completed_at=row[7],
-            result=json.loads(row[8]) if row[8] else None,
-            error=row[9],
-            attempts=row[10],
-            max_attempts=row[11]
+            canceled_at=row[8],
+            result=json.loads(row[9]) if row[9] else None,
+            error=row[10],
+            attempts=row[11],
+            max_attempts=row[12],
+            progress_current=row[13] or 0,
+            progress_total=row[14] or 0,
+            progress_stage=row[15],
+            progress_message=row[16]
         )
 
     def get_user_jobs(self, user_id: int, limit: int = 20) -> List[ProcessingJob]:
@@ -195,7 +244,9 @@ class ProcessingQueue:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, result, error, attempts, max_attempts
+                   started_at, completed_at, canceled_at, result, error,
+                   attempts, max_attempts, progress_current, progress_total,
+                   progress_stage, progress_message
             FROM processing_jobs
             WHERE user_id = ?
             ORDER BY created_at DESC
@@ -214,13 +265,22 @@ class ProcessingQueue:
                 created_at=row[5],
                 started_at=row[6],
                 completed_at=row[7],
-                result=json.loads(row[8]) if row[8] else None,
-                error=row[9],
-                attempts=row[10],
-                max_attempts=row[11]
+                canceled_at=row[8],
+                result=json.loads(row[9]) if row[9] else None,
+                error=row[10],
+                attempts=row[11],
+                max_attempts=row[12],
+                progress_current=row[13] or 0,
+                progress_total=row[14] or 0,
+                progress_stage=row[15],
+                progress_message=row[16]
             )
             for row in rows
         ]
+
+    def register_callback(self, job_type: str, callback: Callable):
+        """Registra callback padrÆo por tipo de job."""
+        self._callbacks_by_type[job_type] = callback
 
     def add_job(
         self,
@@ -247,8 +307,13 @@ class ProcessingQueue:
             id=job_id,
             user_id=user_id,
             file_path=file_path,
-            job_type=job_type
+            job_type=job_type,
+            progress_stage="queued",
+            progress_message="Aguardando na fila"
         )
+
+        if callback is None:
+            callback = self._callbacks_by_type.get(job_type)
 
         with self._lock:
             self._queue.append(job)
@@ -257,6 +322,87 @@ class ProcessingQueue:
 
         self._save_job(job)
         return job
+
+    def update_job_progress(
+        self,
+        job_id: str,
+        current: int,
+        total: int,
+        stage: Optional[str] = None,
+        message: Optional[str] = None
+    ):
+        """Atualiza progresso do job em mem¢ria e no banco."""
+        if self.is_cancel_requested(job_id):
+            return
+
+        with self._lock:
+            job = self._processing.get(job_id)
+            if not job:
+                for queued in self._queue:
+                    if queued.id == job_id:
+                        job = queued
+                        break
+            if job:
+                job.progress_current = current
+                job.progress_total = total
+                job.progress_stage = stage
+                job.progress_message = message
+
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE processing_jobs
+            SET progress_current = ?, progress_total = ?, progress_stage = ?, progress_message = ?
+            WHERE id = ?
+        """, (current, total, stage, message, job_id))
+        conn.commit()
+        conn.close()
+
+    def is_cancel_requested(self, job_id: str) -> bool:
+        """Verifica se o cancelamento foi solicitado."""
+        return job_id in self._cancel_requested
+
+    def cancel_job(self, job_id: str) -> Optional[ProcessingJob]:
+        """Solicita cancelamento de um job."""
+        job = self.get_job(job_id)
+        if not job:
+            return None
+
+        if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
+            return job
+
+        now = datetime.now().isoformat()
+        job.status = JobStatus.CANCELLED
+        job.completed_at = now
+        job.canceled_at = now
+        job.error = "Cancelado pelo usuario"
+
+        with self._lock:
+            self._queue = deque([j for j in self._queue if j.id != job_id])
+            if job_id in self._processing:
+                self._cancel_requested.add(job_id)
+                self._processing[job_id].status = JobStatus.CANCELLED
+            else:
+                self._cancel_requested.discard(job_id)
+
+        self._save_job(job)
+        return job
+
+    def delete_job(self, job_id: str) -> bool:
+        """Remove um job do banco e da fila/memoria."""
+        with self._lock:
+            self._queue = deque([j for j in self._queue if j.id != job_id])
+            self._processing.pop(job_id, None)
+            self._cancel_requested.discard(job_id)
+            self._callbacks.pop(job_id, None)
+
+        conn = sqlite3.connect(self._db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM processing_jobs WHERE id = ?", (job_id,))
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        conn.close()
+        return deleted
 
     async def _process_job(self, job: ProcessingJob) -> ProcessingJob:
         """
@@ -268,29 +414,61 @@ class ProcessingQueue:
         Returns:
             Job atualizado com resultado ou erro
         """
-        from .document_processor import DocumentProcessor
+        from .document_processor import DocumentProcessor, ProcessingCancelled
         from .ai_provider import ai_provider
+
+        if self.is_cancel_requested(job.id):
+            job.status = JobStatus.CANCELLED
+            job.completed_at = datetime.now().isoformat()
+            job.canceled_at = job.completed_at
+            job.error = "Cancelado pelo usuario"
+            self._save_job(job)
+            return job
 
         job.status = JobStatus.PROCESSING
         job.started_at = datetime.now().isoformat()
         job.attempts += 1
+        job.progress_current = 0
+        job.progress_total = 0
+        job.progress_stage = "processing"
+        job.progress_message = "Iniciando processamento"
         self._save_job(job)
 
         try:
             processor = DocumentProcessor()
 
+            def progress_callback(current, total, stage=None, message=None):
+                self.update_job_progress(job.id, current, total, stage, message)
+
+            def cancel_check():
+                return self.is_cancel_requested(job.id)
+
             if job.job_type == "atestado":
-                # Processar atestado com Vision se disponível
+                # Processar atestado com Vision se disponivel
                 use_vision = ai_provider.is_configured
-                result = processor.process_atestado(job.file_path, use_vision=use_vision)
+                result = processor.process_atestado(
+                    job.file_path,
+                    use_vision=use_vision,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check
+                )
             else:
                 # Processar edital
-                result = processor.process_edital(job.file_path)
+                result = processor.process_edital(
+                    job.file_path,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check
+                )
 
             job.status = JobStatus.COMPLETED
             job.completed_at = datetime.now().isoformat()
             job.result = result
 
+        except ProcessingCancelled:
+            job.status = JobStatus.CANCELLED
+            job.completed_at = datetime.now().isoformat()
+            job.canceled_at = job.completed_at
+            job.error = "Cancelado pelo usuario"
         except Exception as e:
             error_msg = f"{str(e)}\n{traceback.format_exc()}"
 
@@ -302,7 +480,7 @@ class ProcessingQueue:
                 # Falha definitiva
                 job.status = JobStatus.FAILED
                 job.completed_at = datetime.now().isoformat()
-                job.error = f"Falhou após {job.attempts} tentativas: {error_msg}"
+                job.error = f"Falhou apos {job.attempts} tentativas: {error_msg}"
 
         self._save_job(job)
         return job
@@ -329,13 +507,16 @@ class ProcessingQueue:
                             if job.id in self._processing:
                                 del self._processing[job.id]
 
+                            if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
+                                self._cancel_requested.discard(job.id)
+
                             # Re-adicionar à fila se precisa retry
                             if job.status == JobStatus.PENDING:
                                 self._queue.append(job)
 
-                            # Executar callback se houver
+                            # Executar callback apenas quando concluido
                             callback = self._callbacks.pop(job.id, None)
-                            if callback:
+                            if callback and job.status == JobStatus.COMPLETED:
                                 try:
                                     callback(job)
                                 except Exception as e:

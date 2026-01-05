@@ -251,7 +251,7 @@ class AIProviderManager:
             exig_un = exig.get("unidade", "").upper()
 
             matches = []
-            total_qtd = 0
+            total_qtd = 0.0
 
             for atestado in atestados:
                 servicos = atestado.get("servicos_json", [])

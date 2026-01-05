@@ -2,13 +2,12 @@ import os
 import shutil
 import uuid
 from typing import List
-from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Usuario, Atestado, Analise
-from schemas import AnaliseCreate, AnaliseResponse, Mensagem, ResultadoExigencia, ExigenciaEdital, AtestadoMatch
+from schemas import AnaliseResponse, Mensagem
 from auth import get_current_approved_user
 from services import document_processor
 
@@ -68,6 +67,11 @@ async def criar_analise(
     """
     # Verificar extensão
     allowed_extensions = [".pdf"]
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Arquivo sem nome. Envie novamente."
+        )
     file_ext = os.path.splitext(file.filename)[1].lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(

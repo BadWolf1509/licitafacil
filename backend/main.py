@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 
 from database import engine, Base
-from routers import auth, admin, atestados, analise, ai_status
+from routers import auth, admin, atestados, analise, ai_status, pipeline_status
 from services.processing_queue import processing_queue
 
 # Carregar variáveis de ambiente
@@ -62,6 +62,7 @@ app.include_router(admin.router)
 app.include_router(atestados.router)
 app.include_router(analise.router)
 app.include_router(ai_status.router)
+app.include_router(pipeline_status.router)
 
 
 # Servir arquivos estáticos do frontend (CSS, JS)

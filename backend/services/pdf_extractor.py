@@ -5,9 +5,7 @@ Utiliza pdfplumber para PDFs digitais e PyMuPDF para renderização.
 
 import pdfplumber
 import fitz  # PyMuPDF
-from typing import List, Dict, Any, Optional
-from pathlib import Path
-import io
+from typing import List, Dict, Any
 
 
 class PDFExtractor:
@@ -85,7 +83,7 @@ class PDFExtractor:
         Returns:
             Dicionário com texto, tabelas e metadados
         """
-        result = {
+        result: Dict[str, Any] = {
             "texto": "",
             "tabelas": [],
             "paginas": 0,
@@ -95,12 +93,13 @@ class PDFExtractor:
 
         try:
             with pdfplumber.open(file_path) as pdf:
-                result["paginas"] = len(pdf.pages)
+                pages = list(pdf.pages)
+                result["paginas"] = len(pages)
 
                 text_parts = []
                 all_tables = []
 
-                for page in pdf.pages:
+                for page in pages:
                     # Extrair texto
                     page_text = page.extract_text()
                     if page_text:
@@ -144,7 +143,7 @@ class PDFExtractor:
         try:
             text = self.extract_text(file_path)
             return len(text.strip()) < self.min_text_length
-        except:
+        except Exception:
             return True
 
     def pdf_to_images(self, file_path: str, dpi: int = 200) -> List[bytes]:
@@ -187,8 +186,9 @@ class PDFExtractor:
         """
         try:
             with pdfplumber.open(file_path) as pdf:
-                if page_num < len(pdf.pages):
-                    return pdf.pages[page_num].extract_text() or ""
+                pages = list(pdf.pages)
+                if page_num < len(pages):
+                    return pages[page_num].extract_text() or ""
                 return ""
         except Exception as e:
             raise Exception(f"Erro ao extrair página {page_num}: {str(e)}")

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Any
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 
@@ -59,9 +59,11 @@ class TokenData(BaseModel):
 
 class ServicoAtestado(BaseModel):
     """Representa um serviço individual dentro de um atestado."""
-    descricao: str
-    quantidade: float
-    unidade: str
+    item: Optional[str] = None
+    descricao: Optional[str] = None
+    quantidade: Optional[float] = None
+    unidade: Optional[str] = None
+
 
 
 class AtestadoBase(BaseModel):
@@ -82,6 +84,11 @@ class AtestadoUpdate(BaseModel):
     unidade: Optional[str] = None
     contratante: Optional[str] = None
     data_emissao: Optional[datetime] = None
+
+
+class AtestadoServicosUpdate(BaseModel):
+    """Schema para atualizar apenas os serviços de um atestado."""
+    servicos_json: List[ServicoAtestado]
 
 
 class AtestadoResponse(AtestadoBase):
@@ -146,3 +153,8 @@ class AnaliseResponse(BaseModel):
 class Mensagem(BaseModel):
     mensagem: str
     sucesso: bool = True
+
+class JobResponse(BaseModel):
+    mensagem: str
+    sucesso: bool = True
+    job_id: str

@@ -18,8 +18,8 @@ def listar_usuarios_pendentes(
 ):
     """Lista todos os usuários pendentes de aprovação."""
     usuarios = db.query(Usuario).filter(
-        Usuario.is_approved == False,
-        Usuario.is_active == True
+        Usuario.is_approved.is_(False),
+        Usuario.is_active.is_(True)
     ).order_by(Usuario.created_at.desc()).all()
     return usuarios
 
@@ -130,12 +130,12 @@ def obter_estatisticas(
 ):
     """Retorna estatísticas gerais do sistema."""
     total_usuarios = db.query(Usuario).count()
-    usuarios_aprovados = db.query(Usuario).filter(Usuario.is_approved == True).count()
+    usuarios_aprovados = db.query(Usuario).filter(Usuario.is_approved.is_(True)).count()
     usuarios_pendentes = db.query(Usuario).filter(
-        Usuario.is_approved == False,
-        Usuario.is_active == True
+        Usuario.is_approved.is_(False),
+        Usuario.is_active.is_(True)
     ).count()
-    usuarios_inativos = db.query(Usuario).filter(Usuario.is_active == False).count()
+    usuarios_inativos = db.query(Usuario).filter(Usuario.is_active.is_(False)).count()
 
     return {
         "total_usuarios": total_usuarios,

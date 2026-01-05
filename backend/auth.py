@@ -76,14 +76,16 @@ async def get_current_user(
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        user_id: int = payload.get("user_id")
+        email = payload.get("sub")
+        user_id = payload.get("user_id")
         if email is None:
             raise credentials_exception
         token_data = TokenData(email=email, user_id=user_id)
     except JWTError:
         raise credentials_exception
 
+    if token_data.email is None:
+        raise credentials_exception
     user = get_user_by_email(db, email=token_data.email)
     if user is None:
         raise credentials_exception

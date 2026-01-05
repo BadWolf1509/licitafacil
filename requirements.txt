@@ -4,7 +4,7 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 
 # Banco de dados
-sqlalchemy==2.0.25
+sqlalchemy==2.0.45
 aiosqlite==0.19.0
 
 # Autenticação
@@ -13,19 +13,27 @@ passlib[bcrypt]==1.7.4
 
 # Extração de PDF
 pdfplumber==0.10.3
-PyMuPDF==1.23.8
+PyMuPDF==1.26.7
 
 # OCR
 easyocr==1.7.1
 
 # OpenAI
-openai==1.12.0
+openai==1.109.1
 
 # Google Gemini
-google-generativeai==0.8.3
-Pillow==10.2.0
+google-genai==0.5.0
+google-cloud-documentai==2.30.0
+Pillow==11.3.0
 
 # Utilitários
 python-dotenv==1.0.0
-pydantic[email]==2.5.3
-pydantic-settings==2.1.0
+pydantic[email]==2.12.5
+pydantic-settings==2.12.0
+
+# Azure Document Intelligence (OCR Cloud)
+azure-ai-documentintelligence==1.0.0
+azure-core==1.30.0
+
+# Processamento de imagem (pré-processamento para OCR)
+# scipy==1.11.4  # Opcional - descomente se necessário (requer build tools)

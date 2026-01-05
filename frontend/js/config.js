@@ -2,7 +2,7 @@
 
 const CONFIG = {
     // URL base da API (alterar em produção)
-    API_URL: 'http://localhost:8000',
+    API_URL: window.location.origin,
 
     // Chaves do localStorage
     TOKEN_KEY: 'licitafacil_token',
@@ -71,6 +71,13 @@ const api = {
 
     delete(endpoint) {
         return this.request(endpoint, { method: 'DELETE' });
+    },
+
+    patch(endpoint, body) {
+        return this.request(endpoint, {
+            method: 'PATCH',
+            body: JSON.stringify(body)
+        });
     },
 
     /**
