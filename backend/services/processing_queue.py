@@ -15,6 +15,9 @@ from collections import deque
 import threading
 import traceback
 
+from logging_config import get_logger
+logger = get_logger('services.processing_queue')
+
 
 class JobStatus(str, Enum):
     """Status de um job de processamento."""
@@ -520,7 +523,7 @@ class ProcessingQueue:
                                 try:
                                     callback(job)
                                 except Exception as e:
-                                    print(f"Erro no callback do job {job.id}: {e}")
+                                    logger.error(f"Erro no callback do job {job.id}: {e}")
 
             await asyncio.sleep(self._poll_interval)
 
@@ -540,7 +543,7 @@ class ProcessingQueue:
                 self._queue.append(job)
 
         self._worker_task = asyncio.create_task(self._worker())
-        print(f"ProcessingQueue iniciada com {len(pending)} jobs pendentes")
+        logger.info(f"ProcessingQueue iniciada com {len(pending)} jobs pendentes")
 
     async def stop(self):
         """Para o worker de processamento."""
@@ -551,7 +554,7 @@ class ProcessingQueue:
                 await self._worker_task
             except asyncio.CancelledError:
                 pass
-        print("ProcessingQueue parada")
+        logger.info("ProcessingQueue parada")
 
     def get_status(self) -> Dict[str, Any]:
         """Retorna status da fila."""

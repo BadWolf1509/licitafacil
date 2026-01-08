@@ -8,6 +8,8 @@ import os
 import json
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+from utils.json_helpers import clean_json_response
+from exceptions import AINotConfiguredError, GeminiError
 
 load_dotenv()
 
@@ -59,7 +61,7 @@ class GeminiAnalyzer:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API Google nao configurada. Defina GOOGLE_API_KEY no arquivo .env")
+            raise AINotConfiguredError("Google Gemini")
 
         try:
             if self._use_new:
@@ -91,7 +93,7 @@ class GeminiAnalyzer:
             )
             return response.text
         except Exception as e:
-            raise Exception(f"Erro na API Google Gemini: {str(e)}")
+            raise GeminiError(str(e))
 
     def _call_gemini_vision(self, system_prompt: str, images: List[bytes], user_text: str = "") -> str:
         """
@@ -106,7 +108,7 @@ class GeminiAnalyzer:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API Google nao configurada. Defina GOOGLE_API_KEY no arquivo .env")
+            raise AINotConfiguredError("Google Gemini")
 
         try:
             from PIL import Image
@@ -161,7 +163,7 @@ class GeminiAnalyzer:
             )
             return response.text
         except Exception as e:
-            raise Exception(f"Erro na API Google Gemini Vision: {str(e)}")
+            raise GeminiError(str(e))
 
     def extract_atestado_from_images(self, images: List[bytes]) -> Dict[str, Any]:
         """
@@ -215,15 +217,8 @@ INSTRUÇÕES:
         try:
             response = self._call_gemini_vision(system_prompt, images, user_text)
             # Limpar resposta e extrair JSON
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            return json.loads(response.strip())
+            response = clean_json_response(response)
+            return json.loads(response)
         except json.JSONDecodeError:
             return {
                 "descricao_servico": None,
@@ -271,15 +266,8 @@ REGRAS:
 
         try:
             response = self._call_gemini(system_prompt, f"Analise este atestado:\n\n{texto}")
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            return json.loads(response.strip())
+            response = clean_json_response(response)
+            return json.loads(response)
         except json.JSONDecodeError:
             return {
                 "descricao_servico": None,

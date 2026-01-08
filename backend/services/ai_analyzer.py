@@ -10,6 +10,9 @@ import base64
 from typing import List, Dict, Any
 from openai import OpenAI
 from dotenv import load_dotenv
+from utils.json_helpers import clean_json_response
+from exceptions import AINotConfiguredError, OpenAIError
+from services.extraction import filter_classification_paths
 
 load_dotenv()
 
@@ -32,66 +35,6 @@ class AIAnalyzer:
         """Verifica se a API está configurada."""
         return self._client is not None
 
-    def _filter_invalid_services(self, servicos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Filtra serviços inválidos da extração.
-
-        Remove itens que são classificações/categorias em vez de serviços reais.
-
-        Args:
-            servicos: Lista de serviços extraídos
-
-        Returns:
-            Lista de serviços filtrada
-        """
-        if not servicos:
-            return []
-
-        filtered = []
-        for servico in servicos:
-            descricao = servico.get("descricao", "") or ""
-
-            # Ignorar itens vazios
-            if not descricao.strip():
-                continue
-
-            # Ignorar itens que contêm ">" (caminho de classificação)
-            if ">" in descricao:
-                continue
-
-            # Ignorar itens que começam com padrão de classificação
-            desc_upper = descricao.upper().strip()
-
-            # Prefixos que SEMPRE indicam classificação (não serviços reais)
-            invalid_prefixes = [
-                "DIRETA OBRAS",
-                "1 - DIRETA",
-                "2 - DIRETA",
-                "ATIVIDADE TÉCNICA",
-                "CLASSIFICAÇÃO",
-            ]
-            is_invalid = False
-            for prefix in invalid_prefixes:
-                if desc_upper.startswith(prefix):
-                    is_invalid = True
-                    break
-
-            # "EXECUÇÃO" é inválido APENAS se seguido de ">" (classificação)
-            # mas é VÁLIDO se for serviço real como "EXECUÇÃO DE PAVIMENTO"
-            if desc_upper.startswith("EXECUÇÃO") and ">" in desc_upper:
-                is_invalid = True
-
-            if is_invalid:
-                continue
-
-            # Ignorar itens muito curtos (provavelmente não são serviços reais)
-            if len(descricao.strip()) < 5:
-                continue
-
-            filtered.append(servico)
-
-        return filtered
-
     def _call_openai(self, system_prompt: str, user_prompt: str) -> str:
         """
         Faz uma chamada à API da OpenAI.
@@ -104,7 +47,7 @@ class AIAnalyzer:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API OpenAI não configurada. Defina OPENAI_API_KEY no arquivo .env")
+            raise AINotConfiguredError("OpenAI")
 
         try:
             response = self._client.chat.completions.create(
@@ -118,7 +61,7 @@ class AIAnalyzer:
             )
             return response.choices[0].message.content
         except Exception as e:
-            raise Exception(f"Erro na API OpenAI: {str(e)}")
+            raise OpenAIError(str(e))
 
     def _call_openai_vision(self, system_prompt: str, images: List[bytes], user_text: str = "") -> str:
         """
@@ -133,7 +76,7 @@ class AIAnalyzer:
             Resposta do modelo
         """
         if not self.is_configured:
-            raise Exception("API OpenAI não configurada. Defina OPENAI_API_KEY no arquivo .env")
+            raise AINotConfiguredError("OpenAI")
 
         try:
             # Construir conteúdo com imagens
@@ -163,7 +106,7 @@ class AIAnalyzer:
             )
             return response.choices[0].message.content
         except Exception as e:
-            raise Exception(f"Erro na API OpenAI Vision: {str(e)}")
+            raise OpenAIError(str(e))
 
     def extract_atestado_from_images(self, images: List[bytes]) -> Dict[str, Any]:
         """
@@ -265,19 +208,12 @@ CONTA FINAL: Ao terminar, verifique se extraiu todos os itens de todas as série
         try:
             response = self._call_openai_vision(system_prompt, images, user_text)
             # Limpar resposta e extrair JSON
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            result = json.loads(response.strip())
+            response = clean_json_response(response)
+            result = json.loads(response)
 
             # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
             if "servicos" in result and result["servicos"]:
-                result["servicos"] = self._filter_invalid_services(result["servicos"])
+                result["servicos"] = filter_classification_paths(result["servicos"])
 
             return result
         except json.JSONDecodeError:
@@ -417,19 +353,12 @@ Exemplo de resposta:
         try:
             response = self._call_openai(system_prompt, user_prompt)
             # Limpar resposta e extrair JSON
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            result = json.loads(response.strip())
+            response = clean_json_response(response)
+            result = json.loads(response)
 
             # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
             if "servicos" in result and result["servicos"]:
-                result["servicos"] = self._filter_invalid_services(result["servicos"])
+                result["servicos"] = filter_classification_paths(result["servicos"])
 
             return result
         except json.JSONDecodeError:
@@ -482,15 +411,8 @@ Exemplo de resposta:
         try:
             response = self._call_openai(system_prompt, user_prompt)
             # Limpar resposta e extrair JSON
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            return json.loads(response.strip())
+            response = clean_json_response(response)
+            return json.loads(response)
         except json.JSONDecodeError:
             return []
 
@@ -541,15 +463,8 @@ Faça o matching e retorne o resultado em JSON."""
         try:
             response = self._call_openai(system_prompt, user_prompt)
             # Limpar resposta e extrair JSON
-            response = response.strip()
-            if response.startswith("```json"):
-                response = response[7:]
-            if response.startswith("```"):
-                response = response[3:]
-            if response.endswith("```"):
-                response = response[:-3]
-
-            return json.loads(response.strip())
+            response = clean_json_response(response)
+            return json.loads(response)
         except json.JSONDecodeError:
             # Retornar resultado básico sem IA
             return self._basic_matching(requirements, atestados)

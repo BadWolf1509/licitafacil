@@ -2,15 +2,25 @@ import os
 import shutil
 import uuid
 from datetime import datetime, date
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy.orm import Session
 
-from database import get_db, SessionLocal
+from database import get_db, get_db_session
 from models import Usuario, Atestado
-from schemas import AtestadoCreate, AtestadoUpdate, AtestadoServicosUpdate, AtestadoResponse, Mensagem, JobResponse
+from schemas import (
+    AtestadoCreate, AtestadoUpdate, AtestadoServicosUpdate, AtestadoResponse,
+    Mensagem, JobResponse, PaginatedAtestadoResponse
+)
 from auth import get_current_approved_user
 from services.processing_queue import processing_queue, JobStatus
+from config import (
+    UPLOAD_DIR, Messages, validate_upload_file,
+    ALLOWED_DOCUMENT_EXTENSIONS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+)
+
+from logging_config import get_logger
+logger = get_logger('routers.atestados')
 
 
 def parse_date(date_str: Optional[str]) -> Optional[date]:
@@ -37,61 +47,71 @@ def _salvar_atestado_processado(job):
     data_emissao = parse_date(result.get("data_emissao"))
     servicos = result.get("servicos") or []
 
-    db = SessionLocal()
     try:
-        existente = db.query(Atestado).filter(
-            Atestado.user_id == job.user_id,
-            Atestado.arquivo_path == job.file_path
-        ).first()
+        with get_db_session() as db:
+            existente = db.query(Atestado).filter(
+                Atestado.user_id == job.user_id,
+                Atestado.arquivo_path == job.file_path
+            ).first()
 
-        if existente:
-            existente.descricao_servico = result.get("descricao_servico") or "Descricao nao identificada"
-            existente.quantidade = result.get("quantidade") or 0
-            existente.unidade = result.get("unidade") or ""
-            existente.contratante = result.get("contratante")
-            existente.data_emissao = data_emissao
-            existente.texto_extraido = result.get("texto_extraido")
-            existente.servicos_json = servicos if servicos else None
+            if existente:
+                existente.descricao_servico = result.get("descricao_servico") or "Descricao nao identificada"
+                existente.quantidade = result.get("quantidade") or 0
+                existente.unidade = result.get("unidade") or ""
+                existente.contratante = result.get("contratante")
+                existente.data_emissao = data_emissao
+                existente.texto_extraido = result.get("texto_extraido")
+                existente.servicos_json = servicos if servicos else None
+                db.commit()
+                return
+
+            novo_atestado = Atestado(
+                user_id=job.user_id,
+                descricao_servico=result.get("descricao_servico") or "Descricao nao identificada",
+                quantidade=result.get("quantidade") or 0,
+                unidade=result.get("unidade") or "",
+                contratante=result.get("contratante"),
+                data_emissao=data_emissao,
+                arquivo_path=job.file_path,
+                texto_extraido=result.get("texto_extraido"),
+                servicos_json=servicos if servicos else None
+            )
+            db.add(novo_atestado)
             db.commit()
-            return
-
-        novo_atestado = Atestado(
-            user_id=job.user_id,
-            descricao_servico=result.get("descricao_servico") or "Descricao nao identificada",
-            quantidade=result.get("quantidade") or 0,
-            unidade=result.get("unidade") or "",
-            contratante=result.get("contratante"),
-            data_emissao=data_emissao,
-            arquivo_path=job.file_path,
-            texto_extraido=result.get("texto_extraido"),
-            servicos_json=servicos if servicos else None
-        )
-        db.add(novo_atestado)
-        db.commit()
     except Exception as e:
-        db.rollback()
-        print(f"Erro ao salvar atestado do job {job.id}: {e}")
-    finally:
-        db.close()
+        logger.error(f"Erro ao salvar atestado do job {job.id}: {e}")
 
 
 processing_queue.register_callback("atestado", _salvar_atestado_processado)
 
 router = APIRouter(prefix="/atestados", tags=["Atestados"])
 
-UPLOAD_DIR = "uploads"
 
-
-@router.get("/", response_model=List[AtestadoResponse])
+@router.get("/", response_model=PaginatedAtestadoResponse)
 def listar_atestados(
+    page: int = Query(1, ge=1, description="Número da página"),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Itens por página"),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
 ):
-    """Lista todos os atestados do usuário logado."""
+    """Lista todos os atestados do usuário logado com paginação."""
+    # Contar total
+    total = db.query(Atestado).filter(
+        Atestado.user_id == current_user.id
+    ).count()
+
+    # Buscar página
+    offset = (page - 1) * page_size
     atestados = db.query(Atestado).filter(
         Atestado.user_id == current_user.id
-    ).order_by(Atestado.created_at.desc()).all()
-    return atestados
+    ).order_by(Atestado.created_at.desc()).offset(offset).limit(page_size).all()
+
+    return PaginatedAtestadoResponse.create(
+        items=atestados,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
 
 
 @router.get("/{atestado_id}", response_model=AtestadoResponse)
@@ -145,18 +165,13 @@ async def upload_atestado(
     Faz upload de um PDF/imagem de atestado para processamento.
     O arquivo sera processado em background e o status pode ser consultado na fila.
     """
-    # Verificar extensao
-    allowed_extensions = [".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"]
-    if not file.filename:
+    # Validar arquivo
+    try:
+        file_ext = validate_upload_file(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Arquivo sem nome. Envie novamente."
-        )
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Formato nao suportado. Use: {', '.join(allowed_extensions)}"
+            detail=str(e)
         )
 
     # Criar diretorio do usuario
@@ -185,11 +200,12 @@ async def upload_atestado(
             job_id=job_id
         )
     except Exception as e:
+        logger.error(f"Erro ao enfileirar processamento de atestado: {e}")
         if os.path.exists(filepath):
             os.remove(filepath)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao enfileirar processamento: {str(e)}"
+            detail=Messages.QUEUE_ERROR
         )
 
 
@@ -232,9 +248,10 @@ async def reprocessar_atestado(
             job_id=job_id
         )
     except Exception as e:
+        logger.error(f"Erro ao enfileirar reprocessamento de atestado {atestado_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao enfileirar reprocessamento: {str(e)}"
+            detail=Messages.QUEUE_ERROR
         )
 
 

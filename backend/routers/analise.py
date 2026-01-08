@@ -1,37 +1,58 @@
 import os
 import shutil
 import uuid
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Usuario, Atestado, Analise
-from schemas import AnaliseResponse, Mensagem
+from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse
 from auth import get_current_approved_user
 from services import document_processor
+from config import (
+    UPLOAD_DIR, Messages, validate_upload_file,
+    ALLOWED_PDF_EXTENSIONS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+)
+from logging_config import get_logger
+
+logger = get_logger('routers.analise')
 
 router = APIRouter(prefix="/analises", tags=["Análises"])
 
-UPLOAD_DIR = "uploads"
-
 
 @router.get("/status/servicos")
-def status_servicos():
+def status_servicos(
+    current_user: Usuario = Depends(get_current_approved_user)
+):
     """Retorna o status dos serviços de processamento de documentos."""
     return document_processor.get_status()
 
 
-@router.get("/", response_model=List[AnaliseResponse])
+@router.get("/", response_model=PaginatedAnaliseResponse)
 def listar_analises(
+    page: int = Query(1, ge=1, description="Número da página"),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Itens por página"),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
 ):
-    """Lista todas as análises do usuário logado."""
+    """Lista todas as análises do usuário logado com paginação."""
+    # Contar total
+    total = db.query(Analise).filter(
+        Analise.user_id == current_user.id
+    ).count()
+
+    # Buscar página
+    offset = (page - 1) * page_size
     analises = db.query(Analise).filter(
         Analise.user_id == current_user.id
-    ).order_by(Analise.created_at.desc()).all()
-    return analises
+    ).order_by(Analise.created_at.desc()).offset(offset).limit(page_size).all()
+
+    return PaginatedAnaliseResponse.create(
+        items=analises,
+        total=total,
+        page=page,
+        page_size=page_size
+    )
 
 
 @router.get("/{analise_id}", response_model=AnaliseResponse)
@@ -65,18 +86,13 @@ async def criar_analise(
     Cria uma nova análise de licitação.
     Faz upload do PDF do edital, extrai exigências e faz matching com atestados.
     """
-    # Verificar extensão
-    allowed_extensions = [".pdf"]
-    if not file.filename:
+    # Validar arquivo
+    try:
+        file_ext = validate_upload_file(file.filename, ALLOWED_PDF_EXTENSIONS)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Arquivo sem nome. Envie novamente."
-        )
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Apenas arquivos PDF são aceitos para análise de edital"
+            detail=str(e)
         )
 
     # Criar diretório do usuário
@@ -133,12 +149,13 @@ async def criar_analise(
         return nova_analise
 
     except Exception as e:
+        logger.error(f"Erro ao processar edital: {e}")
         # Remover arquivo se falhar
         if os.path.exists(filepath):
             os.remove(filepath)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao processar edital: {str(e)}"
+            detail=Messages.PROCESSING_ERROR
         )
 
 
@@ -212,9 +229,10 @@ async def processar_analise(
         return analise
 
     except Exception as e:
+        logger.error(f"Erro ao reprocessar análise {analise_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao reprocessar análise: {str(e)}"
+            detail=Messages.PROCESSING_ERROR
         )
 
 

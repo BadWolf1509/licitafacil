@@ -3,6 +3,7 @@ Serviço de extração de texto e tabelas de PDFs.
 Utiliza pdfplumber para PDFs digitais e PyMuPDF para renderização.
 """
 
+from exceptions import PDFError
 import pdfplumber
 import fitz  # PyMuPDF
 from typing import List, Dict, Any
@@ -33,7 +34,7 @@ class PDFExtractor:
                     if page_text:
                         text_parts.append(page_text)
         except Exception as e:
-            raise Exception(f"Erro ao extrair texto do PDF: {str(e)}")
+            raise PDFError("extrair texto", str(e))
 
         return "\n\n".join(text_parts)
 
@@ -69,7 +70,7 @@ class PDFExtractor:
                             if cleaned_table:
                                 all_tables.append(cleaned_table)
         except Exception as e:
-            raise Exception(f"Erro ao extrair tabelas do PDF: {str(e)}")
+            raise PDFError("extrair tabelas", str(e))
 
         return all_tables
 
@@ -126,7 +127,7 @@ class PDFExtractor:
                 result["precisa_ocr"] = not result["tem_texto"]
 
         except Exception as e:
-            raise Exception(f"Erro ao processar PDF: {str(e)}")
+            raise PDFError("processar", str(e))
 
         return result
 
@@ -169,7 +170,7 @@ class PDFExtractor:
                 images.append(img_bytes)
             doc.close()
         except Exception as e:
-            raise Exception(f"Erro ao converter PDF para imagens: {str(e)}")
+            raise PDFError("converter para imagens", str(e))
 
         return images
 
@@ -191,7 +192,7 @@ class PDFExtractor:
                     return pages[page_num].extract_text() or ""
                 return ""
         except Exception as e:
-            raise Exception(f"Erro ao extrair página {page_num}: {str(e)}")
+            raise PDFError(f"extrair página {page_num}", str(e))
 
 
 # Instância singleton para uso global

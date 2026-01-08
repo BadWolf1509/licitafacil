@@ -16,7 +16,7 @@ try:
     from google.cloud import documentai  # type: ignore
     _DOC_AI_AVAILABLE = True
 except Exception:
-    documentai = None
+    documentai = None  # type: ignore[assignment]
     _DOC_AI_AVAILABLE = False
 
 

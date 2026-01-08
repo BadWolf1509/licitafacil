@@ -2,17 +2,62 @@
 Rotas para gerenciamento e status dos provedores de IA.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Dict, Any, Optional
 import os
 import uuid
 
 from auth import get_current_active_user
 from models import Usuario
 from services.ai_provider import ai_provider
-from services.processing_queue import processing_queue, JobStatus
+from services.processing_queue import processing_queue, JobStatus, ProcessingJob
+from config import Messages
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+
+def _get_job_with_permission(
+    job_id: str,
+    user: Usuario,
+    allowed_statuses: Optional[set] = None,
+    disallowed_statuses: Optional[set] = None
+) -> ProcessingJob:
+    """
+    Busca um job e verifica permissão de acesso.
+
+    Args:
+        job_id: ID do job
+        user: Usuário atual
+        allowed_statuses: Se fornecido, job deve estar em um desses status
+        disallowed_statuses: Se fornecido, job NÃO pode estar nesses status
+
+    Returns:
+        ProcessingJob se encontrado e permitido
+
+    Raises:
+        HTTPException: Se job não encontrado ou acesso negado
+    """
+    job = processing_queue.get_job(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail=Messages.JOB_NOT_FOUND)
+
+    if job.user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=403, detail=Messages.ACCESS_DENIED)
+
+    if allowed_statuses and job.status not in allowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job não pode ser processado no status atual: {job.status.value}"
+        )
+
+    if disallowed_statuses and job.status in disallowed_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Operação não permitida para jobs com status: {job.status.value}"
+        )
+
+    return job
 
 
 @router.get("/status")
@@ -65,14 +110,7 @@ async def get_job_status(
     """
     Retorna o status de um job específico.
     """
-    job = processing_queue.get_job(job_id)
-
-    if not job:
-        raise HTTPException(status_code=404, detail="Job não encontrado")
-
-    if job.user_id != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Acesso negado")
-
+    job = _get_job_with_permission(job_id, current_user)
     return {
         "status": "ok",
         "job": job.to_dict()
@@ -87,16 +125,11 @@ async def cancel_job(
     """
     Cancela um job pendente ou em processamento.
     """
-    job = processing_queue.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job nao encontrado")
-
-    if job.user_id != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Acesso negado")
-
-    if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
-        raise HTTPException(status_code=400, detail="Job ja finalizado")
-
+    _get_job_with_permission(
+        job_id,
+        current_user,
+        disallowed_statuses={JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+    )
     updated = processing_queue.cancel_job(job_id)
     return {
         "status": "ok",
@@ -112,18 +145,14 @@ async def retry_job(
     """
     Reenvia um job falhado/cancelado para a fila.
     """
-    job = processing_queue.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job nao encontrado")
-
-    if job.user_id != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Acesso negado")
-
-    if job.status not in {JobStatus.FAILED, JobStatus.CANCELLED}:
-        raise HTTPException(status_code=400, detail="Job nao pode ser reprocessado")
+    job = _get_job_with_permission(
+        job_id,
+        current_user,
+        allowed_statuses={JobStatus.FAILED, JobStatus.CANCELLED}
+    )
 
     if not job.file_path or not os.path.exists(job.file_path):
-        raise HTTPException(status_code=400, detail="Arquivo do job nao encontrado")
+        raise HTTPException(status_code=400, detail=Messages.FILE_NOT_FOUND)
 
     new_job_id = str(uuid.uuid4())
     new_job = processing_queue.add_job(
@@ -146,18 +175,10 @@ async def delete_job(
     """
     Remove um job da fila e do banco (apenas falhados/cancelados).
     """
-    job = processing_queue.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job nao encontrado")
-
-    if job.user_id != current_user.id and not current_user.is_admin:
-        raise HTTPException(status_code=403, detail="Acesso negado")
-
-    if job.status not in {JobStatus.FAILED, JobStatus.CANCELLED}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Somente jobs falhados ou cancelados podem ser removidos"
-        )
-
+    _get_job_with_permission(
+        job_id,
+        current_user,
+        allowed_statuses={JobStatus.FAILED, JobStatus.CANCELLED}
+    )
     deleted = processing_queue.delete_job(job_id)
     return {"status": "ok", "deleted": deleted}

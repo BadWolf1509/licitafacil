@@ -5,9 +5,12 @@ Usa o modelo Read para OCR de alta qualidade em documentos difíceis.
 
 import os
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass
 from dotenv import load_dotenv
+
+from logging_config import get_logger
+logger = get_logger('services.azure_document_service')
 
 load_dotenv()
 
@@ -50,10 +53,10 @@ class AzureDocumentService:
             )
             self._initialized = True
         except ImportError:
-            print("Pacote azure-ai-documentintelligence não instalado")
+            logger.warning("Pacote azure-ai-documentintelligence não instalado")
             self._initialized = True
         except Exception as e:
-            print(f"Erro ao inicializar Azure Document Intelligence: {e}")
+            logger.error(f"Erro ao inicializar Azure Document Intelligence: {e}")
             self._initialized = True
 
     @property
@@ -77,8 +80,6 @@ class AzureDocumentService:
                 "Azure Document Intelligence não configurado. "
                 "Defina AZURE_DOCUMENT_ENDPOINT e AZURE_DOCUMENT_KEY no .env"
             )
-
-        start_time = time.time()
 
         try:
             with open(file_path, "rb") as f:

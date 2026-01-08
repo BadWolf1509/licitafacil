@@ -1,14 +1,28 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError as SAIntegrityError, OperationalError
 
 from database import engine, Base
 from routers import auth, admin, atestados, analise, ai_status, pipeline_status
 from services.processing_queue import processing_queue
+from middleware.rate_limit import RateLimitMiddleware
+from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION
+from exceptions import (
+    LicitaFacilError,
+    DatabaseError,
+    RecordNotFoundError,
+    DuplicateRecordError,
+    ValidationError,
+    ProcessingError
+)
+
+from logging_config import get_logger
+logger = get_logger('main')
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -22,13 +36,13 @@ async def lifespan(app: FastAPI):
     """Gerenciador de ciclo de vida da aplicação."""
     # Startup: iniciar fila de processamento
     await processing_queue.start()
-    print("Fila de processamento iniciada")
+    logger.info("Fila de processamento iniciada")
 
     yield
 
     # Shutdown: parar fila de processamento
     await processing_queue.stop()
-    print("Fila de processamento parada")
+    logger.info("Fila de processamento parada")
 
 
 # Criar aplicação FastAPI
@@ -41,28 +55,133 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configurar CORS
+# Configurar Rate Limiting (deve vir antes do CORS)
+app.add_middleware(RateLimitMiddleware)
+
+# Configurar CORS com origens da configuração
+# Em desenvolvimento: localhost. Em produção: definir CORS_ORIGINS no .env
+cors_origins = CORS_ORIGINS if CORS_ORIGINS else ["*"]
+logger.info(f"CORS configurado para origens: {cors_origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especificar domínios permitidos
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=cors_origins,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 # Criar diretório de uploads se não existir
-os.makedirs("uploads", exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# === Exception Handlers ===
+
+@app.exception_handler(RecordNotFoundError)
+async def record_not_found_handler(request: Request, exc: RecordNotFoundError):
+    """Handler para registros não encontrados."""
+    return JSONResponse(
+        status_code=404,
+        content={"detail": exc.message}
+    )
+
+
+@app.exception_handler(DuplicateRecordError)
+async def duplicate_record_handler(request: Request, exc: DuplicateRecordError):
+    """Handler para registros duplicados."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": exc.message}
+    )
+
+
+@app.exception_handler(ValidationError)
+async def validation_error_handler(request: Request, exc: ValidationError):
+    """Handler para erros de validação."""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.message}
+    )
+
+
+@app.exception_handler(ProcessingError)
+async def processing_error_handler(request: Request, exc: ProcessingError):
+    """Handler para erros de processamento."""
+    logger.error(f"Erro de processamento: {exc.message}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": exc.message}
+    )
+
+
+@app.exception_handler(DatabaseError)
+async def database_error_handler(request: Request, exc: DatabaseError):
+    """Handler para erros de banco de dados customizados."""
+    logger.error(f"Erro de banco de dados: {exc.message}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": Messages.DB_ERROR}
+    )
+
+
+@app.exception_handler(SAIntegrityError)
+async def sqlalchemy_integrity_handler(request: Request, exc: SAIntegrityError):
+    """Handler para violações de integridade do SQLAlchemy."""
+    logger.error(f"Violação de integridade: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=409,
+        content={"detail": Messages.DUPLICATE_ENTRY}
+    )
+
+
+@app.exception_handler(OperationalError)
+async def sqlalchemy_operational_handler(request: Request, exc: OperationalError):
+    """Handler para erros operacionais do SQLAlchemy (conexão, etc)."""
+    logger.error(f"Erro operacional do banco: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Serviço de banco de dados temporariamente indisponível"}
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_generic_handler(request: Request, exc: SQLAlchemyError):
+    """Handler genérico para erros do SQLAlchemy."""
+    logger.error(f"Erro SQLAlchemy: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": Messages.DB_ERROR}
+    )
+
+
+@app.exception_handler(LicitaFacilError)
+async def licitafacil_error_handler(request: Request, exc: LicitaFacilError):
+    """Handler genérico para exceções do LicitaFacil."""
+    logger.error(f"Erro da aplicação: {exc.message}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": exc.message}
+    )
+
 
 # Caminho do frontend
 frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
 
-# Registrar routers (ANTES de montar arquivos estáticos)
-app.include_router(auth.router)
-app.include_router(admin.router)
-app.include_router(atestados.router)
-app.include_router(analise.router)
-app.include_router(ai_status.router)
-app.include_router(pipeline_status.router)
+# Registrar routers com prefixo de versão da API
+app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(admin.router, prefix=API_PREFIX)
+app.include_router(atestados.router, prefix=API_PREFIX)
+app.include_router(analise.router, prefix=API_PREFIX)
+app.include_router(ai_status.router, prefix=API_PREFIX)
+app.include_router(pipeline_status.router, prefix=API_PREFIX)
+
+# Também incluir routers sem prefixo para retrocompatibilidade (será descontinuado)
+app.include_router(auth.router, tags=["Auth (legacy)"], deprecated=True)
+app.include_router(admin.router, tags=["Admin (legacy)"], deprecated=True)
+app.include_router(atestados.router, tags=["Atestados (legacy)"], deprecated=True)
+app.include_router(analise.router, tags=["Análises (legacy)"], deprecated=True)
+app.include_router(ai_status.router, tags=["AI Status (legacy)"], deprecated=True)
+app.include_router(pipeline_status.router, tags=["Pipeline Status (legacy)"], deprecated=True)
 
 
 # Servir arquivos estáticos do frontend (CSS, JS)
@@ -112,6 +231,16 @@ def serve_admin():
 def health_check():
     """Endpoint de verificação de saúde da API."""
     return {"status": "healthy"}
+
+
+@app.get("/api/version")
+def api_version():
+    """Retorna informações sobre a versão da API."""
+    return {
+        "version": API_VERSION,
+        "prefix": API_PREFIX,
+        "status": "stable"
+    }
 
 
 if __name__ == "__main__":

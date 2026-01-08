@@ -19,6 +19,16 @@ from .pdf_extractor import pdf_extractor
 from .ocr_service import ocr_service
 from .ai_provider import ai_provider
 from .document_ai_service import document_ai_service
+from exceptions import (
+    PDFError,
+    OCRError,
+    UnsupportedFileError,
+    TextExtractionError
+)
+from text_utils import is_garbage_text
+
+from logging_config import get_logger
+logger = get_logger('services.document_processor')
 
 # Configurações de paralelização
 OCR_PARALLEL_ENABLED = os.getenv("OCR_PARALLEL", "0").lower() in {"1", "true", "yes"}
@@ -72,38 +82,6 @@ class DocumentProcessor:
         doc.close()
         return images
 
-    def _is_garbage_text(self, text: str) -> bool:
-        """
-        Verifica se o texto é lixo (marca d'água invertida, etc).
-
-        Args:
-            text: Texto a verificar
-
-        Returns:
-            True se o texto parecer ser lixo/marca d'água
-        """
-        if not text or len(text.strip()) < 50:
-            return True
-
-        # Verificar se tem palavras comuns em português
-        palavras_comuns = ['de', 'do', 'da', 'em', 'para', 'que', 'com', 'os', 'as', 'um', 'uma',
-                          'no', 'na', 'ao', 'pela', 'pelo', 'este', 'esta', 'esse', 'essa']
-        text_lower = text.lower()
-        palavras_encontradas = sum(1 for p in palavras_comuns if f' {p} ' in text_lower)
-
-        # Se não encontrar pelo menos 5 palavras comuns, provavelmente é lixo
-        if palavras_encontradas < 5:
-            return True
-
-        # Verificar proporção de caracteres válidos vs especiais/números
-        letras = sum(1 for c in text if c.isalpha())
-        total = len(text.replace(' ', '').replace('\n', ''))
-
-        if total > 0 and letras / total < 0.5:  # Menos de 50% letras = lixo
-            return True
-
-        return False
-
     def _extract_pdf_with_ocr_fallback(
         self,
         file_path: str,
@@ -140,7 +118,7 @@ class DocumentProcessor:
                     text_stripped = page_text.strip()
 
                     # Se a página tem pouco texto OU texto é lixo/marca d'água, marcar para OCR
-                    needs_ocr = len(text_stripped) < MIN_TEXT_PER_PAGE or self._is_garbage_text(text_stripped)
+                    needs_ocr = len(text_stripped) < MIN_TEXT_PER_PAGE or is_garbage_text(text_stripped)
 
                     if needs_ocr:
                         pages_needing_ocr.append(i)
@@ -181,14 +159,14 @@ class DocumentProcessor:
                                 for part in text_parts
                             ]
                     except Exception as e:
-                        print(f"Erro no OCR da página {page_idx+1}: {str(e)}")
+                        logger.warning(f"Erro no OCR da página {page_idx+1}: {str(e)}")
 
                 doc.close()
 
             return "\n\n".join(text_parts)
 
         except Exception as e:
-            raise Exception(f"Erro ao processar PDF: {str(e)}")
+            raise PDFError("processar", str(e))
 
     def _notify_progress(self, progress_callback, current: int, total: int, stage: str, message: str):
         if progress_callback:
@@ -613,6 +591,9 @@ class DocumentProcessor:
 
         Isso inclui itens que contêm ">" (caminho de classificação) ou
         começam com padrões de classificação de CAT.
+
+        IMPORTANTE: "EXECUÇÃO" só é inválido quando seguido de ">" (classificação).
+        "EXECUÇÃO DE PAVIMENTO" ou "EXECUÇÃO DE PÁTIO" são serviços válidos.
         """
         if not servicos:
             return []
@@ -630,8 +611,10 @@ class DocumentProcessor:
 
             # Ignorar itens que começam com padrão de classificação
             desc_upper = descricao.upper().strip()
+
+            # Prefixos que SEMPRE são classificação (não serviços reais)
             invalid_prefixes = [
-                "EXECUÇÃO", "DIRETA OBRAS", "1 - DIRETA",
+                "DIRETA OBRAS", "1 - DIRETA",
                 "2 - DIRETA", "ATIVIDADE TÉCNICA", "CLASSIFICAÇÃO",
             ]
 
@@ -640,6 +623,11 @@ class DocumentProcessor:
                 if desc_upper.startswith(prefix):
                     is_invalid = True
                     break
+
+            # "EXECUÇÃO" é inválido APENAS se seguido de ">" (classificação)
+            # mas é VÁLIDO se for serviço real como "EXECUÇÃO DE PAVIMENTO"
+            if desc_upper.startswith("EXECUÇÃO") and ">" in desc_upper:
+                is_invalid = True
 
             if is_invalid:
                 continue
@@ -659,7 +647,8 @@ class DocumentProcessor:
         Mantém serviços com código de item (mesmo que tenham mesma descrição,
         pois podem ser itens diferentes em etapas diferentes da obra).
 
-        Remove serviços SEM código que têm descrição similar (>50%) a algum serviço COM código.
+        Remove serviços SEM código que têm descrição similar (>50%) a algum serviço COM código,
+        OU que compartilham palavras distintivas com serviços COM código.
         """
         if not servicos:
             return []
@@ -675,11 +664,26 @@ class DocumentProcessor:
 
         # Criar lista de palavras-chave dos serviços COM item
         com_item_keywords = []
+        # Também criar conjunto de palavras distintivas (6+ chars, não são termos comuns)
+        com_item_distinctive = set()
+        common_terms = {
+            "execucao", "fornecimento", "instalacao", "servico", "servicos",
+            "material", "materiais", "equipamento", "equipamentos", "construcao",
+            "obra", "obras", "manutencao", "reforma", "reparo", "sistema",
+            "estrutura", "revestimento", "pintura", "acabamento", "fundacao",
+            "concreto", "armado", "simples", "duplo", "triplo", "completo",
+            "conforme", "projeto", "norma", "padrao", "modelo", "tipo",
+        }
+
         for servico in com_item:
             desc = str(servico.get("descricao", "") or "").strip()
             if desc:
                 keywords = self._extract_keywords(desc)
                 com_item_keywords.append(keywords)
+                # Extrair palavras distintivas (6+ chars, não são termos comuns)
+                for kw in keywords:
+                    if len(kw) >= 6 and kw.lower() not in common_terms:
+                        com_item_distinctive.add(kw.lower())
 
         def is_similar_to_any_com_item(desc: str, threshold: float = 0.5) -> bool:
             """Verifica se descrição é similar a algum serviço COM item."""
@@ -694,6 +698,20 @@ class DocumentProcessor:
                 union = len(keywords | com_kw)
                 similarity = intersection / union if union > 0 else 0
                 if similarity >= threshold:
+                    return True
+            return False
+
+        def shares_distinctive_keyword(desc: str) -> bool:
+            """
+            Verifica se descrição compartilha palavras distintivas com serviços COM item.
+            Isso captura casos onde OCR corrompeu parte da descrição mas manteve
+            palavras-chave únicas como nomes próprios ou termos específicos.
+            """
+            keywords = self._extract_keywords(desc)
+            if not keywords:
+                return False
+            for kw in keywords:
+                if len(kw) >= 6 and kw.lower() in com_item_distinctive:
                     return True
             return False
 
@@ -715,6 +733,11 @@ class DocumentProcessor:
             if is_similar_to_any_com_item(desc):
                 continue
 
+            # Se compartilha palavras distintivas com serviço COM item, pular
+            # (provavelmente é uma versão corrompida do OCR)
+            if shares_distinctive_keyword(desc):
+                continue
+
             desc_sem_item_vistos.add(desc_norm)
             sem_item_filtrado.append(servico)
 
@@ -727,7 +750,8 @@ class DocumentProcessor:
 
         lengths = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if item_tuple:
                 lengths.append(len(item_tuple))
 
@@ -760,7 +784,8 @@ class DocumentProcessor:
 
         filtered = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if not item_tuple or len(item_tuple) == dominant_len:
                 filtered.append(servico)
                 continue
@@ -781,7 +806,8 @@ class DocumentProcessor:
 
         prefixes = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if item_tuple:
                 prefixes.append(item_tuple[0])
 
@@ -808,7 +834,8 @@ class DocumentProcessor:
 
         filtered = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if not item_tuple or item_tuple[0] == dominant_prefix:
                 filtered.append(servico)
 
@@ -819,7 +846,8 @@ class DocumentProcessor:
     def _dominant_item_length(self, servicos: list) -> tuple[Optional[int], float]:
         lengths = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if item_tuple:
                 lengths.append(len(item_tuple))
         if not lengths:
@@ -837,7 +865,8 @@ class DocumentProcessor:
         existing = {s.get("item") for s in servicos if s.get("item")}
         repaired = 0
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_val = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if not item_tuple or len(item_tuple) != 2:
                 continue
             new_item = f"{dominant_prefix}.{self._item_tuple_to_str(item_tuple)}"
@@ -977,7 +1006,8 @@ class DocumentProcessor:
         seq_ratio = 0.0
         filtered_tuples = []
         for servico in servicos:
-            item_tuple = self._parse_item_tuple(servico.get("item"))
+            item_value: Any = servico.get("item")
+            item_tuple = self._parse_item_tuple(str(item_value)) if item_value else None
             if item_tuple:
                 filtered_tuples.append(item_tuple)
         if len(filtered_tuples) > 1:
@@ -1028,7 +1058,7 @@ class DocumentProcessor:
             return [], 0.0, {"error": str(exc)}
         if not tables:
             return [], 0.0, {"tables": 0}
-        best = {"servicos": [], "confidence": 0.0, "debug": {}}
+        best: Dict[str, Any] = {"servicos": [], "confidence": 0.0, "debug": {}}
         for table in tables:
             servicos, confidence, debug = self._extract_servicos_from_table(table)
             if confidence > best["confidence"] or (confidence == best["confidence"] and len(servicos) > len(best["servicos"])):
@@ -1048,7 +1078,7 @@ class DocumentProcessor:
         if not tables:
             return [], 0.0, {"tables": 0, "pages": result.get("pages", 0)}
 
-        best = {"servicos": [], "confidence": 0.0, "debug": {}}
+        best: Dict[str, Any] = {"servicos": [], "confidence": 0.0, "debug": {}}
         for table in tables:
             rows = table.get("rows") or []
             servicos, confidence, debug = self._extract_servicos_from_table(rows)
@@ -1127,7 +1157,7 @@ class DocumentProcessor:
             rows.append(current)
 
         centers = sorted(w["x_center"] for w in words)
-        clusters = []
+        clusters: List[Dict[str, Any]] = []
         for center in centers:
             if not clusters:
                 clusters.append({"center": center, "values": [center]})
@@ -1639,34 +1669,60 @@ class DocumentProcessor:
         """
         Remove serviços duplicados baseado na descrição normalizada.
         Prefere serviços que têm código de item sobre os que não têm.
+
+        IMPORTANTE: Serviços com códigos de item DIFERENTES não são duplicatas,
+        mesmo que as descrições sejam similares (podem ser itens diferentes em
+        etapas diferentes da obra).
         """
         if not servicos:
             return servicos
 
+        def get_item_code(servico: dict) -> str:
+            """Extrai código do item, seja do campo 'item' ou do início da descrição."""
+            item = servico.get("item") or ""
+            if item:
+                return item
+            # Se não tem campo item, tentar extrair do início da descrição
+            desc = servico.get("descricao") or ""
+            extracted = self._extract_item_code(desc)
+            return extracted
+
         # Agrupar por descrição normalizada
         by_desc = {}
+        result = []
+
         for s in servicos:
             desc = (s.get("descricao") or "").strip()
             desc_norm = self._normalize_description(desc)[:50]  # Usar apenas primeiros 50 chars
             if not desc_norm:
                 continue
 
+            item_code = get_item_code(s)
+
             if desc_norm not in by_desc:
                 by_desc[desc_norm] = s
             else:
-                # Já existe - preferir o que tem código de item
+                # Já existe um serviço com descrição similar
                 existing = by_desc[desc_norm]
-                existing_has_item = bool(existing.get("item"))
-                new_has_item = bool(s.get("item"))
+                existing_item = get_item_code(existing)
+                new_item = item_code
 
-                if new_has_item and not existing_has_item:
+                # Se AMBOS têm códigos de item DIFERENTES, são itens distintos
+                # (ex: 4.2 e 4.3 podem ter descrições similares mas são itens diferentes)
+                if existing_item and new_item and existing_item != new_item:
+                    # Não é duplicata - adicionar diretamente ao resultado
+                    result.append(s)
+                    continue
+
+                # Se apenas o novo tem código, substituir
+                if new_item and not existing_item:
                     by_desc[desc_norm] = s
-                elif new_has_item == existing_has_item:
-                    # Ambos têm ou não têm código - preferir descrição mais longa
+                elif new_item == existing_item:
+                    # Mesmo código (ou ambos vazios) - preferir descrição mais longa
                     if len(s.get("descricao", "")) > len(existing.get("descricao", "")):
                         by_desc[desc_norm] = s
 
-        return list(by_desc.values())
+        return list(by_desc.values()) + result
 
     def _select_primary_source(self, vision_stats: dict, ocr_stats: dict, vision_score: float, ocr_score: float) -> str:
         margin = float(os.getenv("ATTESTADO_SCORE_MARGIN", "0.1"))
@@ -1752,7 +1808,7 @@ class DocumentProcessor:
                 page_servicos = result.get("servicos", []) if isinstance(result, dict) else []
                 servicos.extend(page_servicos)
             except Exception as exc:
-                print(f"Erro na IA por pagina {page_index + 1}: {exc}")
+                logger.warning(f"Erro na IA por pagina {page_index + 1}: {exc}")
         return servicos
 
     def _extract_item_code(self, desc: str) -> str:
@@ -1815,7 +1871,7 @@ class DocumentProcessor:
         if not servicos:
             return servicos
 
-        deduped = {}
+        deduped: Dict[str, Any] = {}
         extras = []
 
         def score(item: dict) -> int:
@@ -1895,13 +1951,15 @@ class DocumentProcessor:
             qty = self._parse_quantity(servico.get("quantidade"))
             drop = False
             for coded_entry in coded_entries:
-                if self._description_similarity(desc, coded_entry["descricao"]) < similarity_threshold:
+                coded_desc = str(coded_entry.get("descricao") or "")
+                if self._description_similarity(desc, coded_desc) < similarity_threshold:
                     continue
                 unit_match = bool(unit and coded_entry["unidade"] and unit == coded_entry["unidade"])
                 qty_match = False
-                if qty not in (None, 0) and coded_entry["quantidade"] not in (None, 0):
-                    diff = abs(qty - coded_entry["quantidade"])
-                    denom = max(abs(qty), abs(coded_entry["quantidade"]))
+                coded_qty = coded_entry.get("quantidade")
+                if qty is not None and coded_qty is not None and isinstance(qty, (int, float)) and isinstance(coded_qty, (int, float)) and qty != 0 and coded_qty != 0:
+                    diff = abs(qty - coded_qty)
+                    denom = max(abs(qty), abs(coded_qty))
                     if denom > 0:
                         qty_match = (diff / denom) <= 0.02 or diff <= 0.01
                 if unit_match or qty_match:
@@ -1917,7 +1975,7 @@ class DocumentProcessor:
         if not servicos_table:
             return {}
         unit_tokens = self._unit_tokens()
-        candidates = {}
+        candidates: Dict[str, Any] = {}
         for servico in servicos_table:
             item = servico.get("item") or self._extract_item_code(servico.get("descricao") or "")
             if not item:
@@ -1977,9 +2035,10 @@ class DocumentProcessor:
                     continue
                 if unit and candidate["unidade"] and unit == candidate["unidade"]:
                     score += 0.1
-                if qty not in (None, 0) and candidate["quantidade"] not in (None, 0):
-                    diff = abs(qty - candidate["quantidade"])
-                    denom = max(abs(qty), abs(candidate["quantidade"]))
+                cand_qty = candidate.get("quantidade")
+                if qty is not None and cand_qty is not None and isinstance(qty, (int, float)) and isinstance(cand_qty, (int, float)) and qty != 0 and cand_qty != 0:
+                    diff = abs(qty - cand_qty)
+                    denom = max(abs(qty), abs(cand_qty))
                     if denom > 0 and (diff / denom) <= 0.05:
                         score += 0.1
                 if score > best_score:
@@ -1989,9 +2048,9 @@ class DocumentProcessor:
             if best_code:
                 servico["item"] = best_code
                 used_codes.add(best_code)
-                if not servico.get("unidade") and best_candidate.get("unidade"):
+                if best_candidate and not servico.get("unidade") and best_candidate.get("unidade"):
                     servico["unidade"] = best_candidate["unidade"]
-                if self._parse_quantity(servico.get("quantidade")) in (None, 0) and best_candidate.get("quantidade") is not None:
+                if best_candidate and self._parse_quantity(servico.get("quantidade")) in (None, 0) and best_candidate.get("quantidade") is not None:
                     servico["quantidade"] = best_candidate["quantidade"]
 
         return servicos
@@ -2145,23 +2204,23 @@ class DocumentProcessor:
                         cancel_check=cancel_check
                     )
                 except Exception as e2:
-                    raise Exception(f"Erro ao processar PDF: {str(e)} / OCR: {str(e2)}")
+                    raise PDFError("processar", f"{str(e)} / OCR: {str(e2)}")
         elif file_ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
             try:
                 self._check_cancel(cancel_check)
                 self._notify_progress(progress_callback, 1, 1, "ocr", "OCR da imagem")
                 texto = ocr_service.extract_text_from_image(file_path)
             except Exception as e:
-                raise Exception(f"Erro no OCR da imagem: {str(e)}")
+                raise OCRError(str(e))
         else:
-            raise Exception(f"Formato de arquivo não suportado: {file_ext}")
+            raise UnsupportedFileError(file_ext)
 
         if not texto.strip():
-            raise Exception("Não foi possível extrair texto do documento")
+            raise TextExtractionError("documento")
 
-        servicos_table = []
+        servicos_table: List[Any] = []
         table_confidence = 0.0
-        table_debug = {}
+        table_debug: Dict[str, Any] = {}
         table_used = False
         primary_source = None
         table_attempts: Dict[str, Any] = {}
@@ -2314,8 +2373,6 @@ class DocumentProcessor:
         # Usar tabela apenas para servicos quando confianca for alta
         use_ai = ai_provider.is_configured  # Sempre usar AI se configurada
         use_ai_for_services = ai_provider.is_configured and (not llm_fallback_only or not table_used)
-        ai_skipped = False  # AI nunca eh completamente pulada agora
-        ai_skip_reason = None
 
 
         # Sempre executar extração com IA para metadados
@@ -2353,7 +2410,7 @@ class DocumentProcessor:
                     self._check_cancel(cancel_check)
                     dados_vision = ai_provider.extract_atestado_from_images(images)
                 except Exception as e:
-                    print(f"Erro no Vision: {str(e)}")
+                    logger.warning(f"Erro no Vision: {str(e)}")
                     dados_vision = None
 
             servicos_vision = self._filter_summary_rows(dados_vision.get("servicos", []) if dados_vision else [])
@@ -2424,7 +2481,8 @@ class DocumentProcessor:
                     if s.get("quantidade") is not None
                 ]
                 # Comparar com serviços da IA - usar tabela apenas se tiver mais ou igual itens
-                ai_servicos_count = len(dados.get("servicos", []))
+                ai_servicos = dados.get("servicos") or []
+                ai_servicos_count = len(ai_servicos) if isinstance(ai_servicos, list) else 0
                 table_servicos_count = len(servicos_table_filtered)
 
                 if table_servicos_count >= ai_servicos_count:
@@ -2527,7 +2585,7 @@ class DocumentProcessor:
         tabelas = []
 
         if file_ext != ".pdf":
-            raise Exception("O arquivo do edital deve ser um PDF")
+            raise UnsupportedFileError("não-PDF", ["PDF"])
 
         # Extrair conteúdo do PDF
         resultado = pdf_extractor.extract_all(file_path)
@@ -2545,10 +2603,10 @@ class DocumentProcessor:
                 cancel_check=cancel_check
             )
             except Exception as e:
-                raise Exception(f"Erro no OCR do edital: {str(e)}")
+                raise OCRError(str(e))
 
         if not texto.strip():
-            raise Exception("Não foi possível extrair texto do edital")
+            raise TextExtractionError("edital")
 
         # Combinar texto e tabelas para análise
         texto_completo = texto

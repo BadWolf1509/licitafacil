@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -27,5 +29,28 @@ def get_db():
     db = SessionLocal()
     try:
         yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def get_db_session():
+    """
+    Context manager para obter sessão do banco de dados.
+
+    Uso em callbacks, services ou código fora de rotas FastAPI:
+        with get_db_session() as db:
+            db.query(Model).filter(...)
+            db.commit()
+
+    O commit deve ser feito manualmente se necessário.
+    Rollback é automático em caso de exceção.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

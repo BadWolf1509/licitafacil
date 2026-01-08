@@ -9,7 +9,6 @@ Níveis:
 4. VISION_AI: GPT-4o Vision (~R$0.10/página)
 """
 
-import os
 import time
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, field
@@ -22,7 +21,6 @@ import fitz  # PyMuPDF
 from .quality_detector import (
     quality_detector,
     QualityReport,
-    DocumentQuality,
     ExtractionPipeline
 )
 from .image_preprocessor import image_preprocessor
@@ -30,6 +28,12 @@ from .ocr_service import ocr_service
 from .azure_document_service import azure_document_service
 from .ai_analyzer import ai_analyzer
 from .ai_provider import ai_provider
+from exceptions import (
+    ProcessingCancelledError,
+    AzureNotConfiguredError,
+    AINotConfiguredError
+)
+from text_utils import is_garbage_text
 
 
 class PipelineStage(Enum):
@@ -119,8 +123,8 @@ class CascadePipeline:
         """
         start_time = time.time()
         stages_executed = []
-        errors = []
-        debug_info = {}
+        errors: List[str] = []
+        debug_info: Dict[str, Any] = {}
         text = ""
         data = {}
 
@@ -130,7 +134,7 @@ class CascadePipeline:
 
         def check_cancel():
             if cancel_check and cancel_check():
-                raise Exception("Processamento cancelado pelo usuário")
+                raise ProcessingCancelledError()
 
         try:
             # Estágio 1: Análise de qualidade
@@ -270,7 +274,7 @@ class CascadePipeline:
             if len(text) < self.MIN_TEXT_LENGTH:
                 return text, False
 
-            if self._is_garbage_text(text):
+            if is_garbage_text(text):
                 return text, False
 
             return text, True
@@ -329,19 +333,19 @@ class CascadePipeline:
 
         # Aplicar OCR
         text_parts = []
-        total_confidence = 0
+        total_confidence: float = 0.0
         num_words = 0
 
         for i, img_bytes in enumerate(images):
             if cancel_check and cancel_check():
-                raise Exception("Cancelado")
+                raise ProcessingCancelledError()
 
             if progress_callback:
                 progress_callback(i + 1, len(images), "ocr", f"OCR página {i+1}/{len(images)}")
 
             try:
                 # EasyOCR retorna lista de (bbox, text, confidence)
-                result = ocr_service.extract_text_with_confidence(img_bytes)
+                result = ocr_service.extract_text_from_bytes(img_bytes)
 
                 if isinstance(result, tuple):
                     page_text, page_confidence = result
@@ -370,7 +374,7 @@ class CascadePipeline:
             Tuple de (texto, confiança)
         """
         if not azure_document_service.is_configured:
-            raise Exception("Azure Document Intelligence não configurado")
+            raise AzureNotConfiguredError()
 
         result = azure_document_service.extract_text_from_file(file_path)
         return result.text, result.confidence
@@ -388,7 +392,7 @@ class CascadePipeline:
             Dicionário com dados estruturados
         """
         if not ai_analyzer.is_configured:
-            raise Exception("OpenAI não configurado")
+            raise AINotConfiguredError("OpenAI")
 
         path = Path(file_path)
         ext = path.suffix.lower()
@@ -402,7 +406,7 @@ class CascadePipeline:
 
             for i, page in enumerate(doc):
                 if cancel_check and cancel_check():
-                    raise Exception("Cancelado")
+                    raise ProcessingCancelledError()
 
                 if progress_callback:
                     progress_callback(i + 1, len(doc), "vision", f"Preparando página {i+1}")
@@ -436,29 +440,6 @@ class CascadePipeline:
         data = ai_analyzer.extract_atestado_info(text)
         data['texto_extraido'] = text
         return data
-
-    def _is_garbage_text(self, text: str) -> bool:
-        """Verifica se texto é lixo (marca d'água invertida, etc)."""
-        if not text or len(text.strip()) < 50:
-            return True
-
-        palavras_comuns = [
-            'de', 'do', 'da', 'em', 'para', 'que', 'com', 'os', 'as',
-            'um', 'uma', 'no', 'na', 'ao', 'pela', 'pelo'
-        ]
-        text_lower = text.lower()
-        palavras_encontradas = sum(1 for p in palavras_comuns if f' {p} ' in text_lower)
-
-        if palavras_encontradas < 5:
-            return True
-
-        letras = sum(1 for c in text if c.isalpha())
-        total = len(text.replace(' ', '').replace('\n', ''))
-
-        if total > 0 and letras / total < 0.5:
-            return True
-
-        return False
 
     def get_status(self) -> Dict[str, Any]:
         """Retorna status do pipeline e serviços disponíveis."""

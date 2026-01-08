@@ -4,8 +4,6 @@ Inclui correção de inclinação (deskew), ajuste de contraste e redução de r
 """
 
 import io
-import math
-from typing import Tuple, Optional
 from PIL import Image, ImageFilter, ImageEnhance, ImageOps
 import numpy as np
 
@@ -37,7 +35,7 @@ class ImagePreprocessor:
         Returns:
             Imagem processada em bytes (PNG)
         """
-        img = Image.open(io.BytesIO(image_bytes))
+        img: Image.Image = Image.open(io.BytesIO(image_bytes))
 
         # Converter para RGB se necessário
         if img.mode in ('RGBA', 'LA'):
@@ -94,7 +92,7 @@ class ImagePreprocessor:
                 # Rotacionar imagem
                 img = img.rotate(
                     angle,
-                    resample=Image.BICUBIC,
+                    resample=Image.Resampling.BICUBIC,
                     expand=True,
                     fillcolor=(255, 255, 255)
                 )
@@ -114,13 +112,13 @@ class ImagePreprocessor:
         Returns:
             Ângulo de inclinação em graus
         """
-        best_angle = 0
-        best_score = 0
+        best_angle: float = 0.0
+        best_score: float = 0.0
 
         # Testar ângulos de -10 a 10 graus
         for angle in np.arange(-10, 10, 0.5):
             # Rotacionar array
-            rotated = self._rotate_array(binary, angle)
+            rotated = self._rotate_array(binary, float(angle))
 
             # Calcular projeção horizontal (soma de pixels por linha)
             projection = np.sum(rotated, axis=1)
@@ -131,7 +129,7 @@ class ImagePreprocessor:
 
             if score > best_score:
                 best_score = score
-                best_angle = angle
+                best_angle = float(angle)
 
         return best_angle
 
@@ -172,8 +170,8 @@ class ImagePreprocessor:
         img = enhancer.enhance(1.2)
 
         # Aumentar nitidez levemente
-        enhancer = ImageEnhance.Sharpness(img)
-        img = enhancer.enhance(1.3)
+        sharpness_enhancer = ImageEnhance.Sharpness(img)
+        img = sharpness_enhancer.enhance(1.3)
 
         return img
 
@@ -187,7 +185,7 @@ class ImagePreprocessor:
         Returns:
             Dicionário com métricas de qualidade
         """
-        img = Image.open(io.BytesIO(image_bytes))
+        img: Image.Image = Image.open(io.BytesIO(image_bytes))
 
         # Converter para escala de cinza
         gray = img.convert('L')
@@ -202,7 +200,8 @@ class ImagePreprocessor:
             'brightness': self._calculate_brightness(gray_array),
             'noise_level': self._estimate_noise(gray_array),
             'skew_angle': self._detect_skew_angle(gray_array < np.mean(gray_array)),
-            'quality_score': 0.0  # Será calculado abaixo
+            'quality_score': 0.0,  # Será calculado abaixo
+            'quality_level': ''  # Será calculado abaixo
         }
 
         # Calcular score geral de qualidade (0-100)

@@ -5,6 +5,7 @@ Inclui pré-processamento de imagem para melhorar qualidade.
 Suporta Tesseract como fallback opcional.
 """
 
+from exceptions import OCRError
 import easyocr
 from typing import List, Optional, Tuple, Dict, Any
 import io
@@ -186,7 +187,7 @@ class OCRService:
             texts = [result[1] for result in results]
             return " ".join(texts)
         except Exception as e:
-            raise Exception(f"Erro no OCR da imagem: {str(e)}")
+            raise OCRError(str(e))
 
     def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False) -> str:
         """
@@ -211,7 +212,7 @@ class OCRService:
             texts = [result[1] for result in results]
             return " ".join(texts)
         except Exception as e:
-            raise Exception(f"Erro no OCR: {str(e)}")
+            raise OCRError(str(e))
 
     def extract_words_from_bytes(self, image_bytes: bytes, min_confidence: float = 0.3, use_binarization: bool = False) -> List[Dict[str, Any]]:
         """
@@ -254,7 +255,7 @@ class OCRService:
                 })
             return words
         except Exception as e:
-            raise Exception(f"Erro no OCR: {str(e)}")
+            raise OCRError(str(e))
 
     def extract_with_confidence(
         self,
@@ -280,7 +281,7 @@ class OCRService:
             ]
             return filtered
         except Exception as e:
-            raise Exception(f"Erro no OCR: {str(e)}")
+            raise OCRError(str(e))
 
     def extract_from_pdf_images(self, image_list: List[bytes]) -> str:
         """

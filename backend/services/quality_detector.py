@@ -3,8 +3,7 @@ Serviço de detecção de qualidade de documentos.
 Analisa PDFs e imagens para determinar o melhor pipeline de extração.
 """
 
-import io
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 from pathlib import Path
 from enum import Enum
 from dataclasses import dataclass
@@ -13,6 +12,7 @@ import pdfplumber
 import fitz  # PyMuPDF
 
 from .image_preprocessor import image_preprocessor
+from text_utils import is_garbage_text
 
 
 class DocumentQuality(Enum):
@@ -96,11 +96,11 @@ class QualityDetector:
                     text = page.extract_text() or ""
                     text_length = len(text.strip())
 
-                    page_info = {
+                    page_info: Dict[str, Any] = {
                         'page_number': i + 1,
                         'has_native_text': text_length >= self.MIN_TEXT_PER_PAGE,
                         'text_length': text_length,
-                        'is_garbage': self._is_garbage_text(text),
+                        'is_garbage': is_garbage_text(text),
                         'quality_score': None,
                         'quality_metrics': None
                     }
@@ -128,7 +128,7 @@ class QualityDetector:
 
         metrics = image_preprocessor.analyze_quality(image_bytes)
 
-        page_info = {
+        page_info: Dict[str, Any] = {
             'page_number': 1,
             'has_native_text': False,
             'text_length': 0,
@@ -161,31 +161,6 @@ class QualityDetector:
                 'quality_score': 0,
                 'error': str(e)
             }
-
-    def _is_garbage_text(self, text: str) -> bool:
-        """Verifica se o texto é lixo (marca d'água invertida, etc)."""
-        if not text or len(text.strip()) < 50:
-            return True
-
-        # Verificar palavras comuns em português
-        palavras_comuns = [
-            'de', 'do', 'da', 'em', 'para', 'que', 'com', 'os', 'as',
-            'um', 'uma', 'no', 'na', 'ao', 'pela', 'pelo', 'este', 'esta'
-        ]
-        text_lower = text.lower()
-        palavras_encontradas = sum(1 for p in palavras_comuns if f' {p} ' in text_lower)
-
-        if palavras_encontradas < 5:
-            return True
-
-        # Verificar proporção de letras
-        letras = sum(1 for c in text if c.isalpha())
-        total = len(text.replace(' ', '').replace('\n', ''))
-
-        if total > 0 and letras / total < 0.5:
-            return True
-
-        return False
 
     def _generate_report(
         self,
@@ -278,7 +253,7 @@ class QualityDetector:
         self,
         pipeline: ExtractionPipeline,
         num_pages: int
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """Retorna estimativa de custo detalhada."""
         base_cost = self.COST_PER_PAGE[pipeline] * num_pages
 

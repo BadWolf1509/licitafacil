@@ -8,6 +8,10 @@ import os
 from typing import List, Dict, Any, Optional
 from enum import Enum
 from dotenv import load_dotenv
+from exceptions import AINotConfiguredError
+
+from logging_config import get_logger
+logger = get_logger('services.ai_provider')
 
 load_dotenv()
 
@@ -90,7 +94,7 @@ class AIProviderManager:
         available = self.available_providers
 
         if not available:
-            raise Exception("Nenhum provedor de IA configurado. Configure OPENAI_API_KEY ou GOOGLE_API_KEY.")
+            raise AINotConfiguredError()
 
         # Se especificado um preferido e está disponível
         if preferred and preferred in available:
@@ -141,7 +145,7 @@ class AIProviderManager:
 
             if fallback:
                 fallback_provider = fallback[0]
-                print(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
+                logger.warning(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
 
                 if fallback_provider == "gemini":
                     return self._get_gemini().extract_atestado_from_images(images)
@@ -185,7 +189,7 @@ class AIProviderManager:
 
             if fallback:
                 fallback_provider = fallback[0]
-                print(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
+                logger.warning(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
 
                 if fallback_provider == "gemini":
                     return self._get_gemini().extract_atestado_info(texto)
