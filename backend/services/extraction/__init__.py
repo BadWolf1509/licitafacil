@@ -45,6 +45,13 @@ from .service_filter import (
     dominant_item_length,
 )
 
+from .quality_assessor import (
+    compute_servicos_stats,
+    compute_description_quality,
+    is_ocr_noisy,
+    compute_quality_score,
+)
+
 __all__ = [
     # text_normalizer
     'normalize_description',
@@ -80,4 +87,9 @@ __all__ = [
     'servico_key',
     'merge_servicos_prefer_primary',
     'dominant_item_length',
+    # quality_assessor
+    'compute_servicos_stats',
+    'compute_description_quality',
+    'is_ocr_noisy',
+    'compute_quality_score',
 ]

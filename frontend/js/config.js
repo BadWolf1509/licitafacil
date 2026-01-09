@@ -4,6 +4,9 @@ const CONFIG = {
     // URL base da API (alterar em produção)
     API_URL: window.location.origin,
 
+    // Prefixo de versão da API
+    API_PREFIX: '/api/v1',
+
     // Chaves do localStorage
     TOKEN_KEY: 'licitafacil_token',
     USER_KEY: 'licitafacil_user',
@@ -19,7 +22,7 @@ const api = {
      * @returns {Promise<object>} - Resposta da API
      */
     async request(endpoint, options = {}) {
-        const url = CONFIG.API_URL + endpoint;
+        const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
         const token = localStorage.getItem(CONFIG.TOKEN_KEY);
 
         const headers = {
@@ -87,7 +90,7 @@ const api = {
      * @returns {Promise<object>} - Resposta da API
      */
     async upload(endpoint, formData) {
-        const url = CONFIG.API_URL + endpoint;
+        const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
         const token = localStorage.getItem(CONFIG.TOKEN_KEY);
 
         const headers = {};

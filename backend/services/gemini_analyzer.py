@@ -10,6 +10,7 @@ from typing import List, Dict, Any
 from dotenv import load_dotenv
 from utils.json_helpers import clean_json_response
 from exceptions import AINotConfiguredError, GeminiError
+from config import AIModelConfig
 
 load_dotenv()
 
@@ -31,15 +32,15 @@ class GeminiAnalyzer:
                 self._client = genai.Client(api_key=api_key)
                 self._types = types
                 self._use_new = True
-                self._model = "gemini-2.0-flash"  # Modelo mais rapido e economico
-                self._pro_model = "gemini-2.0-flash"
+                self._model = AIModelConfig.GEMINI_MODEL
+                self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
             except ImportError:
                 try:
                     import google.generativeai as genai_old
                     genai_old.configure(api_key=api_key)
                     self._client = genai_old
-                    self._model = "gemini-2.0-flash"
-                    self._pro_model = "gemini-2.0-flash"
+                    self._model = AIModelConfig.GEMINI_MODEL
+                    self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
                 except ImportError:
                     self._client = None
                     self._model = None
@@ -67,8 +68,8 @@ class GeminiAnalyzer:
             if self._use_new:
                 config = self._types.GenerateContentConfig(
                     system_instruction=system_prompt,
-                    temperature=0,
-                    max_output_tokens=16000,
+                    temperature=AIModelConfig.GEMINI_TEMPERATURE,
+                    max_output_tokens=AIModelConfig.GEMINI_MAX_TOKENS,
                     response_mime_type="application/json"
                 )
                 response = self._client.models.generate_content(
@@ -86,8 +87,8 @@ class GeminiAnalyzer:
             response = model.generate_content(
                 user_prompt,
                 generation_config={
-                    "temperature": 0,
-                    "max_output_tokens": 16000,
+                    "temperature": AIModelConfig.GEMINI_TEMPERATURE,
+                    "max_output_tokens": AIModelConfig.GEMINI_MAX_TOKENS,
                     "response_mime_type": "application/json"
                 }
             )
@@ -127,8 +128,8 @@ class GeminiAnalyzer:
 
                 config = self._types.GenerateContentConfig(
                     system_instruction=system_prompt,
-                    temperature=0,
-                    max_output_tokens=16000,
+                    temperature=AIModelConfig.GEMINI_TEMPERATURE,
+                    max_output_tokens=AIModelConfig.GEMINI_MAX_TOKENS,
                     response_mime_type="application/json"
                 )
                 response = self._client.models.generate_content(
@@ -156,8 +157,8 @@ class GeminiAnalyzer:
             response = model.generate_content(
                 content_parts,
                 generation_config={
-                    "temperature": 0,
-                    "max_output_tokens": 16000,
+                    "temperature": AIModelConfig.GEMINI_TEMPERATURE,
+                    "max_output_tokens": AIModelConfig.GEMINI_MAX_TOKENS,
                     "response_mime_type": "application/json"
                 }
             )

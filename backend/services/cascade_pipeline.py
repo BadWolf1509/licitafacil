@@ -33,7 +33,8 @@ from exceptions import (
     AzureNotConfiguredError,
     AINotConfiguredError
 )
-from text_utils import is_garbage_text
+from .text_utils import is_garbage_text
+from config import PipelineConfig, OCRConfig
 
 
 class PipelineStage(Enum):
@@ -72,10 +73,10 @@ class CascadePipeline:
     apenas quando necessário.
     """
 
-    # Configurações de confiança mínima para aceitar resultado
-    MIN_CONFIDENCE_LOCAL_OCR = 0.70
-    MIN_CONFIDENCE_CLOUD_OCR = 0.85
-    MIN_TEXT_LENGTH = 100
+    # Configurações carregadas de config.py (podem ser sobrescritas via env vars)
+    MIN_CONFIDENCE_LOCAL_OCR = PipelineConfig.MIN_CONFIDENCE_LOCAL_OCR
+    MIN_CONFIDENCE_CLOUD_OCR = PipelineConfig.MIN_CONFIDENCE_CLOUD_OCR
+    MIN_TEXT_LENGTH = OCRConfig.MIN_TEXT_LENGTH
 
     def __init__(self):
         self._force_pipeline: Optional[ExtractionPipeline] = None

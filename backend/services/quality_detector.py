@@ -12,7 +12,7 @@ import pdfplumber
 import fitz  # PyMuPDF
 
 from .image_preprocessor import image_preprocessor
-from text_utils import is_garbage_text
+from .text_utils import is_garbage_text
 
 
 class DocumentQuality(Enum):
@@ -229,25 +229,6 @@ class QualityDetector:
             summary=summary,
             estimated_cost=round(estimated_cost, 4)
         )
-
-    def get_pipeline_for_quality(self, quality: DocumentQuality) -> ExtractionPipeline:
-        """Retorna o pipeline recomendado para um nível de qualidade."""
-        mapping = {
-            DocumentQuality.NATIVE: ExtractionPipeline.NATIVE_TEXT,
-            DocumentQuality.EASY: ExtractionPipeline.LOCAL_OCR,
-            DocumentQuality.MEDIUM: ExtractionPipeline.LOCAL_OCR,
-            DocumentQuality.HARD: ExtractionPipeline.CLOUD_OCR,
-            DocumentQuality.VERY_HARD: ExtractionPipeline.VISION_AI,
-        }
-        return mapping[quality]
-
-    def should_use_preprocessing(self, quality: DocumentQuality) -> bool:
-        """Verifica se deve usar pré-processamento de imagem."""
-        return quality in [
-            DocumentQuality.MEDIUM,
-            DocumentQuality.HARD,
-            DocumentQuality.VERY_HARD
-        ]
 
     def get_cost_estimate(
         self,

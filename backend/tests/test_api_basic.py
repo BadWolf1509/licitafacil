@@ -3,6 +3,8 @@ Testes basicos da API.
 """
 from fastapi.testclient import TestClient
 
+from config import API_PREFIX
+
 
 class TestHealthEndpoint:
     """Testes para o endpoint de health check."""
@@ -58,26 +60,26 @@ class TestAuthEndpoints:
 
     def test_login_missing_credentials(self, client: TestClient):
         """Verifica erro ao fazer login sem credenciais."""
-        response = client.post("/auth/login")
+        response = client.post(f"{API_PREFIX}/auth/login")
         assert response.status_code == 422  # Validation error
 
     def test_login_invalid_credentials(self, client: TestClient):
         """Verifica erro ao fazer login com credenciais invalidas."""
         response = client.post(
-            "/auth/login",
+            f"{API_PREFIX}/auth/login",
             data={"username": "inexistente@teste.com", "password": "senhaerrada"}
         )
         assert response.status_code == 401
 
     def test_protected_endpoint_without_token(self, client: TestClient):
         """Verifica que endpoints protegidos requerem token."""
-        response = client.get("/atestados/")
+        response = client.get(f"{API_PREFIX}/atestados/")
         assert response.status_code == 401
 
     def test_protected_endpoint_with_invalid_token(self, client: TestClient):
         """Verifica rejeicao de token invalido."""
         response = client.get(
-            "/atestados/",
+            f"{API_PREFIX}/atestados/",
             headers={"Authorization": "Bearer token_invalido_123"}
         )
         assert response.status_code == 401

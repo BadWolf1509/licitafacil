@@ -13,7 +13,7 @@ from services.ai_provider import ai_provider
 from services.processing_queue import processing_queue, JobStatus, ProcessingJob
 from config import Messages
 
-router = APIRouter(prefix="/api/ai", tags=["ai"])
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 def _get_job_with_permission(

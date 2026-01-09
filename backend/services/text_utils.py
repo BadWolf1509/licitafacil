@@ -5,7 +5,7 @@ Funções extraídas do document_processor.py para melhor organização.
 """
 import re
 import unicodedata
-from typing import Set, Optional
+from typing import Set
 
 
 def normalize_description(desc: str) -> str:
@@ -73,20 +73,6 @@ def extract_keywords(text: str, min_length: int = 3) -> Set[str]:
     return {w for w in words if len(w) >= min_length and w not in stopwords}
 
 
-def jaccard_similarity(set1: Set[str], set2: Set[str]) -> float:
-    """
-    Calcula a similaridade de Jaccard entre dois conjuntos.
-
-    Returns:
-        Valor entre 0.0 e 1.0
-    """
-    if not set1 or not set2:
-        return 0.0
-    intersection = len(set1 & set2)
-    union = len(set1 | set2)
-    return intersection / union if union > 0 else 0.0
-
-
 def is_garbage_text(text: str, threshold: float = 0.4) -> bool:
     """
     Verifica se um texto parece ser lixo de OCR.
@@ -107,59 +93,3 @@ def is_garbage_text(text: str, threshold: float = 0.4) -> bool:
 
     ratio = alnum_count / total_count if total_count > 0 else 0
     return ratio < (1 - threshold)
-
-
-def extract_item_code(text: str) -> Optional[str]:
-    """
-    Extrai código de item de uma descrição (ex: "4.2.1" de "4.2.1 DESCRIÇÃO...").
-
-    Returns:
-        Código do item ou None se não encontrado
-    """
-    if not text:
-        return None
-
-    # Padrões comuns de código de item
-    patterns = [
-        r'^(\d{1,3}(?:\.\d{1,3}){1,4})\s',  # 4.2.1 ou 4.2.1.3
-        r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\s',  # 4 2 1 (espaço separado)
-    ]
-
-    for pattern in patterns:
-        match = re.match(pattern, text.strip())
-        if match:
-            code = match.group(1)
-            # Normalizar formato (trocar espaços por pontos)
-            code = re.sub(r'\s+', '.', code)
-            return code
-
-    return None
-
-
-def clean_description(text: str, remove_item_code: bool = True) -> str:
-    """
-    Limpa uma descrição removendo código de item e caracteres extras.
-
-    Args:
-        text: Texto a limpar
-        remove_item_code: Se True, remove código de item do início
-
-    Returns:
-        Descrição limpa
-    """
-    if not text:
-        return ""
-
-    text = text.strip()
-
-    if remove_item_code:
-        # Remover código de item do início
-        text = re.sub(r'^(\d{1,3}(?:\.\d{1,3}){0,4})\s*', '', text)
-
-    # Remover caracteres de controle
-    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
-
-    # Normalizar espaços
-    text = re.sub(r'\s+', ' ', text)
-
-    return text.strip()

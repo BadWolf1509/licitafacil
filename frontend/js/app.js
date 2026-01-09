@@ -66,12 +66,14 @@ async function verificarAutenticacao() {
 async function carregarDashboard() {
     try {
         // Carregar atestados
-        const atestados = await api.get('/atestados/');
-        document.getElementById('totalAtestados').textContent = atestados.length;
+        const atestadosResp = await api.get('/atestados/');
+        const atestados = atestadosResp.items || [];
+        document.getElementById('totalAtestados').textContent = atestadosResp.total || atestados.length;
 
         // Carregar análises
-        const analises = await api.get('/analises/');
-        document.getElementById('totalAnalises').textContent = analises.length;
+        const analisesResp = await api.get('/analises/');
+        const analises = analisesResp.items || [];
+        document.getElementById('totalAnalises').textContent = analisesResp.total || analises.length;
 
         // Contar licitações atendidas
         const atendidas = analises.filter(a =>

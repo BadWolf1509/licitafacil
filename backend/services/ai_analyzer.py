@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from utils.json_helpers import clean_json_response
 from exceptions import AINotConfiguredError, OpenAIError
 from services.extraction import filter_classification_paths
+from config import AIModelConfig
 
 load_dotenv()
 
@@ -27,8 +28,8 @@ class AIAnalyzer:
         else:
             self._client = OpenAI(api_key=api_key)
 
-        self._model = "gpt-4o-mini"  # Modelo para texto
-        self._vision_model = "gpt-4o"  # Modelo com capacidade de visão
+        self._model = AIModelConfig.OPENAI_TEXT_MODEL
+        self._vision_model = AIModelConfig.OPENAI_VISION_MODEL
 
     @property
     def is_configured(self) -> bool:
@@ -56,8 +57,8 @@ class AIAnalyzer:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0,  # Zero para máxima consistência
-                max_tokens=16000  # Aumentado para extrair todos os serviços detalhados
+                temperature=AIModelConfig.OPENAI_TEMPERATURE,
+                max_tokens=AIModelConfig.OPENAI_MAX_TOKENS
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -101,8 +102,8 @@ class AIAnalyzer:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": content}
                 ],
-                temperature=0,
-                max_tokens=16000
+                temperature=AIModelConfig.OPENAI_TEMPERATURE,
+                max_tokens=AIModelConfig.OPENAI_MAX_TOKENS
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -151,6 +152,9 @@ REGRAS CRÍTICAS:
 - Inclua o código na descrição quando disponível (ex: "001.03.11 PORTÃO DE FERRO")
 - NÃO ignore nenhuma série ou seção do documento
 - Continue até o final da última página
+- EXTRAIA TAMBÉM itens de MATERIAL (aço, vergalhão, cimento, areia, etc.) - são itens válidos!
+- Itens curtos como "ACO CA-50, 10,0 MM, VERGALHAO" são itens legítimos da planilha
+- NÃO pule itens mesmo que pareçam relacionados a outros (ex: 3.3 Armação... e 3.6 Aço... são DISTINTOS)
 
 O QUE IGNORAR (não são serviços da tabela):
 - Seção "Atividade Técnica" da CAT/ART - contém classificação, não serviços individuais
@@ -162,6 +166,31 @@ DESCRICAO COMPLETA DA LINHA:
 - Transcreva a descricao completa da linha (nao abreviar)
 - Se a descricao continuar na linha seguinte, una as partes
 - Nao corte o texto apos poucas palavras
+
+PROBLEMA CRÍTICO - DESCRIÇÕES QUEBRADAS EM MÚLTIPLAS LINHAS:
+Em tabelas de planilha orçamentária, uma ÚNICA descrição de serviço pode ocupar 2-3 linhas.
+O número do item seguinte aparece VISUALMENTE ao lado da continuação da descrição anterior.
+
+COMO ISSO APARECE NA IMAGEM:
+```
+12.11 | CAIXA ENTERRADA HIDRÁULICA RETANGULAR EM ALVENARIA COM    | UN | 1,00
+12.12 | TIJOLOS CERÂMICOS MACIÇOS, DIMENSÕES: 0,30X0,30X0,30 M    | UN | 2,00
+12.13 | COLETOR PREDIAL DE ESGOTO...                              | UN | 1,00
+```
+
+ERRO COMUM: Interpretar 12.12 como item separado "TIJOLOS CERÂMICOS..."
+CORRETO: 12.11 = "CAIXA ENTERRADA... COM TIJOLOS CERÂMICOS MACIÇOS, DIMENSÕES..."
+
+TESTE DE VALIDAÇÃO - APLIQUE SEMPRE:
+1. Leia a descrição em voz alta - faz sentido gramatical completo?
+2. "...EM ALVENARIA COM" termina com preposição = INCOMPLETO = é continuação!
+3. "TIJOLOS CERÂMICOS MACIÇOS, DIMENSÕES..." sem verbo/contexto = é CONTINUAÇÃO!
+
+REGRA OBRIGATÓRIA:
+- Se descrição termina em: COM, DE, EM, PARA, E, OU, ATRAVÉS, MEDIANTE, SOBRE, SOB
+  → O texto da próxima linha visual FAZ PARTE desta descrição
+  → IGNORE o número de item que aparece antes desse texto
+  → UNA as partes em uma descrição única
 
 FORMATO DE NÚMEROS BRASILEIRO:
 - "1.843,84" = 1843.84 (ponto separa milhar, vírgula separa decimal)
@@ -202,20 +231,72 @@ INSTRUÇÕES CRÍTICAS:
 6. NÃO omita nenhum item - extraia a lista COMPLETA
 7. Escreva a descrição completa da linha; não abrevie nem corte
 8. Se a descrição estiver quebrada em duas linhas, una as partes
+9. EXTRAIA ITENS DE MATERIAL (ex: "ACO CA-50, 10,0 MM, VERGALHAO") - são itens válidos!
+10. Se uma seção tem itens 3.1-3.5 E TAMBÉM 3.6-3.8, extraia TODOS (não pule os de material)
+11. MESMO QUE QUANTIDADES SEJAM IGUAIS, itens com NÚMEROS DIFERENTES são DISTINTOS!
+    Exemplo: 3.3 "Armação aço 5mm" (95,70 KG) e 3.6 "Aço vergalhão 5mm" (95,70 KG) = 2 ITENS!
+12. NÃO interprete itens de material como "parte" de itens de serviço - são linhas SEPARADAS
 
-CONTA FINAL: Ao terminar, verifique se extraiu todos os itens de todas as séries."""
+REGRA CRÍTICA - COPIE A DESCRIÇÃO EXATA:
+13. Leia a descrição de CADA LINHA individualmente e copie EXATAMENTE o que está escrito
+14. NÃO generalize descrições! Se a linha diz "ACO CA-60, 5,0 MM, VERGALHAO", copie isso EXATAMENTE
+15. Itens diferentes têm descrições DIFERENTES - não copie a descrição de um item para outro
+16. Exemplo ERRADO: item 3.6 com descrição "ARMAÇÃO DE LAJE..." quando deveria ser "ACO CA-60, VERGALHAO"
+17. Exemplo CORRETO: item 3.6 = "ACO CA-60, 5,0 MM, VERGALHAO" (descrição exata da linha 3.6)
+
+CONTA FINAL: Conte as linhas numeradas na tabela. Cada número (3.1, 3.2, 3.3...) = 1 item.
+Se você vê 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 na tabela = extraia 8 itens da seção 3."""
 
         try:
-            response = self._call_openai_vision(system_prompt, images, user_text)
-            # Limpar resposta e extrair JSON
-            response = clean_json_response(response)
-            result = json.loads(response)
+            # Se houver mais de 2 páginas, processar em batches para garantir extração completa
+            if len(images) > 2:
+                all_servicos = []
+                result = None
+
+                # Processar em batches de 2 páginas
+                for i in range(0, len(images), 2):
+                    batch = images[i:i+2]
+                    batch_user_text = user_text
+                    if i > 0:
+                        batch_user_text += f"\n\nEsta é a continuação do documento (páginas {i+1}-{min(i+2, len(images))})."
+
+                    response = self._call_openai_vision(system_prompt, batch, batch_user_text)
+                    response = clean_json_response(response)
+                    batch_result = json.loads(response)
+
+                    # Guardar metadados do primeiro batch
+                    if result is None:
+                        result = batch_result
+
+                    # Coletar serviços de todos os batches
+                    if "servicos" in batch_result and batch_result["servicos"]:
+                        all_servicos.extend(batch_result["servicos"])
+
+                # Merge: remover duplicatas por item
+                seen_items: set[str] = set()
+                unique_servicos: list[dict[str, Any]] = []
+                for s in all_servicos:
+                    item = s.get("item", "")
+                    if item and item not in seen_items:
+                        seen_items.add(item)
+                        unique_servicos.append(s)
+                    elif not item:
+                        unique_servicos.append(s)
+
+                # Garantir que result foi inicializado
+                if result is None:
+                    result = {}
+                result["servicos"] = unique_servicos
+            else:
+                response = self._call_openai_vision(system_prompt, images, user_text)
+                response = clean_json_response(response)
+                result = json.loads(response) or {}
 
             # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
-            if "servicos" in result and result["servicos"]:
+            if result and "servicos" in result and result["servicos"]:
                 result["servicos"] = filter_classification_paths(result["servicos"])
 
-            return result
+            return result or {}
         except json.JSONDecodeError:
             return {
                 "descricao_servico": None,
@@ -415,121 +496,6 @@ Exemplo de resposta:
             return json.loads(response)
         except json.JSONDecodeError:
             return []
-
-    def match_atestados_to_requirements(
-        self,
-        requirements: List[Dict[str, Any]],
-        atestados: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Faz o matching entre exigências do edital e atestados disponíveis.
-
-        Args:
-            requirements: Lista de exigências do edital
-            atestados: Lista de atestados do usuário
-
-        Returns:
-            Lista de resultados com status de atendimento
-        """
-        system_prompt = """Você é um especialista em qualificação técnica para licitações públicas no Brasil.
-
-Analise as exigências do edital e os atestados disponíveis. Para cada exigência:
-1. Identifique quais atestados são compatíveis (mesmo tipo de serviço)
-2. Verifique se a quantidade atende (soma dos atestados >= quantidade mínima exigida)
-3. A soma de atestados é SEMPRE permitida conforme Art. 67 da Lei 14.133/2021
-
-Retorne um JSON com o seguinte formato para cada exigência:
-{
-    "exigencia": "descrição da exigência",
-    "quantidade_exigida": 1000.0,
-    "unidade": "m²",
-    "atestados_compativeis": [
-        {"id": 1, "descricao": "...", "quantidade": 500.0}
-    ],
-    "quantidade_atendida": 750.0,
-    "status": "atende" | "parcial" | "nao_atende",
-    "percentual_atendido": 75.0,
-    "observacao": "Sugestão ou observação"
-}"""
-
-        user_prompt = f"""EXIGÊNCIAS DO EDITAL:
-{json.dumps(requirements, ensure_ascii=False, indent=2)}
-
-ATESTADOS DISPONÍVEIS:
-{json.dumps(atestados, ensure_ascii=False, indent=2)}
-
-Faça o matching e retorne o resultado em JSON."""
-
-        try:
-            response = self._call_openai(system_prompt, user_prompt)
-            # Limpar resposta e extrair JSON
-            response = clean_json_response(response)
-            return json.loads(response)
-        except json.JSONDecodeError:
-            # Retornar resultado básico sem IA
-            return self._basic_matching(requirements, atestados)
-
-    def _basic_matching(
-        self,
-        requirements: List[Dict[str, Any]],
-        atestados: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Matching básico sem IA (fallback).
-
-        Usa comparação simples de strings para encontrar atestados compatíveis.
-        """
-        results = []
-
-        for req in requirements:
-            req_desc = req.get("descricao", "").lower()
-            req_qty = req.get("quantidade_minima", 0) or 0
-            req_unit = req.get("unidade", "")
-
-            compatible = []
-            total_qty = 0
-
-            for at in atestados:
-                at_desc = (at.get("descricao_servico") or "").lower()
-                at_qty = at.get("quantidade", 0) or 0
-                at_unit = at.get("unidade", "")
-
-                # Verificar compatibilidade básica (palavras em comum)
-                req_words = set(req_desc.split())
-                at_words = set(at_desc.split())
-                common_words = req_words & at_words
-
-                # Se tiver palavras significativas em comum e mesma unidade
-                significant_words = common_words - {"de", "do", "da", "em", "para", "com", "e", "a", "o"}
-                if len(significant_words) >= 2 and (at_unit.lower() == req_unit.lower() or not at_unit):
-                    compatible.append({
-                        "id": at.get("id"),
-                        "descricao": at.get("descricao_servico"),
-                        "quantidade": at_qty
-                    })
-                    total_qty += at_qty
-
-            # Calcular percentual e status
-            percentual = (total_qty / req_qty * 100) if req_qty > 0 else 0
-            if percentual >= 100:
-                status = "atende"
-            elif percentual >= 50:
-                status = "parcial"
-            else:
-                status = "nao_atende"
-
-            results.append({
-                "exigencia": req.get("descricao"),
-                "quantidade_exigida": req_qty,
-                "unidade": req_unit,
-                "atestados_compativeis": compatible,
-                "quantidade_atendida": total_qty,
-                "status": status,
-                "percentual_atendido": round(percentual, 2),
-                "observacao": None
-            })
-
-        return results
 
 
 # Instância singleton para uso global

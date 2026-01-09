@@ -1,117 +1,46 @@
 import os
 import shutil
 import uuid
-from datetime import datetime, date
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 
-from database import get_db, get_db_session
+from database import get_db
 from models import Usuario, Atestado
 from schemas import (
     AtestadoCreate, AtestadoUpdate, AtestadoServicosUpdate, AtestadoResponse,
     Mensagem, JobResponse, PaginatedAtestadoResponse
 )
 from auth import get_current_approved_user
-from services.processing_queue import processing_queue, JobStatus
+from services.processing_queue import processing_queue
+from services.atestado_service import ordenar_servicos, salvar_atestado_processado
 from config import (
     UPLOAD_DIR, Messages, validate_upload_file,
-    ALLOWED_DOCUMENT_EXTENSIONS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+    ALLOWED_DOCUMENT_EXTENSIONS
 )
+from utils.pagination import PaginationParams, paginate_query
 
 from logging_config import get_logger
 logger = get_logger('routers.atestados')
 
 
-def parse_date(date_str: Optional[str]) -> Optional[date]:
-    """Converte string de data para objeto date do Python."""
-    if not date_str:
-        return None
-    try:
-        # Tentar formato ISO (YYYY-MM-DD)
-        return datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
-        try:
-            # Tentar formato brasileiro (DD/MM/YYYY)
-            return datetime.strptime(date_str, "%d/%m/%Y").date()
-        except ValueError:
-            return None
-
-
-def _salvar_atestado_processado(job):
-    """Salva o resultado do processamento no banco."""
-    if job.status != JobStatus.COMPLETED:
-        return
-
-    result = job.result or {}
-    data_emissao = parse_date(result.get("data_emissao"))
-    servicos = result.get("servicos") or []
-
-    try:
-        with get_db_session() as db:
-            existente = db.query(Atestado).filter(
-                Atestado.user_id == job.user_id,
-                Atestado.arquivo_path == job.file_path
-            ).first()
-
-            if existente:
-                existente.descricao_servico = result.get("descricao_servico") or "Descricao nao identificada"
-                existente.quantidade = result.get("quantidade") or 0
-                existente.unidade = result.get("unidade") or ""
-                existente.contratante = result.get("contratante")
-                existente.data_emissao = data_emissao
-                existente.texto_extraido = result.get("texto_extraido")
-                existente.servicos_json = servicos if servicos else None
-                db.commit()
-                return
-
-            novo_atestado = Atestado(
-                user_id=job.user_id,
-                descricao_servico=result.get("descricao_servico") or "Descricao nao identificada",
-                quantidade=result.get("quantidade") or 0,
-                unidade=result.get("unidade") or "",
-                contratante=result.get("contratante"),
-                data_emissao=data_emissao,
-                arquivo_path=job.file_path,
-                texto_extraido=result.get("texto_extraido"),
-                servicos_json=servicos if servicos else None
-            )
-            db.add(novo_atestado)
-            db.commit()
-    except Exception as e:
-        logger.error(f"Erro ao salvar atestado do job {job.id}: {e}")
-
-
-processing_queue.register_callback("atestado", _salvar_atestado_processado)
+# Registrar callback para processamento de atestados
+processing_queue.register_callback("atestado", salvar_atestado_processado)
 
 router = APIRouter(prefix="/atestados", tags=["Atestados"])
 
 
 @router.get("/", response_model=PaginatedAtestadoResponse)
 def listar_atestados(
-    page: int = Query(1, ge=1, description="Número da página"),
-    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Itens por página"),
+    pagination: PaginationParams = Depends(),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
 ):
     """Lista todos os atestados do usuário logado com paginação."""
-    # Contar total
-    total = db.query(Atestado).filter(
+    query = db.query(Atestado).filter(
         Atestado.user_id == current_user.id
-    ).count()
+    ).order_by(Atestado.created_at.desc())
 
-    # Buscar página
-    offset = (page - 1) * page_size
-    atestados = db.query(Atestado).filter(
-        Atestado.user_id == current_user.id
-    ).order_by(Atestado.created_at.desc()).offset(offset).limit(page_size).all()
-
-    return PaginatedAtestadoResponse.create(
-        items=atestados,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return paginate_query(query, pagination, PaginatedAtestadoResponse)
 
 
 @router.get("/{atestado_id}", response_model=AtestadoResponse)
@@ -129,7 +58,7 @@ def obter_atestado(
     if not atestado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atestado não encontrado"
+            detail=Messages.ATESTADO_NOT_FOUND
         )
     return atestado
 
@@ -192,10 +121,10 @@ async def upload_atestado(
             user_id=current_user.id,
             file_path=filepath,
             job_type="atestado",
-            callback=_salvar_atestado_processado
+            callback=salvar_atestado_processado
         )
         return JobResponse(
-            mensagem="Arquivo enviado. Processamento iniciado.",
+            mensagem=Messages.UPLOAD_SUCCESS,
             sucesso=True,
             job_id=job_id
         )
@@ -224,13 +153,13 @@ async def reprocessar_atestado(
     if not atestado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atestado nao encontrado"
+            detail=Messages.ATESTADO_NOT_FOUND
         )
 
     if not atestado.arquivo_path or not os.path.exists(atestado.arquivo_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Arquivo do atestado nao encontrado"
+            detail=Messages.ATESTADO_FILE_NOT_FOUND
         )
 
     try:
@@ -240,7 +169,7 @@ async def reprocessar_atestado(
             user_id=current_user.id,
             file_path=atestado.arquivo_path,
             job_type="atestado",
-            callback=_salvar_atestado_processado
+            callback=salvar_atestado_processado
         )
         return JobResponse(
             mensagem="Reprocessamento iniciado.",
@@ -271,7 +200,7 @@ def atualizar_atestado(
     if not atestado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atestado não encontrado"
+            detail=Messages.ATESTADO_NOT_FOUND
         )
 
     # Atualizar campos fornecidos
@@ -307,11 +236,12 @@ def atualizar_servicos(
     if not atestado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atestado não encontrado"
+            detail=Messages.ATESTADO_NOT_FOUND
         )
 
-    # Converter ServicoAtestado para dict para salvar no JSON
-    atestado.servicos_json = [s.model_dump() for s in dados.servicos_json]
+    # Converter ServicoAtestado para dict e ordenar por item
+    servicos_dict = [s.model_dump() for s in dados.servicos_json]
+    atestado.servicos_json = ordenar_servicos(servicos_dict)
 
     db.commit()
     db.refresh(atestado)
@@ -333,7 +263,7 @@ def excluir_atestado(
     if not atestado:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Atestado não encontrado"
+            detail=Messages.ATESTADO_NOT_FOUND
         )
 
     # Remover arquivo se existir
@@ -344,6 +274,6 @@ def excluir_atestado(
     db.commit()
 
     return Mensagem(
-        mensagem="Atestado excluído com sucesso!",
+        mensagem=Messages.ATESTADO_DELETED,
         sucesso=True
     )

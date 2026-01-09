@@ -13,8 +13,6 @@ load_dotenv()
 # === Diretórios ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
-UPLOAD_DIR_EDITAIS = os.path.join(UPLOAD_DIR, "editais")
-UPLOAD_DIR_ATESTADOS = os.path.join(UPLOAD_DIR, "atestados")
 
 
 # === Extensões de Arquivo Permitidas ===
@@ -54,7 +52,7 @@ CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == 
 
 # === Rate Limiting ===
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))  # requests per window
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "300"))  # requests per window
 RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # window in seconds
 
 
@@ -90,24 +88,38 @@ JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
 # === Mensagens de Erro Padronizadas ===
 class Messages:
+    # Recursos não encontrados
     NOT_FOUND = "Recurso não encontrado"
     ATESTADO_NOT_FOUND = "Atestado não encontrado"
     ANALISE_NOT_FOUND = "Análise não encontrada"
     USER_NOT_FOUND = "Usuário não encontrado"
     JOB_NOT_FOUND = "Job não encontrado"
     FILE_NOT_FOUND = "Arquivo não encontrado"
+    ATESTADO_FILE_NOT_FOUND = "Arquivo do atestado não encontrado"
+    EDITAL_FILE_NOT_FOUND = "Arquivo do edital não encontrado"
+    # Valores padrão
+    DESCRICAO_NAO_IDENTIFICADA = "Descrição não identificada"
+    # Acesso e autenticação
     ACCESS_DENIED = "Acesso negado"
     UNAUTHORIZED = "Acesso não autorizado"
     FORBIDDEN = "Acesso proibido"
+    CANNOT_DEACTIVATE_SELF = "Você não pode desativar sua própria conta"
+    # Validação de arquivos
     INVALID_FILE = "Arquivo inválido"
     INVALID_EXTENSION = "Extensão de arquivo não permitida"
     FILE_REQUIRED = "Arquivo é obrigatório"
+    # Rate limiting e erros
     RATE_LIMIT_EXCEEDED = "Muitas requisições. Tente novamente em alguns minutos."
     INTERNAL_ERROR = "Erro interno do servidor"
     DB_ERROR = "Erro ao acessar o banco de dados"
     DUPLICATE_ENTRY = "Registro já existe"
     PROCESSING_ERROR = "Erro ao processar documento. Tente novamente."
     QUEUE_ERROR = "Erro ao enfileirar processamento. Tente novamente."
+    # Atestados
+    NO_ATESTADOS = "Você não possui atestados cadastrados. Cadastre atestados antes de analisar uma licitação."
+    UPLOAD_SUCCESS = "Arquivo enviado. Processamento iniciado."
+    ATESTADO_DELETED = "Atestado excluído com sucesso!"
+    ANALISE_DELETED = "Análise excluída com sucesso!"
 
 
 # === Processamento ===
@@ -118,6 +130,68 @@ OCR_MAX_WORKERS = int(os.getenv("OCR_MAX_WORKERS", "4"))
 # === Paginação ===
 DEFAULT_PAGE_SIZE = int(os.getenv("DEFAULT_PAGE_SIZE", "20"))
 MAX_PAGE_SIZE = int(os.getenv("MAX_PAGE_SIZE", "100"))
+
+
+# === Configurações de OCR ===
+class OCRConfig:
+    """Configurações para processamento OCR."""
+    DPI = int(os.getenv("OCR_DPI", "300"))
+    MIN_TEXT_PER_PAGE = int(os.getenv("OCR_MIN_TEXT_PER_PAGE", "200"))
+    MIN_TEXT_LENGTH = int(os.getenv("OCR_MIN_TEXT_LENGTH", "100"))
+    MIN_CONFIDENT_CHARS = int(os.getenv("OCR_MIN_CONFIDENT_CHARS", "20"))
+
+
+# === Configurações do Pipeline ===
+class PipelineConfig:
+    """Configurações de confiança do pipeline de extração."""
+    MIN_CONFIDENCE_LOCAL_OCR = float(os.getenv("MIN_CONFIDENCE_LOCAL_OCR", "0.70"))
+    MIN_CONFIDENCE_CLOUD_OCR = float(os.getenv("MIN_CONFIDENCE_CLOUD_OCR", "0.85"))
+
+
+# === Configurações de Modelos de IA ===
+class AIModelConfig:
+    """Configurações dos modelos de IA."""
+    # OpenAI
+    OPENAI_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
+    OPENAI_VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4o")
+    OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "16000"))
+    OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0"))
+    # Gemini
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-2.0-flash")
+    GEMINI_MAX_TOKENS = int(os.getenv("GEMINI_MAX_TOKENS", "16000"))
+    GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0"))
+
+
+# === Configurações de Extração de Tabelas ===
+class TableExtractionConfig:
+    """Configurações para extração e parsing de tabelas."""
+    HEADER_ROWS_LIMIT = int(os.getenv("TABLE_HEADER_ROWS_LIMIT", "5"))
+    HEADER_MIN_KEYWORD_MATCHES = int(os.getenv("TABLE_HEADER_MIN_KEYWORDS", "2"))
+    MIN_DESCRIPTION_LENGTH = int(os.getenv("TABLE_MIN_DESC_LENGTH", "5"))
+    # Validação de colunas
+    MIN_UNIT_RATIO = float(os.getenv("TABLE_MIN_UNIT_RATIO", "0.2"))
+    MIN_QTY_RATIO = float(os.getenv("TABLE_MIN_QTY_RATIO", "0.35"))
+    MIN_DESC_LEN = float(os.getenv("TABLE_MIN_DESC_LEN", "10.0"))
+    MAX_DESC_NUMERIC = float(os.getenv("TABLE_MAX_DESC_NUMERIC", "0.6"))
+    # Pesos de scoring para detecção de coluna de item
+    ITEM_SCORE_PATTERN_WEIGHT = float(os.getenv("ITEM_SCORE_PATTERN_WEIGHT", "0.45"))
+    ITEM_SCORE_SEQ_WEIGHT = float(os.getenv("ITEM_SCORE_SEQ_WEIGHT", "0.2"))
+    ITEM_SCORE_UNIQUE_WEIGHT = float(os.getenv("ITEM_SCORE_UNIQUE_WEIGHT", "0.2"))
+    ITEM_SCORE_LEFT_BIAS_WEIGHT = float(os.getenv("ITEM_SCORE_LEFT_BIAS_WEIGHT", "0.1"))
+    ITEM_SCORE_LENGTH_BONUS_WEIGHT = float(os.getenv("ITEM_SCORE_LENGTH_BONUS_WEIGHT", "0.05"))
+
+
+# === Configurações de Deduplicação ===
+class DeduplicationConfig:
+    """Configurações para detecção de duplicatas."""
+    SIMILARITY_THRESHOLD = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.5"))
+    MAX_DESC_CHARS = int(os.getenv("DEDUP_MAX_DESC_CHARS", "50"))
+    ITEM_LENGTH_RATIO = float(os.getenv("ATTESTADO_ITEM_LEN_RATIO", "0.6"))
+    ITEM_LENGTH_KEEP_MIN_DESC = int(os.getenv("ATTESTADO_ITEM_LEN_KEEP_MIN_DESC", "20"))
+    ITEM_PREFIX_RATIO = float(os.getenv("ATTESTADO_ITEM_PREFIX_RATIO", "0.7"))
+    ITEM_PREFIX_KEEP_MIN_DESC = int(os.getenv("ATTESTADO_ITEM_PREFIX_KEEP_MIN_DESC", "15"))
+    ITEM_COL_MIN_SCORE = float(os.getenv("ATTESTADO_ITEM_COL_MIN_SCORE", "0.5"))
 
 
 # === API Versioning ===

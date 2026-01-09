@@ -19,13 +19,55 @@ from .pdf_extractor import pdf_extractor
 from .ocr_service import ocr_service
 from .ai_provider import ai_provider
 from .document_ai_service import document_ai_service
+# Módulos extraídos para migração gradual - noqa: F401
+from .pdf_converter import pdf_converter  # noqa: F401
+from .extraction import (  # noqa: F401
+    # text_normalizer
+    normalize_description,
+    normalize_unit,
+    normalize_header,
+    extract_keywords,
+    description_similarity,
+    UNIT_TOKENS,
+    # table_processor
+    parse_item_tuple,
+    item_tuple_to_str,
+    parse_quantity,
+    score_item_column,
+    detect_header_row,
+    guess_columns_by_header,
+    compute_column_stats,
+    guess_columns_by_content,
+    validate_column_mapping,
+    build_description_from_cells,
+    # service_filter
+    filter_classification_paths,
+    remove_duplicate_services,
+    filter_servicos_by_item_length,
+    filter_servicos_by_item_prefix,
+    repair_missing_prefix,
+    is_summary_row,
+    filter_summary_rows,
+    deduplicate_by_description,
+    quantities_similar,
+    descriptions_similar,
+    items_similar,
+    servico_key,
+    merge_servicos_prefer_primary,
+    dominant_item_length,
+    # quality_assessor
+    compute_servicos_stats,
+    compute_description_quality,
+    is_ocr_noisy,
+    compute_quality_score,
+)
 from exceptions import (
     PDFError,
     OCRError,
     UnsupportedFileError,
     TextExtractionError
 )
-from text_utils import is_garbage_text
+from .text_utils import is_garbage_text
 
 from logging_config import get_logger
 logger = get_logger('services.document_processor')
@@ -827,20 +869,38 @@ class DocumentProcessor:
             "dominant_prefix": dominant_prefix,
             "ratio": round(ratio, 3),
             "applied": False,
-            "filtered_out": 0
+            "filtered_out": 0,
+            "kept_mismatch": 0
         }
         if ratio < min_ratio:
             return servicos, info
 
+        # Preservar itens com prefixo diferente se tiverem dados validos
+        # (caso de aditivos contratuais onde itens reiniciam em 1.1)
+        try:
+            min_desc_len = int(os.getenv("ATTESTADO_ITEM_PREFIX_KEEP_MIN_DESC", "15"))
+        except ValueError:
+            min_desc_len = 15
+
         filtered = []
+        kept_mismatch = 0
         for servico in servicos:
             item_val = servico.get("item")
             item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if not item_tuple or item_tuple[0] == dominant_prefix:
                 filtered.append(servico)
+            else:
+                # Item com prefixo diferente - manter se tiver dados validos
+                qty = self._parse_quantity(servico.get("quantidade"))
+                unit = self._normalize_unit(servico.get("unidade") or "")
+                desc = (servico.get("descricao") or "").strip()
+                if qty not in (None, 0) and unit and len(desc) >= min_desc_len:
+                    filtered.append(servico)
+                    kept_mismatch += 1
 
         info["applied"] = True
         info["filtered_out"] = len(servicos) - len(filtered)
+        info["kept_mismatch"] = kept_mismatch
         return filtered, info
 
     def _dominant_item_length(self, servicos: list) -> tuple[Optional[int], float]:
@@ -864,10 +924,16 @@ class DocumentProcessor:
 
         existing = {s.get("item") for s in servicos if s.get("item")}
         repaired = 0
+        skipped_small_prefix = 0
         for servico in servicos:
             item_val = servico.get("item")
             item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
             if not item_tuple or len(item_tuple) != 2:
+                continue
+            # Nao reparar itens que comecam com numeros pequenos (1, 2, 3)
+            # pois provavelmente sao secoes de aditivos contratuais
+            if item_tuple[0] <= 3:
+                skipped_small_prefix += 1
                 continue
             new_item = f"{dominant_prefix}.{self._item_tuple_to_str(item_tuple)}"
             if new_item in existing:
@@ -876,7 +942,7 @@ class DocumentProcessor:
             existing.add(new_item)
             repaired += 1
 
-        return servicos, {"applied": repaired > 0, "repaired": repaired}
+        return servicos, {"applied": repaired > 0, "repaired": repaired, "skipped_small_prefix": skipped_small_prefix}
 
     def _build_description_from_cells(self, cells: list, exclude_cols: set) -> str:
         parts = []
@@ -1058,13 +1124,45 @@ class DocumentProcessor:
             return [], 0.0, {"error": str(exc)}
         if not tables:
             return [], 0.0, {"tables": 0}
-        best: Dict[str, Any] = {"servicos": [], "confidence": 0.0, "debug": {}}
+
+        # Combinar servicos de TODAS as tabelas (não apenas a melhor)
+        all_servicos: list = []
+        all_confidences: list = []
+        best_debug: dict = {}
+        item_counts: dict[str, int] = {}  # Contador de ocorrências de cada item
+
         for table in tables:
             servicos, confidence, debug = self._extract_servicos_from_table(table)
-            if confidence > best["confidence"] or (confidence == best["confidence"] and len(servicos) > len(best["servicos"])):
-                best = {"servicos": servicos, "confidence": confidence, "debug": debug}
-        best["debug"]["tables"] = len(tables)
-        return best["servicos"], best["confidence"], best["debug"]
+            if servicos:
+                all_confidences.append(confidence)
+                if not best_debug or confidence > best_debug.get("confidence", 0):
+                    best_debug = debug
+
+                # Adicionar servicos, prefixando duplicados com AD{n}-
+                for s in servicos:
+                    item = s.get("item", "")
+                    if item:
+                        count = item_counts.get(item, 0)
+                        if count == 0:
+                            # Primeira ocorrência - manter item original
+                            item_counts[item] = 1
+                            all_servicos.append(s)
+                        else:
+                            # Item duplicado (aditivo) - prefixar com AD{n}-
+                            item_counts[item] = count + 1
+                            s_copy = s.copy()
+                            s_copy["item"] = f"AD{count}-{item}"
+                            all_servicos.append(s_copy)
+                    else:
+                        # Item sem número - adicionar diretamente
+                        all_servicos.append(s)
+
+        # Calcular confidence média
+        avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0.0
+        best_debug["tables"] = len(tables)
+        best_debug["combined_tables"] = len([c for c in all_confidences if c > 0])
+
+        return all_servicos, avg_confidence, best_debug
 
     def _extract_servicos_from_document_ai(self, file_path: str) -> tuple[list, float, dict]:
         if not document_ai_service.is_configured:
@@ -1788,6 +1886,17 @@ class DocumentProcessor:
             import re
             if re.search(r"\b\d{3}\s*\d{2}\s*\d{2}\b", normalized):
                 table_pages.append(index)
+
+        # Se encontramos páginas de tabela mas não a última, incluir páginas consecutivas
+        # pois tabelas frequentemente continuam em páginas seguintes sem cabeçalho
+        if table_pages and len(images) > 1:
+            max_detected = max(table_pages)
+            # Se há páginas após a última detectada, incluí-las
+            for i in range(max_detected + 1, len(images)):
+                if i not in table_pages:
+                    table_pages.append(i)
+            table_pages.sort()
+
         return table_pages
 
     def _extract_servicos_pagewise(self, images: List[bytes], progress_callback=None, cancel_check=None) -> List[dict]:
@@ -1798,6 +1907,7 @@ class DocumentProcessor:
         table_pages = self._detect_table_pages(images)
         page_indexes = table_pages if table_pages else list(range(total_pages))
         total = len(page_indexes)
+        logger.info(f"Pagewise: processando {total} paginas de {total_pages} - indices: {page_indexes}")
         for idx, page_index in enumerate(page_indexes):
             self._check_cancel(cancel_check)
             self._notify_progress(progress_callback, idx + 1, total, "ia", f"Analisando pagina {page_index + 1} de {total_pages} com IA")
@@ -1806,9 +1916,13 @@ class DocumentProcessor:
             try:
                 result = ai_provider.extract_atestado_from_images([cropped], provider="openai")
                 page_servicos = result.get("servicos", []) if isinstance(result, dict) else []
+                logger.info(f"Pagewise: pagina {page_index + 1} extraiu {len(page_servicos)} servicos")
+                for s in page_servicos:
+                    logger.debug(f"  Item: {s.get('item', '?')}: {s.get('descricao', '')[:50]}")
                 servicos.extend(page_servicos)
             except Exception as exc:
                 logger.warning(f"Erro na IA por pagina {page_index + 1}: {exc}")
+        logger.info(f"Pagewise: total extraido = {len(servicos)} servicos")
         return servicos
 
     def _extract_item_code(self, desc: str) -> str:
@@ -2111,56 +2225,6 @@ class DocumentProcessor:
                 item['descricao'] = better
         return items
 
-    def _merge_servicos(self, servicos1: list, servicos2: list) -> list:
-        """
-        Faz merge inteligente de duas listas de servicos.
-
-        Estrategia:
-        1. Priorizar itens com codigo (mais precisos)
-        2. Para itens sem codigo, remover duplicatas por similaridade
-        3. Itens com codigos diferentes sao mantidos
-        """
-        servicos1 = self._filter_summary_rows(servicos1 or [])
-        servicos2 = self._filter_summary_rows(servicos2 or [])
-        items_with_code: Dict[str, Dict[str, Any]] = {}
-        items_without_code: List[Dict[str, Any]] = []
-
-        for s in servicos1 + servicos2:
-            desc = s.get('descricao', '')
-            code = self._extract_item_code(desc)
-            if code:
-                existing = items_with_code.get(code)
-                if not existing or len(desc) > len(existing.get('descricao', '')):
-                    items_with_code[code] = s
-            else:
-                items_without_code.append(s)
-
-        final_items = list(items_with_code.values())
-        added_without_code: List[Dict[str, Any]] = []
-
-        for s in items_without_code:
-            desc = s.get('descricao', '')
-            if self._is_summary_row(desc):
-                continue
-            is_duplicate = False
-            for item in final_items:
-                if self._items_similar(s, item):
-                    is_duplicate = True
-                    break
-            if is_duplicate:
-                continue
-            for item in added_without_code:
-                if self._items_similar(s, item):
-                    is_duplicate = True
-                    break
-            if is_duplicate:
-                continue
-            added_without_code.append(s)
-
-        final_items.extend(added_without_code)
-        final_items = self._improve_short_descriptions(final_items, servicos1 + servicos2)
-        return final_items
-
     def process_atestado(
         self,
         file_path: str,
@@ -2422,10 +2486,12 @@ class DocumentProcessor:
 
             # Fallback por pagina com OpenAI quando a qualidade estiver baixa
             pagewise_enabled = os.getenv("ATTESTADO_PAGEWISE_VISION", "1").lower() in {"1", "true", "yes"}
+            logger.info(f"Pagewise check: enabled={pagewise_enabled}, use_vision={use_vision}, images={len(images) if images else 0}, openai_available={'openai' in ai_provider.available_providers}")
             if pagewise_enabled and use_vision and images and "openai" in ai_provider.available_providers:
                 quality_threshold = float(os.getenv("ATTESTADO_VISION_QUALITY_THRESHOLD", "0.6"))
                 min_pages = int(os.getenv("ATTESTADO_PAGEWISE_MIN_PAGES", "3"))
                 min_items = int(os.getenv("ATTESTADO_PAGEWISE_MIN_ITEMS", "40"))
+                logger.info(f"Pagewise condition: vision_score={vision_score:.2f} < {quality_threshold} OR (pages={len(images)} >= {min_pages} AND items={vision_stats.get('total', 0)} < {min_items})")
                 if vision_score < quality_threshold or (len(images) >= min_pages and vision_stats.get("total", 0) < min_items):
                     page_servicos = self._extract_servicos_pagewise(images, progress_callback, cancel_check)
                     if page_servicos:

@@ -175,14 +175,6 @@ app.include_router(analise.router, prefix=API_PREFIX)
 app.include_router(ai_status.router, prefix=API_PREFIX)
 app.include_router(pipeline_status.router, prefix=API_PREFIX)
 
-# Também incluir routers sem prefixo para retrocompatibilidade (será descontinuado)
-app.include_router(auth.router, tags=["Auth (legacy)"], deprecated=True)
-app.include_router(admin.router, tags=["Admin (legacy)"], deprecated=True)
-app.include_router(atestados.router, tags=["Atestados (legacy)"], deprecated=True)
-app.include_router(analise.router, tags=["Análises (legacy)"], deprecated=True)
-app.include_router(ai_status.router, tags=["AI Status (legacy)"], deprecated=True)
-app.include_router(pipeline_status.router, tags=["Pipeline Status (legacy)"], deprecated=True)
-
 
 # Servir arquivos estáticos do frontend (CSS, JS)
 if os.path.exists(frontend_path):
@@ -194,12 +186,6 @@ if os.path.exists(frontend_path):
 @app.get("/")
 def serve_index():
     """Página de login."""
-    return FileResponse(os.path.join(frontend_path, "index.html"))
-
-
-@app.get("/index.html")
-def serve_index_html():
-    """Página de login (alternativo)."""
     return FileResponse(os.path.join(frontend_path, "index.html"))
 
 
@@ -225,6 +211,24 @@ def serve_analises():
 def serve_admin():
     """Painel administrativo."""
     return FileResponse(os.path.join(frontend_path, "admin.html"))
+
+
+@app.get("/admin")
+def serve_admin_alias():
+    """Painel administrativo (alias sem .html)."""
+    return FileResponse(os.path.join(frontend_path, "admin.html"))
+
+
+@app.get("/index.html")
+def serve_index_alias():
+    """Página de login (alias)."""
+    return FileResponse(os.path.join(frontend_path, "index.html"))
+
+
+@app.get("/favicon.ico")
+def serve_favicon():
+    """Favicon do site."""
+    return FileResponse(os.path.join(frontend_path, "favicon.ico"))
 
 
 @app.get("/health")

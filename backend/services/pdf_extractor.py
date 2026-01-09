@@ -131,22 +131,6 @@ class PDFExtractor:
 
         return result
 
-    def is_scanned_pdf(self, file_path: str) -> bool:
-        """
-        Verifica se o PDF é escaneado (imagem) ou digital (texto).
-
-        Args:
-            file_path: Caminho para o arquivo PDF
-
-        Returns:
-            True se o PDF parecer ser escaneado
-        """
-        try:
-            text = self.extract_text(file_path)
-            return len(text.strip()) < self.min_text_length
-        except Exception:
-            return True
-
     def pdf_to_images(self, file_path: str, dpi: int = 200) -> List[bytes]:
         """
         Converte páginas do PDF em imagens para OCR.
@@ -173,26 +157,6 @@ class PDFExtractor:
             raise PDFError("converter para imagens", str(e))
 
         return images
-
-    def extract_text_from_page(self, file_path: str, page_num: int) -> str:
-        """
-        Extrai texto de uma página específica.
-
-        Args:
-            file_path: Caminho para o arquivo PDF
-            page_num: Número da página (0-indexed)
-
-        Returns:
-            Texto da página
-        """
-        try:
-            with pdfplumber.open(file_path) as pdf:
-                pages = list(pdf.pages)
-                if page_num < len(pages):
-                    return pages[page_num].extract_text() or ""
-                return ""
-        except Exception as e:
-            raise PDFError(f"extrair página {page_num}", str(e))
 
 
 # Instância singleton para uso global

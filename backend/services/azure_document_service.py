@@ -183,19 +183,6 @@ class AzureDocumentService:
         except Exception as e:
             raise Exception(f"Erro na API Azure: {str(e)}")
 
-    def extract_tables_from_file(self, file_path: str) -> List[Dict[str, Any]]:
-        """
-        Extrai apenas tabelas de um arquivo.
-
-        Args:
-            file_path: Caminho para o arquivo
-
-        Returns:
-            Lista de tabelas com células estruturadas
-        """
-        result = self.extract_text_from_file(file_path)
-        return result.tables
-
     def get_status(self) -> Dict[str, Any]:
         """Retorna status do serviço."""
         self._initialize()

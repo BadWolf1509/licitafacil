@@ -7,6 +7,8 @@ from database import get_db
 from models import Usuario
 from schemas import UsuarioAdminResponse, Mensagem
 from auth import get_current_admin_user
+from config import Messages
+from repositories import usuario_repository
 
 router = APIRouter(prefix="/admin", tags=["Administração"])
 
@@ -17,11 +19,7 @@ def listar_usuarios_pendentes(
     db: Session = Depends(get_db)
 ):
     """Lista todos os usuários pendentes de aprovação."""
-    usuarios = db.query(Usuario).filter(
-        Usuario.is_approved.is_(False),
-        Usuario.is_active.is_(True)
-    ).order_by(Usuario.created_at.desc()).all()
-    return usuarios
+    return usuario_repository.get_pending_approval(db)
 
 
 @router.get("/usuarios", response_model=List[UsuarioAdminResponse])
@@ -41,11 +39,11 @@ def aprovar_usuario(
     db: Session = Depends(get_db)
 ):
     """Aprova um usuário pendente."""
-    usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+    usuario = usuario_repository.get_by_id(db, user_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado"
+            detail=Messages.USER_NOT_FOUND
         )
 
     if usuario.is_approved:
@@ -72,17 +70,17 @@ def rejeitar_usuario(
     db: Session = Depends(get_db)
 ):
     """Rejeita (desativa) um usuário."""
-    usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+    usuario = usuario_repository.get_by_id(db, user_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado"
+            detail=Messages.USER_NOT_FOUND
         )
 
     if usuario.id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você não pode desativar sua própria conta"
+            detail=Messages.CANNOT_DEACTIVATE_SELF
         )
 
     usuario.is_active = False
@@ -101,11 +99,11 @@ def reativar_usuario(
     db: Session = Depends(get_db)
 ):
     """Reativa um usuário desativado."""
-    usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
+    usuario = usuario_repository.get_by_id(db, user_id)
     if not usuario:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado"
+            detail=Messages.USER_NOT_FOUND
         )
 
     if usuario.is_active:

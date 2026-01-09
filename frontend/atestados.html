@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LicitaFácil - Atestados</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1046,7 +1047,7 @@
             if (jobTimers.has(jobId)) return;
             const poll = async () => {
                 try {
-                    const data = await api.get(`/api/ai/queue/jobs/${jobId}`);
+                    const data = await api.get(`/ai/queue/jobs/${jobId}`);
                     const job = data.job;
                     if (!job) return;
                     job.last_polled_at = new Date().toISOString();
@@ -1092,7 +1093,7 @@
 
         async function carregarJobsEmProcessamento() {
             try {
-                const data = await api.get('/api/ai/queue/jobs?limit=20');
+                const data = await api.get('/ai/queue/jobs?limit=20');
                 const jobs = (data.jobs || []).filter(j => j.job_type === 'atestado' && j.status !== 'completed');
                 jobs.forEach(job => {
                     job.last_polled_at = new Date().toISOString();
@@ -1111,7 +1112,7 @@
         async function cancelarJob(jobId) {
             if (!confirm('Cancelar o processamento deste atestado?')) return;
             try {
-                const data = await api.post(`/api/ai/queue/jobs/${jobId}/cancel`, {});
+                const data = await api.post(`/ai/queue/jobs/${jobId}/cancel`, {});
                 if (data.job) {
                     upsertJob(data.job);
                 }
@@ -1123,7 +1124,7 @@
 
         async function reprocessarJob(jobId) {
             try {
-                const data = await api.post(`/api/ai/queue/jobs/${jobId}/retry`, {});
+                const data = await api.post(`/ai/queue/jobs/${jobId}/retry`, {});
                 if (data.job) {
                     removeJob(jobId);
                     upsertJob(data.job);
@@ -1138,7 +1139,7 @@
         async function excluirJob(jobId) {
             if (!confirm('Remover este job da lista?')) return;
             try {
-                const data = await api.delete(`/api/ai/queue/jobs/${jobId}`);
+                const data = await api.delete(`/ai/queue/jobs/${jobId}`);
                 if (data.deleted) {
                     removeJob(jobId);
                 }
@@ -1170,7 +1171,8 @@
 
         async function carregarAtestados() {
             try {
-                const atestados = await api.get('/atestados/');
+                const response = await api.get('/atestados/');
+                const atestados = response.items || [];
                 atestadosCache = atestados;
                 const container = document.getElementById('listaAtestados');
                 const btnRelatorioGeral = document.getElementById('btnRelatorioGeral');
@@ -1461,16 +1463,23 @@
                 return '';
             }
 
-            const servicosHtml = atestado.servicos_json.map((s, index) => {
+            // Mapear serviços com índice original antes de ordenar
+            const servicosComIndice = atestado.servicos_json.map((s, idx) => ({ ...s, _originalIndex: idx }));
+
+            // Ordenar serviços pelo código do item
+            const servicosOrdenados = ordenarServicosPorItem(servicosComIndice);
+
+            const servicosHtml = servicosOrdenados.map((s) => {
                 const parsed = extrairItemDescricao(s);
                 const itemHtml = parsed.item ? `<span class="servico-item-codigo">${parsed.item}</span>` : '';
+                const originalIndex = s._originalIndex;
                 return `
-                    <div class="servico-item" data-index="${index}">
+                    <div class="servico-item" data-index="${originalIndex}">
                         <span class="servico-descricao">${itemHtml}${parsed.descricao}</span>
                         <span class="servico-quantidade">${formatarNumero(s.quantidade)} ${s.unidade}</span>
                         <div class="servico-actions">
-                            <button class="servico-btn edit" onclick="editarServicoItem(${atestado.id}, ${index})" title="Editar item">&#9998;</button>
-                            <button class="servico-btn delete" onclick="excluirServicoItem(${atestado.id}, ${index})" title="Excluir item">&#10005;</button>
+                            <button class="servico-btn edit" onclick="editarServicoItem(${atestado.id}, ${originalIndex})" title="Editar item">&#9998;</button>
+                            <button class="servico-btn delete" onclick="excluirServicoItem(${atestado.id}, ${originalIndex})" title="Excluir item">&#10005;</button>
                         </div>
                     </div>
                 `;
@@ -1548,6 +1557,32 @@
             // Padrão: 3 dígitos + separador + 2 dígitos + separador + 2 dígitos + espaço
             // Ex: "001.03.11 PORTÃO..." -> "PORTÃO..."
             return descricao.replace(/^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*/, '').trim();
+        }
+
+        // Compara dois códigos de item numericamente (ex: "1.2" < "1.10" < "2.1")
+        function compararItens(a, b) {
+            const itemA = a.item || '';
+            const itemB = b.item || '';
+
+            // Separar em partes numéricas
+            const partesA = itemA.split('.').map(p => parseInt(p, 10) || 0);
+            const partesB = itemB.split('.').map(p => parseInt(p, 10) || 0);
+
+            // Comparar cada parte
+            const maxLen = Math.max(partesA.length, partesB.length);
+            for (let i = 0; i < maxLen; i++) {
+                const valA = partesA[i] || 0;
+                const valB = partesB[i] || 0;
+                if (valA !== valB) {
+                    return valA - valB;
+                }
+            }
+            return 0;
+        }
+
+        // Ordena serviços pelo código do item
+        function ordenarServicosPorItem(servicos) {
+            return [...servicos].sort(compararItens);
         }
 
         // Agrupa serviços por descrição (sem código) e soma quantidades

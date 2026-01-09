@@ -1,7 +1,7 @@
 import os
 import shutil
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -11,8 +11,9 @@ from auth import get_current_approved_user
 from services import document_processor
 from config import (
     UPLOAD_DIR, Messages, validate_upload_file,
-    ALLOWED_PDF_EXTENSIONS, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
+    ALLOWED_PDF_EXTENSIONS
 )
+from utils.pagination import PaginationParams, paginate_query
 from logging_config import get_logger
 
 logger = get_logger('routers.analise')
@@ -30,29 +31,16 @@ def status_servicos(
 
 @router.get("/", response_model=PaginatedAnaliseResponse)
 def listar_analises(
-    page: int = Query(1, ge=1, description="Número da página"),
-    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, description="Itens por página"),
+    pagination: PaginationParams = Depends(),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
 ):
     """Lista todas as análises do usuário logado com paginação."""
-    # Contar total
-    total = db.query(Analise).filter(
+    query = db.query(Analise).filter(
         Analise.user_id == current_user.id
-    ).count()
+    ).order_by(Analise.created_at.desc())
 
-    # Buscar página
-    offset = (page - 1) * page_size
-    analises = db.query(Analise).filter(
-        Analise.user_id == current_user.id
-    ).order_by(Analise.created_at.desc()).offset(offset).limit(page_size).all()
-
-    return PaginatedAnaliseResponse.create(
-        items=analises,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return paginate_query(query, pagination, PaginatedAnaliseResponse)
 
 
 @router.get("/{analise_id}", response_model=AnaliseResponse)
@@ -70,7 +58,7 @@ def obter_analise(
     if not analise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Análise não encontrada"
+            detail=Messages.ANALISE_NOT_FOUND
         )
     return analise
 
@@ -177,13 +165,13 @@ async def processar_analise(
     if not analise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Análise não encontrada"
+            detail=Messages.ANALISE_NOT_FOUND
         )
 
     if not analise.arquivo_path or not os.path.exists(analise.arquivo_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Arquivo do edital não encontrado"
+            detail=Messages.EDITAL_FILE_NOT_FOUND
         )
 
     # Buscar atestados do usuário
@@ -194,7 +182,7 @@ async def processar_analise(
     if not atestados:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você não possui atestados cadastrados. Cadastre atestados antes de analisar uma licitação."
+            detail=Messages.NO_ATESTADOS
         )
 
     try:
@@ -251,7 +239,7 @@ def excluir_analise(
     if not analise:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Análise não encontrada"
+            detail=Messages.ANALISE_NOT_FOUND
         )
 
     # Remover arquivo se existir
@@ -262,6 +250,6 @@ def excluir_analise(
     db.commit()
 
     return Mensagem(
-        mensagem="Análise excluída com sucesso!",
+        mensagem=Messages.ANALISE_DELETED,
         sucesso=True
     )
