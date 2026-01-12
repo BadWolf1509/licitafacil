@@ -2,7 +2,7 @@
 Rotas para gerenciamento e status dos provedores de IA.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any, Optional
 import os
 import uuid
@@ -40,20 +40,20 @@ def _get_job_with_permission(
     job = processing_queue.get_job(job_id)
 
     if not job:
-        raise HTTPException(status_code=404, detail=Messages.JOB_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=Messages.JOB_NOT_FOUND)
 
     if job.user_id != user.id and not user.is_admin:
-        raise HTTPException(status_code=403, detail=Messages.ACCESS_DENIED)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=Messages.ACCESS_DENIED)
 
     if allowed_statuses and job.status not in allowed_statuses:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Job não pode ser processado no status atual: {job.status.value}"
         )
 
     if disallowed_statuses and job.status in disallowed_statuses:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Operação não permitida para jobs com status: {job.status.value}"
         )
 
@@ -152,14 +152,15 @@ async def retry_job(
     )
 
     if not job.file_path or not os.path.exists(job.file_path):
-        raise HTTPException(status_code=400, detail=Messages.FILE_NOT_FOUND)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=Messages.FILE_NOT_FOUND)
 
     new_job_id = str(uuid.uuid4())
     new_job = processing_queue.add_job(
         job_id=new_job_id,
         user_id=job.user_id,
         file_path=job.file_path,
-        job_type=job.job_type
+        job_type=job.job_type,
+        original_filename=job.original_filename  # Preservar nome original do job anterior
     )
     return {
         "status": "ok",

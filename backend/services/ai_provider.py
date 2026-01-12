@@ -1,7 +1,9 @@
 """
 Gerenciador de Provedores de IA.
+
 Abstrai a escolha entre OpenAI e Google Gemini.
 Permite trocar de provedor via configuração.
+Suporta novos providers (OpenAIProvider, GeminiProvider) e analyzers legados.
 """
 
 import os
@@ -9,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from enum import Enum
 from dotenv import load_dotenv
 from exceptions import AINotConfiguredError
+from .base_ai_provider import BaseAIProvider
 
 from logging_config import get_logger
 logger = get_logger('services.ai_provider')
@@ -16,11 +19,38 @@ logger = get_logger('services.ai_provider')
 load_dotenv()
 
 
-class AIProvider(str, Enum):
+class AIProviderEnum(str, Enum):
     """Provedores de IA disponíveis."""
     OPENAI = "openai"
     GEMINI = "gemini"
     AUTO = "auto"  # Escolhe automaticamente baseado em disponibilidade
+
+
+# Alias para compatibilidade com código existente
+AIProvider = AIProviderEnum
+
+
+def get_provider(provider_type: str) -> BaseAIProvider:
+    """
+    Factory para obter instância de um provider específico.
+
+    Args:
+        provider_type: 'openai' ou 'gemini'
+
+    Returns:
+        Instância do provider solicitado
+
+    Raises:
+        ValueError: Se provider_type inválido
+    """
+    if provider_type == "openai":
+        from .providers.openai_provider import OpenAIProvider
+        return OpenAIProvider()
+    elif provider_type == "gemini":
+        from .providers.gemini_provider import GeminiProvider
+        return GeminiProvider()
+    else:
+        raise ValueError(f"Provider inválido: {provider_type}. Use 'openai' ou 'gemini'")
 
 
 class AIProviderManager:
@@ -37,24 +67,65 @@ class AIProviderManager:
         self._provider = os.getenv("AI_PROVIDER", "auto").lower()
         self._openai_analyzer = None
         self._gemini_analyzer = None
+        self._openai_provider = None
+        self._gemini_provider = None
         self._stats = {
             "openai": {"calls": 0, "errors": 0, "tokens_used": 0},
             "gemini": {"calls": 0, "errors": 0, "tokens_used": 0}
         }
 
     def _get_openai(self):
-        """Lazy load do analisador OpenAI."""
+        """Lazy load do analisador OpenAI (legado)."""
         if self._openai_analyzer is None:
             from .ai_analyzer import ai_analyzer
             self._openai_analyzer = ai_analyzer
         return self._openai_analyzer
 
     def _get_gemini(self):
-        """Lazy load do analisador Gemini."""
+        """Lazy load do analisador Gemini (legado)."""
         if self._gemini_analyzer is None:
             from .gemini_analyzer import gemini_analyzer
             self._gemini_analyzer = gemini_analyzer
         return self._gemini_analyzer
+
+    def get_openai_provider(self):
+        """
+        Obtém instância do novo OpenAIProvider.
+
+        Returns:
+            OpenAIProvider configurado
+        """
+        if self._openai_provider is None:
+            from .providers.openai_provider import OpenAIProvider
+            self._openai_provider = OpenAIProvider()
+        return self._openai_provider
+
+    def get_gemini_provider(self):
+        """
+        Obtém instância do novo GeminiProvider.
+
+        Returns:
+            GeminiProvider configurado
+        """
+        if self._gemini_provider is None:
+            from .providers.gemini_provider import GeminiProvider
+            self._gemini_provider = GeminiProvider()
+        return self._gemini_provider
+
+    def get_provider_instance(self, provider_type: Optional[str] = None):
+        """
+        Obtém instância do provider baseado na interface BaseAIProvider.
+
+        Args:
+            provider_type: 'openai', 'gemini' ou None para auto
+
+        Returns:
+            Instância de BaseAIProvider (OpenAIProvider ou GeminiProvider)
+        """
+        selected = self._select_provider(provider_type)
+        if selected == "openai":
+            return self.get_openai_provider()
+        return self.get_gemini_provider()
 
     @property
     def current_provider(self) -> str:

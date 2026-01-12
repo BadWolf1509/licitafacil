@@ -8,7 +8,7 @@ Inclui processamento paralelo opcional para melhor performance.
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import io
-import os
+import re
 import pdfplumber
 import fitz  # PyMuPDF
 from PIL import Image
@@ -26,6 +26,7 @@ from .extraction import (  # noqa: F401
     normalize_description,
     normalize_unit,
     normalize_header,
+    normalize_desc_for_match,
     extract_keywords,
     description_similarity,
     UNIT_TOKENS,
@@ -61,20 +62,24 @@ from .extraction import (  # noqa: F401
     is_ocr_noisy,
     compute_quality_score,
 )
+from .aditivo_processor import prefix_aditivo_items
 from exceptions import (
     PDFError,
     OCRError,
     UnsupportedFileError,
-    TextExtractionError
+    TextExtractionError,
+    AzureAPIError,
+    OpenAIError,
 )
 from .text_utils import is_garbage_text
+from config import (
+    OCR_PARALLEL_ENABLED,
+    OCR_MAX_WORKERS,
+    AtestadoProcessingConfig as APC,
+)
 
 from logging_config import get_logger
 logger = get_logger('services.document_processor')
-
-# Configurações de paralelização
-OCR_PARALLEL_ENABLED = os.getenv("OCR_PARALLEL", "0").lower() in {"1", "true", "yes"}
-OCR_MAX_WORKERS = int(os.getenv("OCR_MAX_WORKERS", "2"))  # Número de threads para OCR
 
 
 class ProcessingCancelled(Exception):
@@ -200,14 +205,14 @@ class DocumentProcessor:
                                 f"Página {page_idx+1}/{len(doc)}\n{ocr_text}" if part == placeholder else part
                                 for part in text_parts
                             ]
-                    except Exception as e:
-                        logger.warning(f"Erro no OCR da página {page_idx+1}: {str(e)}")
+                    except OCRError as e:
+                        logger.warning(f"Erro no OCR da pagina {page_idx+1}: {e}")
 
                 doc.close()
 
             return "\n\n".join(text_parts)
 
-        except Exception as e:
+        except (IOError, ValueError, RuntimeError, PDFError, OCRError) as e:
             raise PDFError("processar", str(e))
 
     def _notify_progress(self, progress_callback, current: int, total: int, stage: str, message: str):
@@ -226,8 +231,9 @@ class DocumentProcessor:
             if page_text.strip():
                 return (page_index, f"--- Pagina {page_index + 1} ---\n{page_text}")
             return (page_index, "")
-        except Exception as e:
-            return (page_index, f"--- Pagina {page_index + 1} ---\n[Erro no OCR: {str(e)}]")
+        except OCRError as e:
+            logger.debug(f"Erro OCR na pagina {page_index + 1}: {e}")
+            return (page_index, f"--- Pagina {page_index + 1} ---\n[Erro no OCR: {e}]")
 
     def _ocr_image_list(self, image_list, progress_callback=None, cancel_check=None) -> str:
         total = len(image_list)
@@ -251,8 +257,9 @@ class DocumentProcessor:
                 page_text = ocr_service.extract_text_from_bytes(image_bytes)
                 if page_text.strip():
                     all_texts.append(f"--- Pagina {i + 1} ---\n{page_text}")
-            except Exception as e:
-                all_texts.append(f"--- Pagina {i + 1} ---\n[Erro no OCR: {str(e)}]")
+            except OCRError as e:
+                logger.debug(f"Erro OCR na pagina {i + 1}: {e}")
+                all_texts.append(f"--- Pagina {i + 1} ---\n[Erro no OCR: {e}]")
 
         return "\n\n".join(all_texts)
 
@@ -296,663 +303,137 @@ class DocumentProcessor:
         all_texts = [results[i] for i in sorted(results.keys()) if results[i]]
         return "\n\n".join(all_texts)
 
-    def _normalize_description(self, desc: str) -> str:
+    def _remove_duplicate_pairs(self, servicos: list) -> list:
         """
-        Normaliza descrição para comparação.
-        Remove acentos, espaços extras, pontuação e converte para maiúsculas.
-        Também corrige erros comuns de OCR.
-        """
-        import unicodedata
-        import re
+        Remove duplicatas entre pares X.Y e X.Y.1 que representam o mesmo serviço.
 
-        if not desc:
-            return ""
-
-        # Remover acentos
-        nfkd = unicodedata.normalize('NFKD', desc)
-        ascii_text = nfkd.encode('ASCII', 'ignore').decode('ASCII')
-
-        # Converter para maiúsculas
-        text = ascii_text.upper()
-
-        # Normalizar pontuação (OCR pode confundir ; com , ou .)
-        text = text.replace(';', ',').replace(':', ',')
-
-        # Remover toda pontuação para comparação mais robusta
-        text = re.sub(r'[^\w\s]', ' ', text)
-
-        # Corrigir erros comuns de OCR em números/letras
-        # I no meio de números geralmente é 1
-        # Exemplo: 9X19XI9CM -> 9X19X19CM
-        text = re.sub(r'(\d)I(\d)', r'\g<1>1', text)
-        text = re.sub(r'(\d)l(\d)', r'\g<1>1', text)  # l minúsculo
-        text = re.sub(r'(\d)O(\d)', r'\g<1>0', text)  # O -> 0
-
-        # Remover espaços extras
-        return ' '.join(text.split())
-
-    def _normalize_unit(self, unit: str) -> str:
-        """
-        Normaliza unidade para compara‡Æo.
-        Converte expoentes e padroniza caixa.
-        """
-        if not unit:
-            return ""
-        normalized = unit.strip().upper()
-        normalized = normalized.translate({ord("\u00b2"): '2', ord("\u00b3"): '3'})
-        normalized = normalized.replace("M^2", "M2").replace("M^3", "M3")
-        normalized = normalized.replace("M\u00b2", "M2").replace("M\u00b3", "M3")
-        normalized = normalized.replace(" ", "")
-        return normalized
-
-    def _extract_keywords(self, desc: str) -> set:
-        """
-        Extrai palavras-chave significativas da descrição.
-        """
-        normalized = self._normalize_description(desc)
-        # Palavras a ignorar
-        stopwords = {'DE', 'DO', 'DA', 'EM', 'PARA', 'COM', 'E', 'A', 'O', 'AS', 'OS',
-                     'UN', 'M2', 'M3', 'ML', 'M', 'VB', 'KG', 'INCLUSIVE', 'INCLUSIV',
-                     'TIPO', 'MODELO', 'TRACO'}
-        words = set(normalized.split())
-        return words - stopwords
-
-    def _description_similarity(self, left: str, right: str) -> float:
-        left_kw = self._extract_keywords(left)
-        right_kw = self._extract_keywords(right)
-        if not left_kw or not right_kw:
-            return 0.0
-        intersection = len(left_kw & right_kw)
-        return intersection / max(len(left_kw), len(right_kw))
-
-    def _unit_tokens(self) -> set:
-        return {
-            "M", "M2", "M3", "M3XKM", "M2XKM", "UN", "UND", "VB", "KG", "TON", "T", "KM", "L", "MODULOS"
-        }
-
-    def _normalize_header(self, value: str) -> str:
-        return self._normalize_description(value or "")
-
-    def _parse_item_tuple(self, value: str) -> Optional[tuple]:
-        if value is None:
-            return None
-        text = str(value).strip()
-        if not text:
-            return None
-        import re
-        cleaned = re.sub(r"[^0-9. ]", "", text)
-        cleaned = cleaned.strip().strip(".")
-        if not cleaned:
-            return None
-        parts = [p for p in re.split(r"[ .]+", cleaned) if p]
-        if not parts or len(parts) > 4:
-            return None
-        if any(len(p) > 3 for p in parts):
-            return None
-        try:
-            return tuple(int(p) for p in parts)
-        except ValueError:
-            return None
-
-    def _item_tuple_to_str(self, value: tuple) -> str:
-        return ".".join(str(v) for v in value)
-
-    def _score_item_column(self, cells: list, col_index: int, total_cols: int) -> dict:
-        non_empty = 0
-        matches = 0
-        tuples = []
-        lengths = []
-        for cell in cells:
-            text = str(cell or "").strip()
-            if not text:
-                continue
-            non_empty += 1
-            item_tuple = self._parse_item_tuple(text)
-            if item_tuple:
-                matches += 1
-                tuples.append(item_tuple)
-                lengths.append(len(text))
-        if non_empty == 0:
-            return {"score": 0.0, "pattern_ratio": 0.0, "seq_ratio": 0.0, "unique_ratio": 0.0}
-        pattern_ratio = matches / non_empty
-        unique_ratio = (len(set(tuples)) / matches) if matches else 0.0
-        ordered = 0
-        total_pairs = 0
-        prev = None
-        for item_tuple in tuples:
-            if prev is not None:
-                total_pairs += 1
-                if item_tuple >= prev:
-                    ordered += 1
-            prev = item_tuple
-        seq_ratio = (ordered / total_pairs) if total_pairs else 0.0
-        avg_len = (sum(lengths) / len(lengths)) if lengths else 99
-        if avg_len <= 6:
-            length_bonus = 1.0
-        elif avg_len <= 10:
-            length_bonus = 0.5
-        else:
-            length_bonus = 0.0
-        left_bias = 1.0 - (col_index / max(1, total_cols - 1))
-        score = (
-            0.45 * pattern_ratio +
-            0.2 * seq_ratio +
-            0.2 * unique_ratio +
-            0.1 * left_bias +
-            0.05 * length_bonus
-        )
-        return {
-            "score": round(score, 3),
-            "pattern_ratio": round(pattern_ratio, 3),
-            "seq_ratio": round(seq_ratio, 3),
-            "unique_ratio": round(unique_ratio, 3)
-        }
-
-    def _detect_header_row(self, rows: list) -> Optional[int]:
-        if not rows:
-            return None
-        header_keywords = {
-            "ITEM", "ITENS", "COD", "CODIGO", "DESCRICAO", "DISCRIMINACAO",
-            "SERVICO", "SERVICOS", "UNID", "UNIDADE", "QTD", "QTE", "QUANT", "QUANTIDADE",
-            "EXECUTADA", "EXECUTADO", "VALOR", "CUSTO", "PRECO"
-        }
-        best_score = 0
-        best_index = None
-        for idx, row in enumerate(rows[:5]):
-            score = 0
-            for cell in row:
-                text = self._normalize_header(cell)
-                if not text:
-                    continue
-                for kw in header_keywords:
-                    if kw in text:
-                        score += 1
-                        break
-            if score > best_score:
-                best_score = score
-                best_index = idx
-        if best_score >= 2:
-            return best_index
-        return None
-
-    def _guess_columns_by_header(self, header_row: list) -> dict:
-        mapping: dict = {"item": None, "descricao": None, "unidade": None, "quantidade": None, "valor": None}
-        for idx, cell in enumerate(header_row):
-            text = self._normalize_header(cell)
-            if not text:
-                continue
-            if mapping["item"] is None and ("ITEM" in text or "COD" in text):
-                mapping["item"] = idx
-            if mapping["descricao"] is None and ("DESCRICAO" in text or "DISCRIMINACAO" in text or "SERVICO" in text):
-                mapping["descricao"] = idx
-            if mapping["unidade"] is None and ("UNID" in text or "UNIDADE" in text):
-                mapping["unidade"] = idx
-            if mapping["quantidade"] is None and ("QUANT" in text or "QTD" in text or "QTE" in text or "EXECUTAD" in text):
-                mapping["quantidade"] = idx
-            if mapping["valor"] is None and ("VALOR" in text or "CUSTO" in text or "PRECO" in text):
-                mapping["valor"] = idx
-        return mapping
-
-    def _compute_column_stats(self, rows: list, total_cols: int) -> list:
-        unit_tokens = {
-            "M", "M2", "M3", "M3XKM", "M2XKM", "UN", "UND", "VB", "KG", "TON", "T", "KM", "L", "MODULOS"
-        }
-        col_stats = []
-        for col in range(total_cols):
-            non_empty = 0
-            numeric = 0
-            unit_hits = 0
-            text_len = 0
-            for row in rows:
-                if col >= len(row):
-                    continue
-                cell = str(row[col] or "").strip()
-                if not cell:
-                    continue
-                non_empty += 1
-                if self._parse_quantity(cell) is not None:
-                    numeric += 1
-                unit_norm = self._normalize_unit(cell)
-                unit_norm = self._normalize_description(unit_norm).replace(" ", "")
-                if unit_norm in unit_tokens:
-                    unit_hits += 1
-                text_len += len(cell)
-            if non_empty == 0:
-                col_stats.append({"non_empty": 0, "numeric_ratio": 0.0, "unit_ratio": 0.0, "avg_len": 0.0})
-                continue
-            col_stats.append({
-                "non_empty": non_empty,
-                "numeric_ratio": numeric / non_empty,
-                "unit_ratio": unit_hits / non_empty,
-                "avg_len": text_len / non_empty
-            })
-        return col_stats
-
-    def _guess_columns_by_content(self, rows: list, total_cols: int, mapping: dict, col_stats: Optional[list] = None) -> dict:
-        if col_stats is None:
-            col_stats = self._compute_column_stats(rows, total_cols)
-
-        if mapping.get("descricao") is None:
-            best_col = None
-            best_len = 0
-            for col, stats in enumerate(col_stats):
-                if col in (mapping.get("item"), mapping.get("unidade"), mapping.get("quantidade"), mapping.get("valor")):
-                    continue
-                if stats["avg_len"] > best_len and stats["numeric_ratio"] < 0.7:
-                    best_len = stats["avg_len"]
-                    best_col = col
-            mapping["descricao"] = best_col
-
-        if mapping.get("unidade") is None:
-            best_col = None
-            best_ratio = 0
-            for col, stats in enumerate(col_stats):
-                if col in (mapping.get("item"), mapping.get("descricao"), mapping.get("quantidade"), mapping.get("valor")):
-                    continue
-                if stats["unit_ratio"] > best_ratio:
-                    best_ratio = stats["unit_ratio"]
-                    best_col = col
-            mapping["unidade"] = best_col
-
-        if mapping.get("quantidade") is None:
-            best_col = None
-            best_ratio = 0
-            for col, stats in enumerate(col_stats):
-                if col in (mapping.get("item"), mapping.get("descricao"), mapping.get("unidade"), mapping.get("valor")):
-                    continue
-                if stats["numeric_ratio"] > best_ratio:
-                    best_ratio = stats["numeric_ratio"]
-                    best_col = col
-            mapping["quantidade"] = best_col
-
-        return mapping
-
-    def _validate_column_mapping(self, mapping: dict, col_stats: list) -> dict:
-        if not col_stats:
-            return mapping
-
-        def ratio(idx: Optional[int], key: str) -> float:
-            if idx is None or idx >= len(col_stats):
-                return 0.0
-            return float(col_stats[idx].get(key, 0.0))
-
-        def avg_len(idx: Optional[int]) -> float:
-            if idx is None or idx >= len(col_stats):
-                return 0.0
-            return float(col_stats[idx].get("avg_len", 0.0))
-
-        min_unit_ratio = 0.2
-        min_qty_ratio = 0.35
-        min_desc_len = 10.0
-        max_desc_numeric = 0.6
-
-        item_col = mapping.get("item")
-        desc_col = mapping.get("descricao")
-        unit_col = mapping.get("unidade")
-        qty_col = mapping.get("quantidade")
-
-        if desc_col in {item_col, unit_col, qty_col}:
-            mapping["descricao"] = None
-
-        if unit_col in {item_col, desc_col, qty_col}:
-            mapping["unidade"] = None
-
-        if qty_col in {item_col, desc_col, unit_col}:
-            mapping["quantidade"] = None
-
-        if unit_col is not None and ratio(unit_col, "unit_ratio") < min_unit_ratio:
-            mapping["unidade"] = None
-
-        if qty_col is not None and ratio(qty_col, "numeric_ratio") < min_qty_ratio:
-            mapping["quantidade"] = None
-
-        if desc_col is not None:
-            if avg_len(desc_col) < min_desc_len or ratio(desc_col, "numeric_ratio") > max_desc_numeric:
-                mapping["descricao"] = None
-
-        unit_col = mapping.get("unidade")
-        qty_col = mapping.get("quantidade")
-        if unit_col is not None and qty_col is not None and qty_col < unit_col:
-            best_col = None
-            best_ratio = 0.0
-            for col in range(unit_col + 1, len(col_stats)):
-                if col in {mapping.get("item"), mapping.get("descricao")}:
-                    continue
-                col_ratio = ratio(col, "numeric_ratio")
-                if col_ratio >= min_qty_ratio and col_ratio > best_ratio:
-                    best_ratio = col_ratio
-                    best_col = col
-            if best_col is not None:
-                mapping["quantidade"] = best_col
-
-        return mapping
-
-    def _filter_classification_paths(self, servicos: list) -> list:
-        """
-        Remove serviços que são caminhos de classificação (não serviços reais).
-
-        Isso inclui itens que contêm ">" (caminho de classificação) ou
-        começam com padrões de classificação de CAT.
-
-        IMPORTANTE: "EXECUÇÃO" só é inválido quando seguido de ">" (classificação).
-        "EXECUÇÃO DE PAVIMENTO" ou "EXECUÇÃO DE PÁTIO" são serviços válidos.
+        Quando ambos existem com quantidade igual e descrições similares:
+        - Calcula similaridade baseada em keywords em comum
+        - Se similaridade >= 50%, são considerados duplicados
+        - Mantém apenas o item com código mais curto (X.Y) pois geralmente é o original
+        - Exceto quando o pai é um header curto (< 20 chars), aí mantém o filho (X.Y.1)
         """
         if not servicos:
-            return []
+            return servicos
 
-        filtered = []
-        for servico in servicos:
-            descricao = servico.get("descricao", "") or ""
+        # Indexar serviços por código de item
+        by_item_code = {}
+        for s in servicos:
+            item = s.get("item")
+            if item:
+                by_item_code[str(item)] = s
 
-            if not descricao.strip():
-                continue
+        # Identificar itens a remover
+        items_to_remove = set()
 
-            # Ignorar itens que contêm ">" (caminho de classificação)
-            if ">" in descricao:
-                continue
+        for item_code, servico in by_item_code.items():
+            # Verificar se existe item pai (X.Y para X.Y.1)
+            parts = item_code.split(".")
+            if len(parts) >= 2:
+                parent_code = ".".join(parts[:-1])
+                if parent_code in by_item_code:
+                    parent = by_item_code[parent_code]
 
-            # Ignorar itens que começam com padrão de classificação
-            desc_upper = descricao.upper().strip()
+                    # Comparar quantidade
+                    qty_filho = parse_quantity(servico.get("quantidade"))
+                    qty_pai = parse_quantity(parent.get("quantidade"))
 
-            # Prefixos que SEMPRE são classificação (não serviços reais)
-            invalid_prefixes = [
-                "DIRETA OBRAS", "1 - DIRETA",
-                "2 - DIRETA", "ATIVIDADE TÉCNICA", "CLASSIFICAÇÃO",
-            ]
+                    if not (qty_filho is not None and qty_pai is not None):
+                        continue
 
-            is_invalid = False
-            for prefix in invalid_prefixes:
-                if desc_upper.startswith(prefix):
-                    is_invalid = True
-                    break
+                    # Verificar se quantidades são iguais ou similares
+                    if not quantities_similar(qty_filho, qty_pai):
+                        continue
 
-            # "EXECUÇÃO" é inválido APENAS se seguido de ">" (classificação)
-            # mas é VÁLIDO se for serviço real como "EXECUÇÃO DE PAVIMENTO"
-            if desc_upper.startswith("EXECUÇÃO") and ">" in desc_upper:
-                is_invalid = True
+                    # Calcular similaridade de descrições via keywords
+                    desc_filho = servico.get("descricao") or ""
+                    desc_pai = parent.get("descricao") or ""
+                    kw_filho = extract_keywords(desc_filho)
+                    kw_pai = extract_keywords(desc_pai)
 
-            if is_invalid:
-                continue
+                    if not kw_filho or not kw_pai:
+                        continue
 
-            # Ignorar itens muito curtos (provavelmente ruído)
-            if len(descricao.strip()) < 5:
-                continue
+                    # Calcular Jaccard similarity
+                    intersection = len(kw_filho & kw_pai)
+                    union = len(kw_filho | kw_pai)
+                    similarity = intersection / union if union > 0 else 0
 
-            filtered.append(servico)
+                    # Se similaridade >= 50%, são duplicados
+                    if similarity >= 0.5:
+                        # Decidir qual remover baseado no contexto
+                        desc_pai_norm = normalize_description(desc_pai)
 
-        return filtered
+                        # Caso 1: Pai é header curto - remover pai, manter filho
+                        if len(desc_pai_norm) < 20:
+                            items_to_remove.add(parent_code)
+                        # Caso 2: Itens do aditivo (11.x) - manter filho (são os serviços reais)
+                        elif parent_code.startswith("11"):
+                            items_to_remove.add(parent_code)
+                        # Caso 3: Itens do contrato - remover filho (provavelmente fantasma do OCR)
+                        else:
+                            items_to_remove.add(item_code)
 
-    def _remove_duplicate_services(self, servicos: list) -> list:
+        # Filtrar serviços removendo os duplicados
+        return [s for s in servicos if s.get("item") not in items_to_remove]
+
+    def _filter_items_without_quantity(self, servicos: list) -> list:
         """
-        Remove serviços duplicados do OCR que não têm código de item.
+        Remove itens que não têm quantidade definida.
 
-        Mantém serviços com código de item (mesmo que tenham mesma descrição,
-        pois podem ser itens diferentes em etapas diferentes da obra).
+        Itens sem quantidade geralmente são headers de seção ou linhas de título
+        que foram erroneamente extraídos como serviços.
 
-        Remove serviços SEM código que têm descrição similar (>50%) a algum serviço COM código,
-        OU que compartilham palavras distintivas com serviços COM código.
+        Preserva itens do aditivo que foram prefixados (têm _section metadata),
+        pois esses itens foram identificados como tendo quantidade no texto original
+        mesmo que a extração não tenha capturado a quantidade corretamente.
         """
         if not servicos:
-            return []
+            return servicos
 
-        # Separar serviços com e sem código de item
-        com_item = []
-        sem_item = []
-        for servico in servicos:
-            if servico.get("item"):
-                com_item.append(servico)
-            else:
-                sem_item.append(servico)
+        return [
+            s for s in servicos
+            if parse_quantity(s.get("quantidade")) not in (None, 0)
+            or s.get("_section")  # Preservar itens do aditivo prefixados
+        ]
 
-        # Criar lista de palavras-chave dos serviços COM item
-        com_item_keywords = []
-        # Também criar conjunto de palavras distintivas (6+ chars, não são termos comuns)
-        com_item_distinctive = set()
-        common_terms = {
-            "execucao", "fornecimento", "instalacao", "servico", "servicos",
-            "material", "materiais", "equipamento", "equipamentos", "construcao",
-            "obra", "obras", "manutencao", "reforma", "reparo", "sistema",
-            "estrutura", "revestimento", "pintura", "acabamento", "fundacao",
-            "concreto", "armado", "simples", "duplo", "triplo", "completo",
-            "conforme", "projeto", "norma", "padrao", "modelo", "tipo",
-        }
+    def _filter_items_without_code(self, servicos: list, min_items_with_code: int = 5) -> list:
+        """
+        Remove itens sem código de item quando há itens suficientes com código.
 
-        for servico in com_item:
-            desc = str(servico.get("descricao", "") or "").strip()
-            if desc:
-                keywords = self._extract_keywords(desc)
-                com_item_keywords.append(keywords)
-                # Extrair palavras distintivas (6+ chars, não são termos comuns)
-                for kw in keywords:
-                    if len(kw) >= 6 and kw.lower() not in common_terms:
-                        com_item_distinctive.add(kw.lower())
+        Itens sem código (item=None) geralmente são descrições gerais do documento
+        (ex: "Execução de obra de SISTEMAS DE ILUMINAÇÃO") que foram erroneamente
+        extraídos como serviços pela IA.
 
-        def is_similar_to_any_com_item(desc: str, threshold: float = 0.5) -> bool:
-            """Verifica se descrição é similar a algum serviço COM item."""
-            keywords = self._extract_keywords(desc)
-            if not keywords:
-                return False
-            for com_kw in com_item_keywords:
-                if not com_kw:
-                    continue
-                # Calcular Jaccard similarity
-                intersection = len(keywords & com_kw)
-                union = len(keywords | com_kw)
-                similarity = intersection / union if union > 0 else 0
-                if similarity >= threshold:
-                    return True
-            return False
+        Só remove itens sem código quando há pelo menos `min_items_with_code` itens
+        com código, para não afetar documentos simples sem numeração.
 
-        def shares_distinctive_keyword(desc: str) -> bool:
-            """
-            Verifica se descrição compartilha palavras distintivas com serviços COM item.
-            Isso captura casos onde OCR corrompeu parte da descrição mas manteve
-            palavras-chave únicas como nomes próprios ou termos específicos.
-            """
-            keywords = self._extract_keywords(desc)
-            if not keywords:
-                return False
-            for kw in keywords:
-                if len(kw) >= 6 and kw.lower() in com_item_distinctive:
-                    return True
-            return False
+        Args:
+            servicos: Lista de serviços
+            min_items_with_code: Mínimo de itens com código para ativar o filtro
 
-        # Filtrar serviços SEM item - remover similares a COM item
-        sem_item_filtrado = []
-        desc_sem_item_vistos = set()
-        for servico in sem_item:
-            desc = str(servico.get("descricao", "") or "").strip()
-            desc_norm = self._normalize_description(desc)[:50] if desc else ""
-
-            if not desc_norm:
-                continue
-
-            # Se já vimos essa descrição em outro serviço SEM item, pular
-            if desc_norm in desc_sem_item_vistos:
-                continue
-
-            # Se é similar a algum serviço COM item (>50% palavras em comum), pular
-            if is_similar_to_any_com_item(desc):
-                continue
-
-            # Se compartilha palavras distintivas com serviço COM item, pular
-            # (provavelmente é uma versão corrompida do OCR)
-            if shares_distinctive_keyword(desc):
-                continue
-
-            desc_sem_item_vistos.add(desc_norm)
-            sem_item_filtrado.append(servico)
-
-        # Retornar todos COM item + os SEM item que não são duplicatas
-        return com_item + sem_item_filtrado
-
-    def _filter_servicos_by_item_length(self, servicos: list) -> tuple[list, dict]:
+        Returns:
+            Lista filtrada de serviços
+        """
         if not servicos:
-            return servicos, {"applied": False, "ratio": 0.0}
+            return servicos
 
-        lengths = []
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if item_tuple:
-                lengths.append(len(item_tuple))
+        # Contar itens com e sem código
+        com_codigo = [s for s in servicos if s.get("item")]
+        sem_codigo = [s for s in servicos if not s.get("item")]
 
-        if not lengths:
-            return servicos, {"applied": False, "ratio": 0.0}
+        # Se há poucos itens com código, manter todos (documento pode não ter numeração)
+        if len(com_codigo) < min_items_with_code:
+            return servicos
 
-        from collections import Counter
-        counts = Counter(lengths)
-        dominant_len, dominant_count = max(counts.items(), key=lambda kv: kv[1])
-        ratio = dominant_count / max(1, len(lengths))
-        try:
-            min_ratio = float(os.getenv("ATTESTADO_ITEM_LEN_RATIO", "0.6"))
-        except ValueError:
-            min_ratio = 0.6
+        # Se há itens suficientes com código, remover os sem código
+        if sem_codigo:
+            logger.info(f"[FILTRO] Removendo {len(sem_codigo)} itens sem código de item (há {len(com_codigo)} itens com código)")
+            for s in sem_codigo:
+                desc = (s.get("descricao") or "")[:50]
+                logger.info(f"[FILTRO] Removido item sem código: {desc}...")
 
-        info = {
-            "dominant_len": dominant_len,
-            "ratio": round(ratio, 3),
-            "applied": False,
-            "filtered_out": 0,
-            "kept_mismatch": 0
-        }
-        if ratio < min_ratio or dominant_len < 2:
-            return servicos, info
-
-        try:
-            min_desc_len = int(os.getenv("ATTESTADO_ITEM_LEN_KEEP_MIN_DESC", "20"))
-        except ValueError:
-            min_desc_len = 20
-
-        filtered = []
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if not item_tuple or len(item_tuple) == dominant_len:
-                filtered.append(servico)
-                continue
-            qty = self._parse_quantity(servico.get("quantidade"))
-            unit = self._normalize_unit(servico.get("unidade") or "")
-            desc = (servico.get("descricao") or "").strip()
-            if qty not in (None, 0) and unit and len(desc) >= min_desc_len:
-                filtered.append(servico)
-                info["kept_mismatch"] += 1
-
-        info["applied"] = True
-        info["filtered_out"] = len(servicos) - len(filtered)
-        return filtered, info
-
-    def _filter_servicos_by_item_prefix(self, servicos: list) -> tuple[list, dict]:
-        if not servicos:
-            return servicos, {"applied": False, "ratio": 0.0}
-
-        prefixes = []
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if item_tuple:
-                prefixes.append(item_tuple[0])
-
-        if not prefixes:
-            return servicos, {"applied": False, "ratio": 0.0}
-
-        from collections import Counter
-        counts = Counter(prefixes)
-        dominant_prefix, dominant_count = max(counts.items(), key=lambda kv: kv[1])
-        ratio = dominant_count / max(1, len(prefixes))
-        try:
-            min_ratio = float(os.getenv("ATTESTADO_ITEM_PREFIX_RATIO", "0.7"))
-        except ValueError:
-            min_ratio = 0.7
-
-        info = {
-            "dominant_prefix": dominant_prefix,
-            "ratio": round(ratio, 3),
-            "applied": False,
-            "filtered_out": 0,
-            "kept_mismatch": 0
-        }
-        if ratio < min_ratio:
-            return servicos, info
-
-        # Preservar itens com prefixo diferente se tiverem dados validos
-        # (caso de aditivos contratuais onde itens reiniciam em 1.1)
-        try:
-            min_desc_len = int(os.getenv("ATTESTADO_ITEM_PREFIX_KEEP_MIN_DESC", "15"))
-        except ValueError:
-            min_desc_len = 15
-
-        filtered = []
-        kept_mismatch = 0
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if not item_tuple or item_tuple[0] == dominant_prefix:
-                filtered.append(servico)
-            else:
-                # Item com prefixo diferente - manter se tiver dados validos
-                qty = self._parse_quantity(servico.get("quantidade"))
-                unit = self._normalize_unit(servico.get("unidade") or "")
-                desc = (servico.get("descricao") or "").strip()
-                if qty not in (None, 0) and unit and len(desc) >= min_desc_len:
-                    filtered.append(servico)
-                    kept_mismatch += 1
-
-        info["applied"] = True
-        info["filtered_out"] = len(servicos) - len(filtered)
-        info["kept_mismatch"] = kept_mismatch
-        return filtered, info
-
-    def _dominant_item_length(self, servicos: list) -> tuple[Optional[int], float]:
-        lengths = []
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if item_tuple:
-                lengths.append(len(item_tuple))
-        if not lengths:
-            return None, 0.0
-        from collections import Counter
-        counts = Counter(lengths)
-        dominant_len, dominant_count = max(counts.items(), key=lambda kv: kv[1])
-        ratio = dominant_count / max(1, len(lengths))
-        return dominant_len, ratio
-
-    def _repair_missing_prefix(self, servicos: list, dominant_prefix: Optional[int]) -> tuple[list, dict]:
-        if not servicos or dominant_prefix is None:
-            return servicos, {"applied": False, "repaired": 0}
-
-        existing = {s.get("item") for s in servicos if s.get("item")}
-        repaired = 0
-        skipped_small_prefix = 0
-        for servico in servicos:
-            item_val = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_val)) if item_val else None
-            if not item_tuple or len(item_tuple) != 2:
-                continue
-            # Nao reparar itens que comecam com numeros pequenos (1, 2, 3)
-            # pois provavelmente sao secoes de aditivos contratuais
-            if item_tuple[0] <= 3:
-                skipped_small_prefix += 1
-                continue
-            new_item = f"{dominant_prefix}.{self._item_tuple_to_str(item_tuple)}"
-            if new_item in existing:
-                continue
-            servico["item"] = new_item
-            existing.add(new_item)
-            repaired += 1
-
-        return servicos, {"applied": repaired > 0, "repaired": repaired, "skipped_small_prefix": skipped_small_prefix}
-
-    def _build_description_from_cells(self, cells: list, exclude_cols: set) -> str:
-        parts = []
-        for idx, cell in enumerate(cells):
-            if idx in exclude_cols:
-                continue
-            text = str(cell or "").strip()
-            if text:
-                parts.append(text)
-        return " ".join(parts).strip()
+        return com_codigo
 
     def _extract_servicos_from_table(self, table: list, preferred_item_col: Optional[int] = None) -> tuple[list, float, dict]:
         if not table:
@@ -966,11 +447,11 @@ class DocumentProcessor:
             padded = list(row) + [""] * (max_cols - len(row))
             normalized_rows.append(padded)
 
-        header_index = self._detect_header_row(normalized_rows)
+        header_index = detect_header_row(normalized_rows)
         header_map = {"item": None, "descricao": None, "unidade": None, "quantidade": None, "valor": None}
         data_rows = normalized_rows
         if header_index is not None:
-            header_map = self._guess_columns_by_header(normalized_rows[header_index])
+            header_map = guess_columns_by_header(normalized_rows[header_index])
             data_rows = normalized_rows[header_index + 1:]
 
         item_col = header_map.get("item")
@@ -979,12 +460,8 @@ class DocumentProcessor:
         preferred_used = False
         if item_col is None and preferred_item_col is not None and preferred_item_col < max_cols:
             col_cells = [row[preferred_item_col] for row in data_rows if preferred_item_col < len(row)]
-            preferred_score_data = self._score_item_column(col_cells, preferred_item_col, max_cols)
-            try:
-                min_preferred_score = float(os.getenv("ATTESTADO_ITEM_COL_MIN_SCORE", "0.5"))
-            except ValueError:
-                min_preferred_score = 0.5
-            if preferred_score_data["score"] >= min_preferred_score:
+            preferred_score_data = score_item_column(col_cells, preferred_item_col, max_cols)
+            if preferred_score_data["score"] >= APC.ITEM_COL_MIN_SCORE:
                 item_col = preferred_item_col
                 item_score_data = preferred_score_data
                 preferred_used = True
@@ -994,7 +471,7 @@ class DocumentProcessor:
             best_col = None
             for col in range(max_cols):
                 col_cells = [row[col] for row in data_rows if col < len(row)]
-                score_data = self._score_item_column(col_cells, col, max_cols)
+                score_data = score_item_column(col_cells, col, max_cols)
                 if score_data["score"] > best_score:
                     best_score = score_data["score"]
                     best_col = col
@@ -1002,12 +479,12 @@ class DocumentProcessor:
             item_col = best_col
         else:
             col_cells = [row[item_col] for row in data_rows if item_col < len(row)]
-            item_score_data = self._score_item_column(col_cells, item_col, max_cols)
+            item_score_data = score_item_column(col_cells, item_col, max_cols)
 
-        col_stats = self._compute_column_stats(data_rows, max_cols)
-        header_map = self._guess_columns_by_content(data_rows, max_cols, header_map, col_stats)
-        header_map = self._validate_column_mapping(header_map, col_stats)
-        header_map = self._guess_columns_by_content(data_rows, max_cols, header_map, col_stats)
+        col_stats = compute_column_stats(data_rows, max_cols)
+        header_map = guess_columns_by_content(data_rows, max_cols, header_map, col_stats)
+        header_map = validate_column_mapping(header_map, col_stats)
+        header_map = guess_columns_by_content(data_rows, max_cols, header_map, col_stats)
         desc_col = header_map.get("descricao")
         unit_col = header_map.get("unidade")
         qty_col = header_map.get("quantidade")
@@ -1018,13 +495,13 @@ class DocumentProcessor:
         for row in data_rows:
             cells = [str(cell or "").strip() for cell in row]
             item_val = cells[item_col] if item_col is not None and item_col < len(cells) else ""
-            item_tuple = self._parse_item_tuple(item_val)
+            item_tuple = parse_item_tuple(item_val)
             item_col_effective = item_col
             if item_tuple is None:
                 for idx, cell in enumerate(cells):
                     if idx == desc_col:
                         continue
-                    candidate = self._parse_item_tuple(cell)
+                    candidate = parse_item_tuple(cell)
                     if candidate:
                         item_tuple = candidate
                         item_col_effective = idx
@@ -1036,19 +513,19 @@ class DocumentProcessor:
 
             exclude_cols = {c for c in (item_col_effective, unit_col, qty_col) if c is not None}
             if not desc_val or len(desc_val) < 6:
-                desc_val = self._build_description_from_cells(cells, exclude_cols)
+                desc_val = build_description_from_cells(cells, exclude_cols)
 
             if unit_val:
-                unit_val = self._normalize_unit(unit_val).strip()
+                unit_val = normalize_unit(unit_val).strip()
 
             if item_tuple:
                 item_tuples.append(item_tuple)
-                item_str = self._item_tuple_to_str(item_tuple)
+                item_str = item_tuple_to_str(item_tuple)
                 servico = {
                     "item": item_str,
                     "descricao": desc_val.strip(),
                     "unidade": unit_val.strip(),
-                    "quantidade": self._parse_quantity(qty_val)
+                    "quantidade": parse_quantity(qty_val)
                 }
                 servicos.append(servico)
                 last_item = servico
@@ -1058,22 +535,22 @@ class DocumentProcessor:
                         last_item["descricao"] = (str(last_item.get("descricao") or "") + " " + str(desc_val)).strip()
                     if not last_item.get("unidade") and unit_val:
                         last_item["unidade"] = unit_val.strip()
-                    if (last_item.get("quantidade") in (None, 0)) and self._parse_quantity(qty_val) not in (None, 0):
-                        last_item["quantidade"] = self._parse_quantity(qty_val)
+                    if (last_item.get("quantidade") in (None, 0)) and parse_quantity(qty_val) not in (None, 0):
+                        last_item["quantidade"] = parse_quantity(qty_val)
 
         servicos = [s for s in servicos if s.get("descricao")]
-        servicos, prefix_info = self._filter_servicos_by_item_prefix(servicos)
-        dominant_len, dominant_len_ratio = self._dominant_item_length(servicos)
+        servicos, prefix_info = filter_servicos_by_item_prefix(servicos)
+        dominant_len, dominant_len_ratio = dominant_item_length(servicos)
         repair_info = {"applied": False, "repaired": 0}
         if dominant_len == 3 and prefix_info.get("dominant_prefix") is not None:
-            servicos, repair_info = self._repair_missing_prefix(servicos, prefix_info.get("dominant_prefix"))
-        servicos, dominant_info = self._filter_servicos_by_item_length(servicos)
-        stats = self._compute_servicos_stats(servicos)
+            servicos, repair_info = repair_missing_prefix(servicos, prefix_info.get("dominant_prefix"))
+        servicos, dominant_info = filter_servicos_by_item_length(servicos)
+        stats = compute_servicos_stats(servicos)
         seq_ratio = 0.0
         filtered_tuples = []
         for servico in servicos:
             item_value: Any = servico.get("item")
-            item_tuple = self._parse_item_tuple(str(item_value)) if item_value else None
+            item_tuple = parse_item_tuple(str(item_value)) if item_value else None
             if item_tuple:
                 filtered_tuples.append(item_tuple)
         if len(filtered_tuples) > 1:
@@ -1120,7 +597,8 @@ class DocumentProcessor:
     def _extract_servicos_from_tables(self, file_path: str) -> tuple[list, float, dict]:
         try:
             tables = pdf_extractor.extract_tables(file_path)
-        except Exception as exc:
+        except (PDFError, IOError, ValueError) as exc:
+            logger.warning(f"Erro ao extrair tabelas: {exc}")
             return [], 0.0, {"error": str(exc)}
         if not tables:
             return [], 0.0, {"tables": 0}
@@ -1138,7 +616,8 @@ class DocumentProcessor:
                 if not best_debug or confidence > best_debug.get("confidence", 0):
                     best_debug = debug
 
-                # Adicionar servicos, prefixando duplicados com AD{n}-
+                # Adicionar servicos - NÃO prefixar aqui, deixar para _prefix_aditivo_items
+                # que usa detecção inteligente de reinício de numeração
                 for s in servicos:
                     item = s.get("item", "")
                     if item:
@@ -1148,11 +627,10 @@ class DocumentProcessor:
                             item_counts[item] = 1
                             all_servicos.append(s)
                         else:
-                            # Item duplicado (aditivo) - prefixar com AD{n}-
+                            # Item duplicado - manter sem prefixo aqui
+                            # O prefixo AD- será adicionado por _prefix_aditivo_items
                             item_counts[item] = count + 1
-                            s_copy = s.copy()
-                            s_copy["item"] = f"AD{count}-{item}"
-                            all_servicos.append(s_copy)
+                            all_servicos.append(s)
                     else:
                         # Item sem número - adicionar diretamente
                         all_servicos.append(s)
@@ -1169,7 +647,8 @@ class DocumentProcessor:
             return [], 0.0, {"enabled": False, "error": "not_configured"}
         try:
             result = document_ai_service.extract_tables(file_path)
-        except Exception as exc:
+        except (AzureAPIError, IOError, ValueError) as exc:
+            logger.warning(f"Erro no Document AI: {exc}")
             return [], 0.0, {"error": str(exc)}
 
         tables = result.get("tables") or []
@@ -1289,22 +768,10 @@ class DocumentProcessor:
         if not words or not col_centers:
             return None, {}
 
-        try:
-            min_ratio = float(os.getenv("ATTESTADO_ITEM_COL_RATIO", "0.35"))
-        except ValueError:
-            min_ratio = 0.35
-        try:
-            max_x_ratio = float(os.getenv("ATTESTADO_ITEM_COL_MAX_X_RATIO", "0.35"))
-        except ValueError:
-            max_x_ratio = 0.35
-        try:
-            max_index = int(os.getenv("ATTESTADO_ITEM_COL_MAX_INDEX", "2"))
-        except ValueError:
-            max_index = 2
-        try:
-            min_count = int(os.getenv("ATTESTADO_ITEM_COL_MIN_COUNT", "6"))
-        except ValueError:
-            min_count = 6
+        min_ratio = APC.ITEM_COL_RATIO
+        max_x_ratio = APC.ITEM_COL_MAX_X_RATIO
+        max_index = APC.ITEM_COL_MAX_INDEX
+        min_count = APC.ITEM_COL_MIN_COUNT
 
         min_x = min(w["x0"] for w in words)
         max_x = max(w["x1"] for w in words)
@@ -1313,7 +780,7 @@ class DocumentProcessor:
         counts = [0] * len(col_centers)
         total_candidates = 0
         for word in words:
-            item_tuple = self._parse_item_tuple(word.get("text"))
+            item_tuple = parse_item_tuple(word.get("text"))
             if not item_tuple:
                 continue
             total_candidates += 1
@@ -1347,14 +814,9 @@ class DocumentProcessor:
         progress_callback=None,
         cancel_check=None
     ) -> tuple[list, float, dict]:
-        try:
-            min_conf = float(os.getenv("ATTESTADO_OCR_LAYOUT_CONFIDENCE", "0.3"))
-            dpi = int(os.getenv("ATTESTADO_OCR_LAYOUT_DPI", "300"))
-            page_min_items = int(os.getenv("ATTESTADO_OCR_LAYOUT_PAGE_MIN_ITEMS", "3"))
-        except ValueError:
-            min_conf = 0.3
-            dpi = 300
-            page_min_items = 3
+        min_conf = APC.OCR_LAYOUT_CONFIDENCE
+        dpi = APC.OCR_LAYOUT_DPI
+        page_min_items = APC.OCR_LAYOUT_PAGE_MIN_ITEMS
 
         images = []
         file_ext = Path(file_path).suffix.lower()
@@ -1394,7 +856,8 @@ class DocumentProcessor:
             cropped = self._crop_region(image_bytes, 0.05, 0.15, 0.95, 0.92)
             try:
                 words = ocr_service.extract_words_from_bytes(cropped, min_confidence=min_conf)
-            except Exception as exc:
+            except OCRError as exc:
+                logger.debug(f"Erro OCR na pagina {page_index + 1}: {exc}")
                 page_debug.append({"page": page_index + 1, "error": str(exc)})
                 continue
 
@@ -1410,42 +873,18 @@ class DocumentProcessor:
             item_ratio = stats.get("with_item", 0) / max(1, total_page_items)
             unit_ratio = stats.get("with_unit", 0) / max(1, total_page_items)
             dominant_len = dominant.get("dominant_len", 0) or 0
-            try:
-                min_dom_len = int(os.getenv("ATTESTADO_OCR_PAGE_MIN_DOMINANT_LEN", "2"))
-            except ValueError:
-                min_dom_len = 2
-            try:
-                min_item_ratio = float(os.getenv("ATTESTADO_OCR_PAGE_MIN_ITEM_RATIO", "0.6"))
-            except ValueError:
-                min_item_ratio = 0.6
-            try:
-                min_unit_ratio = float(os.getenv("ATTESTADO_OCR_PAGE_MIN_UNIT_RATIO", "0.2"))
-            except ValueError:
-                min_unit_ratio = 0.2
-            try:
-                fallback_unit_ratio = float(os.getenv("ATTESTADO_OCR_PAGE_FALLBACK_UNIT_RATIO", "0.4"))
-            except ValueError:
-                fallback_unit_ratio = 0.4
-            try:
-                fallback_item_ratio = float(os.getenv("ATTESTADO_OCR_PAGE_FALLBACK_ITEM_RATIO", "0.8"))
-            except ValueError:
-                fallback_item_ratio = 0.8
-            try:
-                fallback_min_items = int(os.getenv("ATTESTADO_OCR_PAGE_MIN_ITEMS", "5"))
-            except ValueError:
-                fallback_min_items = 5
 
             primary_accept = (
                 total_page_items > 0
-                and dominant_len >= min_dom_len
-                and item_ratio >= min_item_ratio
-                and unit_ratio >= min_unit_ratio
+                and dominant_len >= APC.OCR_PAGE_MIN_DOMINANT_LEN
+                and item_ratio >= APC.OCR_PAGE_MIN_ITEM_RATIO
+                and unit_ratio >= APC.OCR_PAGE_MIN_UNIT_RATIO
             )
             fallback_accept = (
-                total_page_items >= fallback_min_items
+                total_page_items >= APC.OCR_PAGE_MIN_ITEMS
                 and dominant_len == 1
-                and item_ratio >= fallback_item_ratio
-                and unit_ratio >= fallback_unit_ratio
+                and item_ratio >= APC.OCR_PAGE_FALLBACK_ITEM_RATIO
+                and unit_ratio >= APC.OCR_PAGE_FALLBACK_UNIT_RATIO
             )
             page_accept = primary_accept or fallback_accept
             debug.update({
@@ -1477,353 +916,8 @@ class DocumentProcessor:
             "page_debug": page_debug
         }
 
-    def _parse_quantity(self, value) -> Optional[float]:
-        if value is None:
-            return None
-        if isinstance(value, (int, float)):
-            return float(value)
-        text = str(value).strip()
-        if not text:
-            return None
-        text = text.replace(" ", "")
-        # Formato brasileiro: 1.234,56
-        if "," in text and "." in text:
-            text = text.replace(".", "").replace(",", ".")
-        else:
-            text = text.replace(",", ".")
-        import re
-        text = re.sub(r"[^0-9.\-]", "", text)
-        if not text:
-            return None
-        try:
-            return float(text)
-        except ValueError:
-            return None
-
-    def _is_summary_row(self, desc: str) -> bool:
-        if not desc:
-            return False
-        normalized = self._normalize_description(desc)
-        if not normalized:
-            return False
-        if normalized.startswith("TOTAL") or "TOTAL DA" in normalized or "TOTAL DO" in normalized:
-            return True
-        if normalized.startswith("SUBTOTAL"):
-            return True
-        if normalized.startswith("RESUMO"):
-            return True
-        if normalized.startswith("#"):
-            return True
-        if normalized in {"ITEM", "DISCRIMINACAO", "DISCRIMINACAO DOS SERVICOS EXECUTADOS"}:
-            return True
-        return False
-
-    def _filter_summary_rows(self, servicos: list) -> list:
-        if not servicos:
-            return servicos
-        return [s for s in servicos if not self._is_summary_row(s.get("descricao", ""))]
-
-    def _quantities_similar(self, qty_a: Optional[float], qty_b: Optional[float]) -> bool:
-        if qty_a is None or qty_b is None:
-            return True
-        if qty_a == 0 or qty_b == 0:
-            return False
-        diff = abs(qty_a - qty_b)
-        if diff <= 1.0:
-            return True
-        base = max(abs(qty_a), abs(qty_b))
-        if base > 0 and diff / base <= 0.2:
-            return True
-        return False
-
-    def _descriptions_similar(self, desc_a: str, desc_b: str) -> bool:
-        if not desc_a or not desc_b:
-            return False
-        norm_a = self._normalize_description(desc_a)
-        norm_b = self._normalize_description(desc_b)
-        if norm_a == norm_b:
-            return True
-        if norm_a in norm_b or norm_b in norm_a:
-            return True
-        kw_a = self._extract_keywords(desc_a)
-        kw_b = self._extract_keywords(desc_b)
-        if not kw_a or not kw_b:
-            return False
-        common = len(kw_a & kw_b)
-        min_len = min(len(kw_a), len(kw_b))
-        return common >= max(1, min_len // 2)
-
-    def _items_similar(self, item_a: dict, item_b: dict) -> bool:
-        desc_a = (item_a.get("descricao") or "").strip()
-        desc_b = (item_b.get("descricao") or "").strip()
-        if not self._descriptions_similar(desc_a, desc_b):
-            return False
-        unit_a = self._normalize_unit(item_a.get("unidade") or "")
-        unit_b = self._normalize_unit(item_b.get("unidade") or "")
-        if unit_a and unit_b and unit_a != unit_b:
-            return False
-        qty_a = self._parse_quantity(item_a.get("quantidade"))
-        qty_b = self._parse_quantity(item_b.get("quantidade"))
-        return self._quantities_similar(qty_a, qty_b)
-
-    def _compute_servicos_stats(self, servicos: list) -> dict:
-        total = len(servicos)
-        if total == 0:
-            return {"total": 0, "with_item": 0, "with_unit": 0, "with_qty": 0, "duplicate_ratio": 0.0}
-        with_item = sum(1 for s in servicos if s.get("item"))
-        with_unit = sum(1 for s in servicos if s.get("unidade"))
-        with_qty = sum(1 for s in servicos if self._parse_quantity(s.get("quantidade")) not in (None, 0))
-        normalized_desc = [self._normalize_description(s.get("descricao", "")) for s in servicos]
-        from collections import Counter
-        counts = Counter(d for d in normalized_desc if d)
-        duplicates = sum(v - 1 for v in counts.values() if v > 1)
-        duplicate_ratio = duplicates / max(1, total)
-        return {
-            "total": total,
-            "with_item": with_item,
-            "with_unit": with_unit,
-            "with_qty": with_qty,
-            "duplicate_ratio": round(duplicate_ratio, 4)
-        }
-
-    def _compute_description_quality(self, servicos: list) -> dict:
-        total = len(servicos)
-        if total == 0:
-            return {"avg_len": 0.0, "short_ratio": 0.0, "alpha_ratio": 0.0}
-
-        try:
-            short_len = int(os.getenv("ATTESTADO_OCR_NOISE_SHORT_DESC_LEN", "12"))
-        except ValueError:
-            short_len = 12
-
-        lengths = []
-        short_count = 0
-        alpha_ratios = []
-
-        for servico in servicos:
-            desc = (servico.get("descricao") or "").strip()
-            if not desc:
-                short_count += 1
-                continue
-            length = len(desc)
-            lengths.append(length)
-            if length < short_len:
-                short_count += 1
-            letters = sum(1 for ch in desc if ch.isalpha())
-            alnum = sum(1 for ch in desc if ch.isalnum())
-            if alnum:
-                alpha_ratios.append(letters / alnum)
-
-        avg_len = sum(lengths) / len(lengths) if lengths else 0.0
-        short_ratio = short_count / max(1, total)
-        alpha_ratio = sum(alpha_ratios) / len(alpha_ratios) if alpha_ratios else 0.0
-        return {
-            "avg_len": round(avg_len, 2),
-            "short_ratio": round(short_ratio, 3),
-            "alpha_ratio": round(alpha_ratio, 3)
-        }
-
-    def _is_ocr_noisy(self, servicos: list) -> tuple[bool, dict]:
-        stats = self._compute_servicos_stats(servicos)
-        quality = self._compute_description_quality(servicos)
-        total = max(1, stats.get("total", 0))
-        unit_ratio = stats.get("with_unit", 0) / total
-        qty_ratio = stats.get("with_qty", 0) / total
-
-        try:
-            min_unit_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_UNIT_RATIO", "0.5"))
-        except ValueError:
-            min_unit_ratio = 0.5
-        try:
-            min_qty_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_QTY_RATIO", "0.35"))
-        except ValueError:
-            min_qty_ratio = 0.35
-        try:
-            min_avg_len = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_AVG_DESC_LEN", "14"))
-        except ValueError:
-            min_avg_len = 14.0
-        try:
-            max_short_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MAX_SHORT_DESC_RATIO", "0.45"))
-        except ValueError:
-            max_short_ratio = 0.45
-        try:
-            min_alpha_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_ALPHA_RATIO", "0.45"))
-        except ValueError:
-            min_alpha_ratio = 0.45
-        try:
-            min_failures = int(os.getenv("ATTESTADO_OCR_NOISE_MIN_FAILS", "2"))
-        except ValueError:
-            min_failures = 2
-
-        failures = 0
-        reasons = {}
-        if unit_ratio < min_unit_ratio:
-            failures += 1
-            reasons["unit_ratio"] = round(unit_ratio, 3)
-        if qty_ratio < min_qty_ratio:
-            failures += 1
-            reasons["qty_ratio"] = round(qty_ratio, 3)
-        if quality["avg_len"] < min_avg_len:
-            failures += 1
-            reasons["avg_desc_len"] = quality["avg_len"]
-        if quality["short_ratio"] > max_short_ratio:
-            failures += 1
-            reasons["short_desc_ratio"] = quality["short_ratio"]
-        if quality["alpha_ratio"] < min_alpha_ratio:
-            failures += 1
-            reasons["alpha_ratio"] = quality["alpha_ratio"]
-
-        noisy = failures >= min_failures
-        debug = {
-            "noisy": noisy,
-            "failures": failures,
-            "min_failures": min_failures,
-            "unit_ratio": round(unit_ratio, 3),
-            "qty_ratio": round(qty_ratio, 3),
-            "quality": quality,
-            "thresholds": {
-                "min_unit_ratio": min_unit_ratio,
-                "min_qty_ratio": min_qty_ratio,
-                "min_avg_desc_len": min_avg_len,
-                "max_short_desc_ratio": max_short_ratio,
-                "min_alpha_ratio": min_alpha_ratio
-            },
-            "reasons": reasons
-        }
-        return noisy, debug
-
-    def _compute_quality_score(self, stats: dict) -> float:
-        total = stats.get("total", 0)
-        if total == 0:
-            return 0.0
-        score = 1.0
-        with_unit_ratio = stats.get("with_unit", 0) / total
-        with_qty_ratio = stats.get("with_qty", 0) / total
-        with_item_ratio = stats.get("with_item", 0) / total
-        if with_unit_ratio < 0.8:
-            score -= 0.2
-        if with_qty_ratio < 0.8:
-            score -= 0.2
-        if with_item_ratio < 0.4:
-            score -= 0.2
-        if stats.get("duplicate_ratio", 0) > 0.35:
-            score -= 0.1
-        min_items = int(os.getenv("ATTESTADO_MIN_ITEMS_FOR_CONFIDENCE", "25"))
-        if total < min_items:
-            score -= 0.2
-        return max(0.0, min(1.0, round(score, 2)))
-
-    def _servico_key(self, servico: dict):
-        desc = (servico.get("descricao") or "").strip()
-        raw_item = servico.get("item") or ""
-        item_code = self._extract_item_code(str(raw_item)) or self._extract_item_code(desc)
-        if item_code:
-            return ("item", item_code)
-        desc_norm = self._normalize_description(desc) if desc else ""
-        unit_norm = self._normalize_unit(servico.get("unidade") or "")
-        if desc_norm:
-            return ("desc", desc_norm, unit_norm)
-        return None
-
-    def _merge_servicos_prefer_primary(self, primary: list, secondary: list) -> list:
-        primary = self._filter_summary_rows(primary or [])
-        secondary = self._filter_summary_rows(secondary or [])
-        merged = []
-        index_by_key = {}
-
-        def add_or_update(item: dict):
-            key = self._servico_key(item)
-            if key is None:
-                merged.append(item)
-                return
-            if key not in index_by_key:
-                index_by_key[key] = len(merged)
-                merged.append(item)
-                return
-
-            existing = merged[index_by_key[key]]
-            if not existing.get("item") and item.get("item"):
-                existing["item"] = item.get("item")
-            if not existing.get("unidade") and item.get("unidade"):
-                existing["unidade"] = item.get("unidade")
-            existing_qty = self._parse_quantity(existing.get("quantidade"))
-            incoming_qty = self._parse_quantity(item.get("quantidade"))
-            if (existing_qty in (None, 0)) and (incoming_qty not in (None, 0)):
-                existing["quantidade"] = item.get("quantidade")
-            if self._is_short_description(existing.get("descricao", "")) and item.get("descricao"):
-                if len(item.get("descricao", "")) > len(existing.get("descricao", "")):
-                    existing["descricao"] = item.get("descricao")
-
-        for servico in primary:
-            add_or_update(servico)
-        for servico in secondary:
-            add_or_update(servico)
-
-        merged = self._improve_short_descriptions(merged, primary + secondary)
-        merged = self._deduplicate_by_description(merged)
-        return merged
-
-    def _deduplicate_by_description(self, servicos: list) -> list:
-        """
-        Remove serviços duplicados baseado na descrição normalizada.
-        Prefere serviços que têm código de item sobre os que não têm.
-
-        IMPORTANTE: Serviços com códigos de item DIFERENTES não são duplicatas,
-        mesmo que as descrições sejam similares (podem ser itens diferentes em
-        etapas diferentes da obra).
-        """
-        if not servicos:
-            return servicos
-
-        def get_item_code(servico: dict) -> str:
-            """Extrai código do item, seja do campo 'item' ou do início da descrição."""
-            item = servico.get("item") or ""
-            if item:
-                return item
-            # Se não tem campo item, tentar extrair do início da descrição
-            desc = servico.get("descricao") or ""
-            extracted = self._extract_item_code(desc)
-            return extracted
-
-        # Agrupar por descrição normalizada
-        by_desc = {}
-        result = []
-
-        for s in servicos:
-            desc = (s.get("descricao") or "").strip()
-            desc_norm = self._normalize_description(desc)[:50]  # Usar apenas primeiros 50 chars
-            if not desc_norm:
-                continue
-
-            item_code = get_item_code(s)
-
-            if desc_norm not in by_desc:
-                by_desc[desc_norm] = s
-            else:
-                # Já existe um serviço com descrição similar
-                existing = by_desc[desc_norm]
-                existing_item = get_item_code(existing)
-                new_item = item_code
-
-                # Se AMBOS têm códigos de item DIFERENTES, são itens distintos
-                # (ex: 4.2 e 4.3 podem ter descrições similares mas são itens diferentes)
-                if existing_item and new_item and existing_item != new_item:
-                    # Não é duplicata - adicionar diretamente ao resultado
-                    result.append(s)
-                    continue
-
-                # Se apenas o novo tem código, substituir
-                if new_item and not existing_item:
-                    by_desc[desc_norm] = s
-                elif new_item == existing_item:
-                    # Mesmo código (ou ambos vazios) - preferir descrição mais longa
-                    if len(s.get("descricao", "")) > len(existing.get("descricao", "")):
-                        by_desc[desc_norm] = s
-
-        return list(by_desc.values()) + result
-
     def _select_primary_source(self, vision_stats: dict, ocr_stats: dict, vision_score: float, ocr_score: float) -> str:
-        margin = float(os.getenv("ATTESTADO_SCORE_MARGIN", "0.1"))
+        margin = APC.SCORE_MARGIN
         if vision_score >= ocr_score + margin:
             return "vision"
         if ocr_score >= vision_score + margin:
@@ -1854,7 +948,8 @@ class DocumentProcessor:
             buffer = io.BytesIO()
             crop.save(buffer, format="PNG")
             return buffer.getvalue()
-        except Exception:
+        except (IOError, ValueError, OSError) as e:
+            logger.debug(f"Erro ao recortar imagem: {e}")
             return image_bytes
 
     def _resize_image_bytes(self, image_bytes: bytes, scale: float = 0.5) -> bytes:
@@ -1865,7 +960,8 @@ class DocumentProcessor:
             buffer = io.BytesIO()
             resized.save(buffer, format="PNG")
             return buffer.getvalue()
-        except Exception:
+        except (IOError, ValueError, OSError) as e:
+            logger.debug(f"Erro ao redimensionar imagem: {e}")
             return image_bytes
 
     def _detect_table_pages(self, images: List[bytes]) -> List[int]:
@@ -1876,14 +972,14 @@ class DocumentProcessor:
             header = self._resize_image_bytes(header, scale=0.5)
             try:
                 text = ocr_service.extract_text_from_bytes(header)
-            except Exception:
+            except OCRError as e:
+                logger.debug(f"Erro OCR na detecao de pagina de tabela: {e}")
                 text = ""
-            normalized = self._normalize_description(text)
+            normalized = normalize_description(text)
             hits = sum(1 for k in keywords if k in normalized)
             if hits >= 2:
                 table_pages.append(index)
                 continue
-            import re
             if re.search(r"\b\d{3}\s*\d{2}\s*\d{2}\b", normalized):
                 table_pages.append(index)
 
@@ -1920,7 +1016,7 @@ class DocumentProcessor:
                 for s in page_servicos:
                     logger.debug(f"  Item: {s.get('item', '?')}: {s.get('descricao', '')[:50]}")
                 servicos.extend(page_servicos)
-            except Exception as exc:
+            except (OpenAIError, ValueError, KeyError) as exc:
                 logger.warning(f"Erro na IA por pagina {page_index + 1}: {exc}")
         logger.info(f"Pagewise: total extraido = {len(servicos)} servicos")
         return servicos
@@ -1928,13 +1024,20 @@ class DocumentProcessor:
     def _extract_item_code(self, desc: str) -> str:
         """
         Extrai código do item da descrição (ex: "001.03.01" de "001.03.01 MOBILIZAÇÃO").
+        Também reconhece formatos com prefixo AD- (ex: "AD-1.1", "AD-1.1-A").
         """
-        import re
         if not desc:
             return ""
 
         text = desc.strip()
-        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3})\b', text)
+
+        # Primeiro, tentar extrair formato com prefixo AD- (ex: AD-1.1, AD-1.1-A)
+        ad_match = re.match(r'^(AD-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
+        if ad_match:
+            return ad_match.group(1).upper()
+
+        # Formato numérico padrão (ex: 1.1, 10.4, 10.4-A)
+        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}(?:-[A-Z])?)\b', text)
         if not match:
             match = re.match(r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\b', text)
 
@@ -1948,7 +1051,6 @@ class DocumentProcessor:
         """
         Separa o codigo do item da descricao, se presente.
         """
-        import re
         if not desc:
             return "", ""
 
@@ -1963,23 +1065,15 @@ class DocumentProcessor:
         ).strip()
         return code, cleaned or desc.strip()
 
-    def _normalize_desc_for_match(self, desc: str) -> str:
-        import re
-        code, cleaned = self._split_item_description(desc or "")
-        base = cleaned if cleaned else (desc or "")
-        normalized = self._normalize_description(base)
-        normalized = re.sub(r"[^A-Z0-9 ]", " ", normalized)
-        return " ".join(normalized.split())
-
     def _servico_match_key(self, servico: dict) -> str:
-        desc = self._normalize_desc_for_match(servico.get("descricao") or "")
-        unit = self._normalize_unit(servico.get("unidade") or "")
+        desc = normalize_desc_for_match(servico.get("descricao") or "")
+        unit = normalize_unit(servico.get("unidade") or "")
         if not desc:
             return ""
         return f"{desc}|||{unit}"
 
     def _servico_desc_key(self, servico: dict) -> str:
-        return self._normalize_desc_for_match(servico.get("descricao") or "")
+        return normalize_desc_for_match(servico.get("descricao") or "")
 
     def _dedupe_no_code_by_desc_unit(self, servicos: list) -> list:
         if not servicos:
@@ -1990,7 +1084,7 @@ class DocumentProcessor:
 
         def score(item: dict) -> int:
             score_val = len((item.get("descricao") or "").strip())
-            if self._parse_quantity(item.get("quantidade")) not in (None, 0):
+            if parse_quantity(item.get("quantidade")) not in (None, 0):
                 score_val += 50
             if item.get("unidade"):
                 score_val += 10
@@ -2043,15 +1137,12 @@ class DocumentProcessor:
         coded_entries = [
             {
                 "descricao": servico.get("descricao") or "",
-                "unidade": self._normalize_unit(servico.get("unidade") or ""),
-                "quantidade": self._parse_quantity(servico.get("quantidade"))
+                "unidade": normalize_unit(servico.get("unidade") or ""),
+                "quantidade": parse_quantity(servico.get("quantidade"))
             }
             for servico in coded
         ]
-        try:
-            similarity_threshold = float(os.getenv("ATTESTADO_DESC_SIM_THRESHOLD", "0.7"))
-        except ValueError:
-            similarity_threshold = 0.7
+        similarity_threshold = APC.DESC_SIM_THRESHOLD
 
         filtered_no_code = [
             servico for servico in no_code
@@ -2061,12 +1152,12 @@ class DocumentProcessor:
         refined_no_code = []
         for servico in filtered_no_code:
             desc = servico.get("descricao") or ""
-            unit = self._normalize_unit(servico.get("unidade") or "")
-            qty = self._parse_quantity(servico.get("quantidade"))
+            unit = normalize_unit(servico.get("unidade") or "")
+            qty = parse_quantity(servico.get("quantidade"))
             drop = False
             for coded_entry in coded_entries:
                 coded_desc = str(coded_entry.get("descricao") or "")
-                if self._description_similarity(desc, coded_desc) < similarity_threshold:
+                if description_similarity(desc, coded_desc) < similarity_threshold:
                     continue
                 unit_match = bool(unit and coded_entry["unidade"] and unit == coded_entry["unidade"])
                 qty_match = False
@@ -2088,25 +1179,25 @@ class DocumentProcessor:
     def _table_candidates_by_code(self, servicos_table: list) -> dict:
         if not servicos_table:
             return {}
-        unit_tokens = self._unit_tokens()
+        unit_tokens = UNIT_TOKENS
         candidates: Dict[str, Any] = {}
         for servico in servicos_table:
             item = servico.get("item") or self._extract_item_code(servico.get("descricao") or "")
             if not item:
                 continue
-            item_tuple = self._parse_item_tuple(item)
+            item_tuple = parse_item_tuple(item)
             if not item_tuple:
                 continue
             desc = (servico.get("descricao") or "").strip()
             if len(desc) < 8:
                 continue
-            qty = self._parse_quantity(servico.get("quantidade"))
+            qty = parse_quantity(servico.get("quantidade"))
             if qty is None:
                 continue
-            unit = self._normalize_unit(servico.get("unidade") or "")
+            unit = normalize_unit(servico.get("unidade") or "")
             if unit and unit not in unit_tokens:
                 unit = ""
-            normalized_item = self._item_tuple_to_str(item_tuple)
+            normalized_item = item_tuple_to_str(item_tuple)
             candidate = {
                 "item": normalized_item,
                 "descricao": desc,
@@ -2125,10 +1216,7 @@ class DocumentProcessor:
         if not table_candidates:
             return servicos
 
-        try:
-            match_threshold = float(os.getenv("ATTESTADO_CODE_MATCH_THRESHOLD", "0.55"))
-        except ValueError:
-            match_threshold = 0.55
+        match_threshold = APC.CODE_MATCH_THRESHOLD
 
         used_codes = {s.get("item") for s in servicos if s.get("item")}
         used_codes.discard(None)
@@ -2136,15 +1224,15 @@ class DocumentProcessor:
             if servico.get("item"):
                 continue
             desc = servico.get("descricao") or ""
-            unit = self._normalize_unit(servico.get("unidade") or "")
-            qty = self._parse_quantity(servico.get("quantidade"))
+            unit = normalize_unit(servico.get("unidade") or "")
+            qty = parse_quantity(servico.get("quantidade"))
             best_code = None
             best_score = 0.0
             best_candidate = None
             for code, candidate in table_candidates.items():
                 if code in used_codes:
                     continue
-                score = self._description_similarity(desc, candidate["descricao"])
+                score = description_similarity(desc, candidate["descricao"])
                 if score < match_threshold:
                     continue
                 if unit and candidate["unidade"] and unit == candidate["unidade"]:
@@ -2164,7 +1252,7 @@ class DocumentProcessor:
                 used_codes.add(best_code)
                 if best_candidate and not servico.get("unidade") and best_candidate.get("unidade"):
                     servico["unidade"] = best_candidate["unidade"]
-                if best_candidate and self._parse_quantity(servico.get("quantidade")) in (None, 0) and best_candidate.get("quantidade") is not None:
+                if best_candidate and parse_quantity(servico.get("quantidade")) in (None, 0) and best_candidate.get("quantidade") is not None:
                     servico["quantidade"] = best_candidate["quantidade"]
 
         return servicos
@@ -2179,79 +1267,34 @@ class DocumentProcessor:
             return True
         return False
 
-    def _find_better_description(self, item: dict, candidates: list) -> str:
-        target_desc = (item.get('descricao') or '').strip()
-        target_unit = self._normalize_unit(item.get('unidade') or '')
-        try:
-            target_qty = float(item.get('quantidade') or 0)
-        except (TypeError, ValueError):
-            target_qty = 0
-        target_kw = self._extract_keywords(target_desc)
+    # ========================================================================
+    # Métodos auxiliares para process_atestado (divididos para legibilidade)
+    # ========================================================================
 
-        best_desc = None
-        best_len = len(target_desc)
-
-        for cand in candidates:
-            cand_desc = (cand.get('descricao') or '').strip()
-            if not cand_desc or len(cand_desc) <= best_len:
-                continue
-            cand_unit = self._normalize_unit(cand.get('unidade') or '')
-            if target_unit and cand_unit and cand_unit != target_unit:
-                continue
-            try:
-                cand_qty = float(cand.get('quantidade') or 0)
-            except (TypeError, ValueError):
-                cand_qty = 0
-            if target_qty and cand_qty and abs(target_qty - cand_qty) > 0.01:
-                continue
-            cand_kw = self._extract_keywords(cand_desc)
-            if target_kw and cand_kw and len(target_kw & cand_kw) == 0:
-                if not cand_desc.upper().startswith(target_desc.upper()):
-                    continue
-            best_desc = cand_desc
-            best_len = len(cand_desc)
-
-        return best_desc or ''
-
-    def _improve_short_descriptions(self, items: list, candidates: list) -> list:
-        if not items or not candidates:
-            return items
-        for item in items:
-            desc = item.get('descricao', '')
-            if not self._is_short_description(desc):
-                continue
-            better = self._find_better_description(item, candidates)
-            if better:
-                item['descricao'] = better
-        return items
-
-    def process_atestado(
+    def _extract_texto_from_file(
         self,
         file_path: str,
-        use_vision: bool = True,
+        file_ext: str,
         progress_callback=None,
         cancel_check=None
-    ) -> Dict[str, Any]:
+    ) -> str:
         """
-        Processa um atestado de capacidade técnica usando abordagem híbrida.
-
-        Combina GPT-4o Vision (para precisão) com OCR+texto (para completude).
+        Extrai texto do arquivo (PDF ou imagem) usando OCR quando necessário.
 
         Args:
-            file_path: Caminho para o arquivo (PDF ou imagem)
-            use_vision: Se True, usa abordagem híbrida Vision+OCR; se False, apenas OCR+texto
+            file_path: Caminho para o arquivo
+            file_ext: Extensão do arquivo (ex: ".pdf", ".png")
+            progress_callback: Callback para progresso
+            cancel_check: Função para verificar cancelamento
 
         Returns:
-            Dicionário com dados extraídos do atestado
-        """
-        self._check_cancel(cancel_check)
-        file_ext = Path(file_path).suffix.lower()
-        texto = ""
-        dados_vision = None
-        dados_ocr = None
-        self._check_cancel(cancel_check)
+            Texto extraído do documento
 
-        # Extrair texto com OCR (sempre necessário para referência)
+        Raises:
+            PDFError, OCRError, UnsupportedFileError, TextExtractionError
+        """
+        texto = ""
+
         if file_ext == ".pdf":
             try:
                 texto = self._extract_pdf_with_ocr_fallback(
@@ -2259,7 +1302,8 @@ class DocumentProcessor:
                     progress_callback=progress_callback,
                     cancel_check=cancel_check
                 )
-            except Exception as e:
+            except (PDFError, TextExtractionError) as e:
+                logger.warning(f"Fallback para OCR apos erro: {e}")
                 try:
                     images = pdf_extractor.pdf_to_images(file_path)
                     texto = self._ocr_image_list(
@@ -2267,14 +1311,14 @@ class DocumentProcessor:
                         progress_callback=progress_callback,
                         cancel_check=cancel_check
                     )
-                except Exception as e2:
-                    raise PDFError("processar", f"{str(e)} / OCR: {str(e2)}")
+                except (PDFError, OCRError) as e2:
+                    raise PDFError("processar", f"{e} / OCR: {e2}")
         elif file_ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
             try:
                 self._check_cancel(cancel_check)
                 self._notify_progress(progress_callback, 1, 1, "ocr", "OCR da imagem")
                 texto = ocr_service.extract_text_from_image(file_path)
-            except Exception as e:
+            except (OCRError, IOError) as e:
                 raise OCRError(str(e))
         else:
             raise UnsupportedFileError(file_ext)
@@ -2282,18 +1326,42 @@ class DocumentProcessor:
         if not texto.strip():
             raise TextExtractionError("documento")
 
-        servicos_table: List[Any] = []
+        return texto
+
+    def _extract_servicos_from_all_tables(
+        self,
+        file_path: str,
+        file_ext: str,
+        progress_callback=None,
+        cancel_check=None
+    ) -> tuple[list, float, dict, dict]:
+        """
+        Tenta extrair serviços de tabelas usando múltiplos métodos.
+
+        Tenta: Document AI, pdfplumber, OCR layout (nessa ordem de prioridade).
+
+        Args:
+            file_path: Caminho para o arquivo
+            file_ext: Extensão do arquivo
+            progress_callback: Callback para progresso
+            cancel_check: Função para verificar cancelamento
+
+        Returns:
+            Tupla (servicos, confidence, debug, attempts)
+        """
+        servicos_table: list = []
         table_confidence = 0.0
-        table_debug: Dict[str, Any] = {}
-        table_used = False
-        primary_source = None
-        table_attempts: Dict[str, Any] = {}
-        table_threshold = float(os.getenv("ATTESTADO_TABLE_CONFIDENCE_THRESHOLD", "0.7"))
-        table_min_items = int(os.getenv("ATTESTADO_TABLE_MIN_ITEMS", "10"))
-        document_ai_enabled = os.getenv("DOCUMENT_AI_ENABLED", "0").lower() in {"1", "true", "yes"}
-        document_ai_fallback_only = os.getenv("DOCUMENT_AI_FALLBACK_ONLY", "1").lower() in {"1", "true", "yes"}
+        table_debug: dict = {}
+        table_attempts: dict = {}
+
+        table_threshold = APC.TABLE_CONFIDENCE_THRESHOLD
+        table_min_items = APC.TABLE_MIN_ITEMS
+        document_ai_enabled = APC.DOCUMENT_AI_ENABLED
+        document_ai_fallback_only = APC.DOCUMENT_AI_FALLBACK_ONLY
         document_ai_ready = document_ai_enabled and document_ai_service.is_configured
+
         if file_ext == ".pdf":
+            # Tentar Document AI primeiro (se não for fallback-only)
             if document_ai_ready and not document_ai_fallback_only:
                 doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
                 doc_debug["source"] = "document_ai"
@@ -2307,6 +1375,7 @@ class DocumentProcessor:
                     doc_servicos, doc_conf, doc_debug
                 )
 
+            # Tentar pdfplumber
             pdf_servicos, pdf_conf, pdf_debug = self._extract_servicos_from_tables(file_path)
             pdf_debug["source"] = "pdfplumber"
             table_attempts["pdfplumber"] = {
@@ -2319,6 +1388,7 @@ class DocumentProcessor:
                 pdf_servicos, pdf_conf, pdf_debug
             )
 
+            # Tentar OCR layout se necessário
             needs_ocr_layout = (
                 not servicos_table
                 or table_confidence < table_threshold
@@ -2341,11 +1411,13 @@ class DocumentProcessor:
                     ocr_servicos, ocr_conf, ocr_debug
                 )
 
+            # Verificar ruído do OCR
             ocr_noisy = False
             if table_debug.get("source") == "ocr_layout" and servicos_table:
-                ocr_noisy, ocr_noise_debug = self._is_ocr_noisy(servicos_table)
+                ocr_noisy, ocr_noise_debug = is_ocr_noisy(servicos_table)
                 table_debug["ocr_noise"] = ocr_noise_debug
 
+            # Document AI como fallback
             needs_document_ai = (
                 document_ai_ready
                 and document_ai_fallback_only
@@ -2368,7 +1440,9 @@ class DocumentProcessor:
                     servicos_table, table_confidence, table_debug,
                     doc_servicos, doc_conf, doc_debug
                 )
+
         elif file_ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
+            # Imagem: tentar Document AI e OCR layout
             if document_ai_ready and not document_ai_fallback_only:
                 doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
                 doc_debug["source"] = "document_ai"
@@ -2400,7 +1474,7 @@ class DocumentProcessor:
 
             ocr_noisy = False
             if table_debug.get("source") == "ocr_layout" and servicos_table:
-                ocr_noisy, ocr_noise_debug = self._is_ocr_noisy(servicos_table)
+                ocr_noisy, ocr_noise_debug = is_ocr_noisy(servicos_table)
                 table_debug["ocr_noise"] = ocr_noise_debug
 
             needs_document_ai = (
@@ -2426,162 +1500,438 @@ class DocumentProcessor:
                     doc_servicos, doc_conf, doc_debug
                 )
 
-        if servicos_table and table_confidence >= table_threshold and len(servicos_table) >= table_min_items:
-            table_used = True
+        return servicos_table, table_confidence, table_debug, table_attempts
+
+    def _extract_dados_with_ai(
+        self,
+        file_path: str,
+        file_ext: str,
+        texto: str,
+        use_vision: bool,
+        servicos_table: list,
+        table_used: bool,
+        progress_callback=None,
+        cancel_check=None
+    ) -> tuple[dict, str, dict]:
+        """
+        Extrai dados do atestado usando IA (Vision e/ou OCR text).
+
+        Args:
+            file_path: Caminho para o arquivo
+            file_ext: Extensão do arquivo
+            texto: Texto extraído do documento
+            use_vision: Se deve usar análise de imagem
+            servicos_table: Serviços extraídos de tabelas
+            table_used: Se tabela foi usada com alta confiança
+            progress_callback: Callback para progresso
+            cancel_check: Função para verificar cancelamento
+
+        Returns:
+            Tupla (dados, primary_source, debug_info)
+        """
+        images: list = []
+        vision_reprocessed = False
+        vision_score = 0.0
+        ocr_score = 0.0
+        vision_stats = {"total": 0, "with_item": 0, "with_unit": 0, "with_qty": 0, "duplicate_ratio": 0.0}
+        ocr_stats = {"total": 0, "with_item": 0, "with_unit": 0, "with_qty": 0, "duplicate_ratio": 0.0}
+        dados_vision = None
+        dados_ocr = None
+        primary_source = None
+
+        llm_fallback_only = APC.LLM_FALLBACK_ONLY
+        use_ai_for_services = not llm_fallback_only or not table_used
+
+        # Método 1: OCR + análise de texto
+        self._notify_progress(progress_callback, 0, 0, "ia", "Analisando texto com IA")
+        self._check_cancel(cancel_check)
+        dados_ocr = ai_provider.extract_atestado_info(texto)
+
+        # Método 2: Vision (GPT-4o ou Gemini)
+        if use_vision:
+            try:
+                if file_ext == ".pdf":
+                    images = self._pdf_to_images(
+                        file_path,
+                        dpi=300,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check,
+                        stage="vision"
+                    )
+                else:
+                    with open(file_path, "rb") as f:
+                        self._check_cancel(cancel_check)
+                        self._notify_progress(progress_callback, 1, 1, "vision", "Carregando imagem")
+                        images = [f.read()]
+
+                self._notify_progress(progress_callback, 0, 0, "ia", "Analisando imagens com IA")
+                self._check_cancel(cancel_check)
+                dados_vision = ai_provider.extract_atestado_from_images(images)
+            except (OpenAIError, ValueError, KeyError) as e:
+                logger.warning(f"Erro no Vision: {e}")
+                dados_vision = None
+
+        servicos_vision = filter_summary_rows(dados_vision.get("servicos", []) if dados_vision else [])
+        servicos_ocr = filter_summary_rows(dados_ocr.get("servicos", []) if dados_ocr else [])
+        vision_stats = compute_servicos_stats(servicos_vision)
+        ocr_stats = compute_servicos_stats(servicos_ocr)
+        vision_score = compute_quality_score(vision_stats)
+        ocr_score = compute_quality_score(ocr_stats)
+
+        # Fallback por página com OpenAI quando a qualidade estiver baixa
+        pagewise_enabled = APC.PAGEWISE_VISION_ENABLED
+        logger.info(f"Pagewise check: enabled={pagewise_enabled}, use_vision={use_vision}, images={len(images) if images else 0}, openai_available={'openai' in ai_provider.available_providers}")
+        if pagewise_enabled and use_vision and images and "openai" in ai_provider.available_providers:
+            quality_threshold = APC.VISION_QUALITY_THRESHOLD
+            min_pages = APC.PAGEWISE_MIN_PAGES
+            min_items = APC.PAGEWISE_MIN_ITEMS
+            logger.info(f"Pagewise condition: vision_score={vision_score:.2f} < {quality_threshold} OR (pages={len(images)} >= {min_pages} AND items={vision_stats.get('total', 0)} < {min_items})")
+            if vision_score < quality_threshold or (len(images) >= min_pages and vision_stats.get("total", 0) < min_items):
+                page_servicos = self._extract_servicos_pagewise(images, progress_callback, cancel_check)
+                if page_servicos:
+                    if dados_vision is None:
+                        dados_vision = {
+                            "descricao_servico": dados_ocr.get("descricao_servico") if dados_ocr else None,
+                            "contratante": dados_ocr.get("contratante") if dados_ocr else None,
+                            "data_emissao": dados_ocr.get("data_emissao") if dados_ocr else None,
+                            "quantidade": dados_ocr.get("quantidade") if dados_ocr else None,
+                            "unidade": dados_ocr.get("unidade") if dados_ocr else None,
+                        }
+                    dados_vision["servicos"] = page_servicos
+                    servicos_vision = filter_summary_rows(page_servicos)
+                    vision_stats = compute_servicos_stats(servicos_vision)
+                    vision_score = compute_quality_score(vision_stats)
+                    vision_reprocessed = True
+                    ocr_score = compute_quality_score(ocr_stats)
+
+        # Combinar resultados
+        self._notify_progress(progress_callback, 0, 0, "merge", "Consolidando dados extraidos")
+        self._check_cancel(cancel_check)
+
+        if dados_vision and dados_ocr:
+            primary_source = self._select_primary_source(vision_stats, ocr_stats, vision_score, ocr_score)
+            if primary_source == "vision":
+                primary = dados_vision
+                secondary = dados_ocr
+                primary_servicos = servicos_vision
+                secondary_servicos = servicos_ocr
+            else:
+                primary = dados_ocr
+                secondary = dados_vision
+                primary_servicos = servicos_ocr
+                secondary_servicos = servicos_vision
+
+            dados = {
+                "descricao_servico": primary.get("descricao_servico") or secondary.get("descricao_servico"),
+                "contratante": primary.get("contratante") or secondary.get("contratante"),
+                "data_emissao": primary.get("data_emissao") or secondary.get("data_emissao"),
+                "quantidade": primary.get("quantidade") or secondary.get("quantidade"),
+                "unidade": primary.get("unidade") or secondary.get("unidade"),
+            }
+
+            # Prefixar itens do aditivo em cada fonte ANTES do merge
+            primary_servicos = prefix_aditivo_items(primary_servicos, texto)
+            secondary_servicos = prefix_aditivo_items(secondary_servicos, texto)
+            dados["servicos"] = merge_servicos_prefer_primary(primary_servicos, secondary_servicos)
+
+        else:
+            primary_source = "ocr" if dados_ocr else "vision"
+            dados = dados_ocr or {
+                "descricao_servico": None,
+                "quantidade": None,
+                "unidade": None,
+                "contratante": None,
+                "data_emissao": None,
+                "servicos": []
+            }
+            if dados.get("servicos"):
+                dados["servicos"] = prefix_aditivo_items(dados["servicos"], texto)
+
+        # Se tabela foi usada com alta confiança, comparar com IA
+        if table_used and not use_ai_for_services:
+            servicos_table_filtered = [
+                s for s in servicos_table
+                if s.get("quantidade") is not None
+            ]
+            servicos_table_filtered = prefix_aditivo_items(servicos_table_filtered, texto)
+
+            ai_servicos = dados.get("servicos") or []
+            ai_servicos_count = len(ai_servicos) if isinstance(ai_servicos, list) else 0
+            table_servicos_count = len(servicos_table_filtered)
+
+            if table_servicos_count >= ai_servicos_count:
+                dados["servicos"] = servicos_table_filtered
+                primary_source = "table_services"
+            else:
+                primary_source = primary_source + "_ai_preferred"
+
+        debug_info = {
+            "vision": {"count": len(servicos_vision), "score": vision_score, "reprocessed": vision_reprocessed},
+            "ocr": {"count": len(servicos_ocr), "score": ocr_score},
+            "vision_stats": vision_stats,
+            "ocr_stats": ocr_stats,
+            "page_count": len(images),
+            "use_ai_for_services": use_ai_for_services,
+        }
+
+        return dados, primary_source, debug_info
+
+    def _postprocess_servicos(
+        self,
+        servicos: list,
+        use_ai: bool,
+        table_used: bool,
+        servicos_table: list
+    ) -> list:
+        """
+        Aplica pós-processamento nos serviços extraídos.
+
+        Inclui: normalização, filtros, deduplicação, limpeza de códigos.
+
+        Args:
+            servicos: Lista de serviços brutos
+            use_ai: Se IA foi usada
+            table_used: Se tabela foi usada com alta confiança
+            servicos_table: Serviços da tabela (para enriquecimento)
+
+        Returns:
+            Lista de serviços processados
+        """
+        servicos = filter_summary_rows(servicos)
+
+        # Enriquecer com dados da tabela se IA foi usada
+        if use_ai and not table_used:
+            servicos = self._attach_item_codes_from_table(servicos, servicos_table)
+            servicos = self._prefer_items_with_code(servicos)
+
+        # Normalizar cada serviço
+        for servico in servicos:
+            desc = servico.get("descricao", "")
+            existing_item = servico.get("item")
+            item, clean_desc = self._split_item_description(desc)
+            if not item and existing_item:
+                item = existing_item
+            if item:
+                servico["item"] = item
+                if clean_desc:
+                    servico["descricao"] = clean_desc
+            else:
+                servico["item"] = None
+            qty = parse_quantity(servico.get("quantidade"))
+            if qty is not None:
+                servico["quantidade"] = qty
+            unit = servico.get("unidade")
+            if isinstance(unit, str):
+                servico["unidade"] = unit.strip()
+
+        # Aplicar filtros
+        servicos = filter_classification_paths(servicos)
+        servicos = remove_duplicate_services(servicos)
+        servicos = self._remove_duplicate_pairs(servicos)
+        servicos = self._filter_items_without_quantity(servicos)
+        servicos = self._filter_items_without_code(servicos)
+
+        return servicos
+
+    def _find_better_description(self, item: dict, candidates: list) -> str:
+        target_desc = (item.get('descricao') or '').strip()
+        target_unit = normalize_unit(item.get('unidade') or '')
+        try:
+            target_qty = float(item.get('quantidade') or 0)
+        except (TypeError, ValueError):
+            target_qty = 0
+        target_kw = extract_keywords(target_desc)
+
+        best_desc = None
+        best_len = len(target_desc)
+
+        for cand in candidates:
+            cand_desc = (cand.get('descricao') or '').strip()
+            if not cand_desc or len(cand_desc) <= best_len:
+                continue
+            cand_unit = normalize_unit(cand.get('unidade') or '')
+            if target_unit and cand_unit and cand_unit != target_unit:
+                continue
+            try:
+                cand_qty = float(cand.get('quantidade') or 0)
+            except (TypeError, ValueError):
+                cand_qty = 0
+            if target_qty and cand_qty and abs(target_qty - cand_qty) > 0.01:
+                continue
+            cand_kw = extract_keywords(cand_desc)
+            if target_kw and cand_kw and len(target_kw & cand_kw) == 0:
+                if not cand_desc.upper().startswith(target_desc.upper()):
+                    continue
+            best_desc = cand_desc
+            best_len = len(cand_desc)
+
+        return best_desc or ''
+
+    def _improve_short_descriptions(self, items: list, candidates: list) -> list:
+        if not items or not candidates:
+            return items
+        for item in items:
+            desc = item.get('descricao', '')
+            if not self._is_short_description(desc):
+                continue
+            better = self._find_better_description(item, candidates)
+            if better:
+                item['descricao'] = better
+        return items
+
+    def _recover_descriptions_from_text(
+        self,
+        servicos: list,
+        texto: str
+    ) -> list:
+        """
+        Recupera descrições ausentes do texto OCR para itens com descrição curta.
+
+        Alguns PDFs têm formato onde a descrição aparece na linha anterior
+        ao código do item. Este método tenta recuperar essas descrições.
+
+        Args:
+            servicos: Lista de serviços
+            texto: Texto OCR extraído
+
+        Returns:
+            Lista de serviços com descrições recuperadas
+        """
+
+        if not servicos or not texto:
+            return servicos
+
+        lines = texto.split('\n')
+        line_map = {}
+
+        # Criar mapa de linhas que começam com código de item
+        for i, line in enumerate(lines):
+            match = re.match(r'^(\d+\.\d+(?:\.\d+)?)\s+', line.strip())
+            if match:
+                item_code = match.group(1)
+                line_map[item_code] = i
+
+        # Para cada serviço com descrição curta, tentar recuperar
+        for servico in servicos:
+            desc = (servico.get("descricao") or "").strip()
+            item_code = servico.get("item")
+
+            # Só processar se descrição muito curta e tem código válido
+            if len(desc) >= 10 or not item_code:
+                continue
+
+            line_idx = line_map.get(str(item_code))
+            if line_idx is None or line_idx == 0:
+                continue
+
+            # Verificar linha anterior
+            prev_line = lines[line_idx - 1].strip()
+
+            # A linha anterior deve ser texto (não um código de item)
+            if re.match(r'^\d+\.\d+', prev_line):
+                continue
+
+            # Ignorar linhas muito curtas ou que são apenas números
+            if len(prev_line) < 15:
+                continue
+            if re.match(r'^[\d\s,\.]+$', prev_line):
+                continue
+
+            # Ignorar linhas de cabeçalho/rodapé comuns
+            skip_patterns = [
+                r'^p[áa]gina\s+\d',
+                r'^\d+/\d+$',
+                r'^af_\d+/\d+$',
+            ]
+            should_skip = False
+            for pattern in skip_patterns:
+                if re.match(pattern, prev_line, re.I):
+                    should_skip = True
+                    break
+            if should_skip:
+                continue
+
+            # Recuperar descrição da linha anterior
+            servico["descricao"] = prev_line
+            servico["_desc_recovered"] = True
+            logger.debug(f"Recuperada descrição para {item_code}: {prev_line[:50]}...")
+
+        return servicos
+
+    def process_atestado(
+        self,
+        file_path: str,
+        use_vision: bool = True,
+        progress_callback=None,
+        cancel_check=None
+    ) -> Dict[str, Any]:
+        """
+        Processa um atestado de capacidade técnica usando abordagem híbrida.
+
+        Combina GPT-4o Vision (para precisão) com OCR+texto (para completude).
+
+        Args:
+            file_path: Caminho para o arquivo (PDF ou imagem)
+            use_vision: Se True, usa abordagem híbrida Vision+OCR; se False, apenas OCR+texto
+
+        Returns:
+            Dicionário com dados extraídos do atestado
+        """
+        self._check_cancel(cancel_check)
+        file_ext = Path(file_path).suffix.lower()
+
+        # 1. Extrair texto do documento
+        texto = self._extract_texto_from_file(
+            file_path, file_ext, progress_callback, cancel_check
+        )
+
+        # 2. Extrair serviços de tabelas (múltiplos métodos)
+        servicos_table, table_confidence, table_debug, table_attempts = \
+            self._extract_servicos_from_all_tables(
+                file_path, file_ext, progress_callback, cancel_check
+            )
+
+        # Determinar se tabela será usada
+        table_threshold = APC.TABLE_CONFIDENCE_THRESHOLD
+        table_min_items = APC.TABLE_MIN_ITEMS
+        table_used = (
+            servicos_table
+            and table_confidence >= table_threshold
+            and len(servicos_table) >= table_min_items
+        )
 
         if isinstance(table_debug, dict):
             table_debug.setdefault("attempts", table_attempts)
 
-        llm_fallback_only = os.getenv("ATTESTADO_LLM_FALLBACK_ONLY", "1").lower() in {"1", "true", "yes"}
-        # SEMPRE executar AI para metadados (descricao, contratante, data)
-        # Usar tabela apenas para servicos quando confianca for alta
-        use_ai = ai_provider.is_configured  # Sempre usar AI se configurada
-        use_ai_for_services = ai_provider.is_configured and (not llm_fallback_only or not table_used)
+        # 3. Extrair dados com IA (se configurada)
+        use_ai = ai_provider.is_configured
 
-
-        # Sempre executar extração com IA para metadados
         if use_ai:
-            images = []
-            vision_reprocessed = False
-            vision_score = 0.0
-            ocr_score = 0.0
-            vision_stats = {"total": 0, "with_item": 0, "with_unit": 0, "with_qty": 0, "duplicate_ratio": 0.0}
-            ocr_stats = {"total": 0, "with_item": 0, "with_unit": 0, "with_qty": 0, "duplicate_ratio": 0.0}
-
-            # Metodo 1: OCR + analise de texto
-            self._notify_progress(progress_callback, 0, 0, "ia", "Analisando texto com IA")
-            self._check_cancel(cancel_check)
-            dados_ocr = ai_provider.extract_atestado_info(texto)
-
-            # Metodo 2: Vision (GPT-4o ou Gemini) (se habilitado)
-            if use_vision:
-                try:
-                    if file_ext == ".pdf":
-                        images = self._pdf_to_images(
-                            file_path,
-                            dpi=300,
-                            progress_callback=progress_callback,
-                            cancel_check=cancel_check,
-                            stage="vision"
-                        )
-                    else:
-                        with open(file_path, "rb") as f:
-                            self._check_cancel(cancel_check)
-                            self._notify_progress(progress_callback, 1, 1, "vision", "Carregando imagem")
-                            images = [f.read()]
-
-                    self._notify_progress(progress_callback, 0, 0, "ia", "Analisando imagens com IA")
-                    self._check_cancel(cancel_check)
-                    dados_vision = ai_provider.extract_atestado_from_images(images)
-                except Exception as e:
-                    logger.warning(f"Erro no Vision: {str(e)}")
-                    dados_vision = None
-
-            servicos_vision = self._filter_summary_rows(dados_vision.get("servicos", []) if dados_vision else [])
-            servicos_ocr = self._filter_summary_rows(dados_ocr.get("servicos", []) if dados_ocr else [])
-            vision_stats = self._compute_servicos_stats(servicos_vision)
-            ocr_stats = self._compute_servicos_stats(servicos_ocr)
-            vision_score = self._compute_quality_score(vision_stats)
-            ocr_score = self._compute_quality_score(ocr_stats)
-
-            # Fallback por pagina com OpenAI quando a qualidade estiver baixa
-            pagewise_enabled = os.getenv("ATTESTADO_PAGEWISE_VISION", "1").lower() in {"1", "true", "yes"}
-            logger.info(f"Pagewise check: enabled={pagewise_enabled}, use_vision={use_vision}, images={len(images) if images else 0}, openai_available={'openai' in ai_provider.available_providers}")
-            if pagewise_enabled and use_vision and images and "openai" in ai_provider.available_providers:
-                quality_threshold = float(os.getenv("ATTESTADO_VISION_QUALITY_THRESHOLD", "0.6"))
-                min_pages = int(os.getenv("ATTESTADO_PAGEWISE_MIN_PAGES", "3"))
-                min_items = int(os.getenv("ATTESTADO_PAGEWISE_MIN_ITEMS", "40"))
-                logger.info(f"Pagewise condition: vision_score={vision_score:.2f} < {quality_threshold} OR (pages={len(images)} >= {min_pages} AND items={vision_stats.get('total', 0)} < {min_items})")
-                if vision_score < quality_threshold or (len(images) >= min_pages and vision_stats.get("total", 0) < min_items):
-                    page_servicos = self._extract_servicos_pagewise(images, progress_callback, cancel_check)
-                    if page_servicos:
-                        dados_vision = dados_vision or {}
-                        dados_vision["servicos"] = page_servicos
-                        servicos_vision = self._filter_summary_rows(page_servicos)
-                        vision_stats = self._compute_servicos_stats(servicos_vision)
-                        vision_score = self._compute_quality_score(vision_stats)
-                        vision_reprocessed = True
-                        ocr_score = self._compute_quality_score(ocr_stats)
-
-            # Combinar resultados
-            if dados_vision and dados_ocr:
-                primary_source = self._select_primary_source(vision_stats, ocr_stats, vision_score, ocr_score)
-                if primary_source == "vision":
-                    primary = dados_vision
-                    secondary = dados_ocr
-                    primary_servicos = servicos_vision
-                    secondary_servicos = servicos_ocr
-                else:
-                    primary = dados_ocr
-                    secondary = dados_vision
-                    primary_servicos = servicos_ocr
-                    secondary_servicos = servicos_vision
-
-                dados = {
-                    "descricao_servico": primary.get("descricao_servico") or secondary.get("descricao_servico"),
-                    "contratante": primary.get("contratante") or secondary.get("contratante"),
-                    "data_emissao": primary.get("data_emissao") or secondary.get("data_emissao"),
-                    "quantidade": primary.get("quantidade") or secondary.get("quantidade"),
-                    "unidade": primary.get("unidade") or secondary.get("unidade"),
-                }
-
-                dados["servicos"] = self._merge_servicos_prefer_primary(primary_servicos, secondary_servicos)
-
-            else:
-                primary_source = "ocr" if dados_ocr else "vision"
-                dados = dados_ocr or {
-                    "descricao_servico": None,
-                    "quantidade": None,
-                    "unidade": None,
-                    "contratante": None,
-                    "data_emissao": None,
-                    "servicos": []
-                }
-
-            # Se tabela foi usada com alta confiança, comparar com IA
-            # e usar a fonte com mais serviços válidos
-            if table_used and not use_ai_for_services:
-                # Filtrar serviços sem quantidade (cabeçalhos de seção)
-                servicos_table_filtered = [
-                    s for s in servicos_table
-                    if s.get("quantidade") is not None
-                ]
-                # Comparar com serviços da IA - usar tabela apenas se tiver mais ou igual itens
-                ai_servicos = dados.get("servicos") or []
-                ai_servicos_count = len(ai_servicos) if isinstance(ai_servicos, list) else 0
-                table_servicos_count = len(servicos_table_filtered)
-
-                if table_servicos_count >= ai_servicos_count:
-                    dados["servicos"] = servicos_table_filtered
-                    primary_source = "table_services"  # Serviços da tabela, metadados da IA
-                else:
-                    # IA tem mais serviços - manter serviços da IA
-                    primary_source = primary_source + "_ai_preferred"  # Indica que IA foi preferida
+            dados, primary_source, ai_debug_info = self._extract_dados_with_ai(
+                file_path, file_ext, texto, use_vision,
+                servicos_table, table_used,
+                progress_callback, cancel_check
+            )
 
             dados["_debug"] = {
-                "vision": {"count": len(servicos_vision), "score": vision_score, "reprocessed": vision_reprocessed},
-                "ocr": {"count": len(servicos_ocr), "score": ocr_score},
-                "vision_stats": vision_stats,
-                "ocr_stats": ocr_stats,
+                **ai_debug_info,
                 "table": {
                     "count": len(servicos_table),
                     "confidence": table_confidence,
                     "used": table_used,
                     "debug": table_debug
                 },
-                "page_count": len(images),
                 "primary_source": primary_source,
                 "provider_config": ai_provider.current_provider,
-                "use_ai_for_services": use_ai_for_services,
             }
-
         else:
-            # IA não está configurada - usar apenas extração de tabela
-            # Filtrar serviços sem quantidade (cabeçalhos de seção)
+            # IA não configurada - usar apenas tabela
             servicos_table_filtered = [
                 s for s in servicos_table
                 if s.get("quantidade") is not None
             ] if table_used else []
+            servicos_table_filtered = prefix_aditivo_items(servicos_table_filtered, texto)
+
             dados = {
                 "descricao_servico": None,
                 "quantidade": None,
@@ -2601,34 +1951,20 @@ class DocumentProcessor:
                 "ai_configured": False,
             }
 
-        servicos = self._filter_summary_rows(dados.get("servicos") or [])
-        if use_ai and not table_used:
-            servicos = self._attach_item_codes_from_table(servicos, servicos_table)
-            servicos = self._prefer_items_with_code(servicos)
-        for servico in servicos:
-            desc = servico.get("descricao", "")
-            existing_item = servico.get("item")
-            item, clean_desc = self._split_item_description(desc)
-            if not item and existing_item:
-                item = existing_item
-            if item:
-                servico["item"] = item
-                if clean_desc:
-                    servico["descricao"] = clean_desc
-            else:
-                servico["item"] = None
-            qty = self._parse_quantity(servico.get("quantidade"))
-            if qty is not None:
-                servico["quantidade"] = qty
-            unit = servico.get("unidade")
-            if isinstance(unit, str):
-                servico["unidade"] = unit.strip()
+        # 4. Pós-processamento dos serviços
+        self._notify_progress(progress_callback, 0, 0, "final", "Finalizando processamento")
+        self._check_cancel(cancel_check)
 
-        # Aplicar filtro para remover classificações inválidas (caminhos com ">")
-        servicos = self._filter_classification_paths(servicos)
+        # Recuperar descrições ausentes do texto OCR
+        servicos_raw = dados.get("servicos") or []
+        servicos_raw = self._recover_descriptions_from_text(servicos_raw, texto)
 
-        # Remover duplicatas (mesmo item + descrição + quantidade + unidade)
-        servicos = self._remove_duplicate_services(servicos)
+        servicos = self._postprocess_servicos(
+            servicos_raw,
+            use_ai,
+            table_used,
+            servicos_table
+        )
 
         dados["servicos"] = servicos
         dados["texto_extraido"] = texto
@@ -2668,7 +2004,7 @@ class DocumentProcessor:
                 progress_callback=progress_callback,
                 cancel_check=cancel_check
             )
-            except Exception as e:
+            except (PDFError, OCRError, IOError) as e:
                 raise OCRError(str(e))
 
         if not texto.strip():
@@ -2698,6 +2034,7 @@ class DocumentProcessor:
         else:
             exigencias = []
 
+        self._notify_progress(progress_callback, 0, 0, "final", "Finalizando processamento")
         return {
             "texto_extraido": texto,
             "tabelas": tabelas,
@@ -2737,7 +2074,7 @@ class DocumentProcessor:
             "document_ai": {
                 "available": document_ai_service.is_available,
                 "configured": document_ai_service.is_configured,
-                "enabled": os.getenv("DOCUMENT_AI_ENABLED", "0").lower() in {"1", "true", "yes"}
+                "enabled": APC.DOCUMENT_AI_ENABLED
             },
             "is_configured": ai_provider.is_configured,
             "mensagem": f"IA configurada ({', '.join(ai_provider.available_providers)})" if ai_provider.is_configured else "Configure OPENAI_API_KEY ou GOOGLE_API_KEY para análise inteligente"

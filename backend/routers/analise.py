@@ -1,6 +1,6 @@
 import os
-import shutil
 import uuid
+from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
@@ -9,11 +9,10 @@ from models import Usuario, Atestado, Analise
 from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse
 from auth import get_current_approved_user
 from services import document_processor
-from config import (
-    UPLOAD_DIR, Messages, validate_upload_file,
-    ALLOWED_PDF_EXTENSIONS
-)
+from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
+from utils.validation import validate_upload_or_raise
+from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 from logging_config import get_logger
 
 logger = get_logger('routers.analise')
@@ -24,7 +23,7 @@ router = APIRouter(prefix="/analises", tags=["Análises"])
 @router.get("/status/servicos")
 def status_servicos(
     current_user: Usuario = Depends(get_current_approved_user)
-):
+) -> Dict[str, Any]:
     """Retorna o status dos serviços de processamento de documentos."""
     return document_processor.get_status()
 
@@ -34,7 +33,7 @@ def listar_analises(
     pagination: PaginationParams = Depends(),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> PaginatedAnaliseResponse:
     """Lista todas as análises do usuário logado com paginação."""
     query = db.query(Analise).filter(
         Analise.user_id == current_user.id
@@ -48,7 +47,7 @@ def obter_analise(
     analise_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AnaliseResponse:
     """Obtém uma análise específica."""
     analise = db.query(Analise).filter(
         Analise.id == analise_id,
@@ -69,30 +68,19 @@ async def criar_analise(
     file: UploadFile = File(...),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AnaliseResponse:
     """
     Cria uma nova análise de licitação.
     Faz upload do PDF do edital, extrai exigências e faz matching com atestados.
     """
     # Validar arquivo
-    try:
-        file_ext = validate_upload_file(file.filename, ALLOWED_PDF_EXTENSIONS)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    file_ext = validate_upload_or_raise(file.filename, ALLOWED_PDF_EXTENSIONS)
 
-    # Criar diretório do usuário
-    user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id), "editais")
-    os.makedirs(user_upload_dir, exist_ok=True)
-
-    # Salvar arquivo
+    # Criar diretório do usuário e salvar arquivo
+    user_upload_dir = get_user_upload_dir(current_user.id, "editais")
     filename = f"{uuid.uuid4()}{file_ext}"
-    filepath = os.path.join(user_upload_dir, filename)
-
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    filepath = str(user_upload_dir / filename)
+    save_upload_file(file, filepath)
 
     try:
         # Processar edital (extrair texto e exigências)
@@ -138,9 +126,7 @@ async def criar_analise(
 
     except Exception as e:
         logger.error(f"Erro ao processar edital: {e}")
-        # Remover arquivo se falhar
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        safe_delete_file(filepath)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=Messages.PROCESSING_ERROR
@@ -152,7 +138,7 @@ async def processar_analise(
     analise_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AnaliseResponse:
     """
     Reprocessa uma análise existente: extrai exigências do edital e faz matching com atestados.
     Útil quando novos atestados são adicionados ou para reprocessar com IA atualizada.
@@ -229,7 +215,7 @@ def excluir_analise(
     analise_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> Mensagem:
     """Exclui uma análise."""
     analise = db.query(Analise).filter(
         Analise.id == analise_id,
@@ -243,8 +229,8 @@ def excluir_analise(
         )
 
     # Remover arquivo se existir
-    if analise.arquivo_path and os.path.exists(analise.arquivo_path):
-        os.remove(analise.arquivo_path)
+    if analise.arquivo_path:
+        safe_delete_file(analise.arquivo_path)
 
     db.delete(analise)
     db.commit()

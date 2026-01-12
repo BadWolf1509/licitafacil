@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -53,7 +53,7 @@ def aprovar_usuario(
         )
 
     usuario.is_approved = True
-    usuario.approved_at = datetime.utcnow()
+    usuario.approved_at = datetime.now(timezone.utc)
     usuario.approved_by = current_user.id
     db.commit()
 

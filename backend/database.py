@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -10,12 +10,26 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./licitafacil.db")
 
-# Para SQLite, precisamos de check_same_thread=False
+# Para SQLite, precisamos de check_same_thread=False e timeout para evitar locks
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(
         DATABASE_URL,
-        connect_args={"check_same_thread": False}
+        connect_args={
+            "check_same_thread": False,
+            "timeout": 30.0  # Timeout de 30s para locks
+        },
+        pool_pre_ping=True  # Verifica conexão antes de usar
     )
+
+    # Habilitar WAL mode para melhor concorrência em SQLite
+    # WAL permite leituras simultâneas com escritas
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")  # 30s timeout
+        cursor.execute("PRAGMA synchronous=NORMAL")  # Balance entre performance e segurança
+        cursor.close()
 else:
     engine = create_engine(DATABASE_URL)
 

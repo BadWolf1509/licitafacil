@@ -3,14 +3,18 @@ Utilitários para processamento de tabelas extraídas de documentos.
 
 Este módulo contém funções para detecção de cabeçalhos, mapeamento de colunas,
 parsing de itens e construção de descrições a partir de células de tabela.
+
+Usa lru_cache para melhorar performance em chamadas repetidas.
 """
 
 import re
+from functools import lru_cache
 from typing import Optional, Any
 
 from .text_normalizer import normalize_header, normalize_unit, normalize_description, UNIT_TOKENS
 
 
+@lru_cache(maxsize=2048)
 def parse_item_tuple(value: str) -> Optional[tuple]:
     """
     Converte string de item para tupla numérica.

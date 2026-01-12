@@ -1,5 +1,4 @@
 import os
-import shutil
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
@@ -13,11 +12,10 @@ from schemas import (
 from auth import get_current_approved_user
 from services.processing_queue import processing_queue
 from services.atestado_service import ordenar_servicos, salvar_atestado_processado
-from config import (
-    UPLOAD_DIR, Messages, validate_upload_file,
-    ALLOWED_DOCUMENT_EXTENSIONS
-)
+from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
+from utils.validation import validate_upload_or_raise
+from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 
 from logging_config import get_logger
 logger = get_logger('routers.atestados')
@@ -34,7 +32,7 @@ def listar_atestados(
     pagination: PaginationParams = Depends(),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> PaginatedAtestadoResponse:
     """Lista todos os atestados do usuário logado com paginação."""
     query = db.query(Atestado).filter(
         Atestado.user_id == current_user.id
@@ -48,7 +46,7 @@ def obter_atestado(
     atestado_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AtestadoResponse:
     """Obtém um atestado específico."""
     atestado = db.query(Atestado).filter(
         Atestado.id == atestado_id,
@@ -68,7 +66,7 @@ def criar_atestado(
     atestado: AtestadoCreate,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AtestadoResponse:
     """Cria um novo atestado manualmente (sem upload de arquivo)."""
     novo_atestado = Atestado(
         user_id=current_user.id,
@@ -89,30 +87,19 @@ async def upload_atestado(
     file: UploadFile = File(...),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> JobResponse:
     """
     Faz upload de um PDF/imagem de atestado para processamento.
     O arquivo sera processado em background e o status pode ser consultado na fila.
     """
     # Validar arquivo
-    try:
-        file_ext = validate_upload_file(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    file_ext = validate_upload_or_raise(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
 
-    # Criar diretorio do usuario
-    user_upload_dir = os.path.join(UPLOAD_DIR, str(current_user.id), "atestados")
-    os.makedirs(user_upload_dir, exist_ok=True)
-
-    # Salvar arquivo
+    # Criar diretorio do usuario e salvar arquivo
+    user_upload_dir = get_user_upload_dir(current_user.id, "atestados")
     filename = f"{uuid.uuid4()}{file_ext}"
-    filepath = os.path.join(user_upload_dir, filename)
-
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    filepath = str(user_upload_dir / filename)
+    save_upload_file(file, filepath)
 
     try:
         job_id = str(uuid.uuid4())
@@ -121,6 +108,7 @@ async def upload_atestado(
             user_id=current_user.id,
             file_path=filepath,
             job_type="atestado",
+            original_filename=file.filename,
             callback=salvar_atestado_processado
         )
         return JobResponse(
@@ -130,8 +118,7 @@ async def upload_atestado(
         )
     except Exception as e:
         logger.error(f"Erro ao enfileirar processamento de atestado: {e}")
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        safe_delete_file(filepath)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=Messages.QUEUE_ERROR
@@ -143,7 +130,7 @@ async def reprocessar_atestado(
     atestado_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> JobResponse:
     """Reprocessa um atestado existente usando o arquivo salvo."""
     atestado = db.query(Atestado).filter(
         Atestado.id == atestado_id,
@@ -164,11 +151,14 @@ async def reprocessar_atestado(
 
     try:
         job_id = str(uuid.uuid4())
+        # Usar basename do arquivo como nome original (já é UUID no reprocessamento)
+        original_name = os.path.basename(atestado.arquivo_path)
         processing_queue.add_job(
             job_id=job_id,
             user_id=current_user.id,
             file_path=atestado.arquivo_path,
             job_type="atestado",
+            original_filename=original_name,
             callback=salvar_atestado_processado
         )
         return JobResponse(
@@ -190,7 +180,7 @@ def atualizar_atestado(
     dados: AtestadoUpdate,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AtestadoResponse:
     """Atualiza um atestado existente."""
     atestado = db.query(Atestado).filter(
         Atestado.id == atestado_id,
@@ -226,7 +216,7 @@ def atualizar_servicos(
     dados: AtestadoServicosUpdate,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> AtestadoResponse:
     """Atualiza apenas os serviços de um atestado (usado para excluir itens individuais)."""
     atestado = db.query(Atestado).filter(
         Atestado.id == atestado_id,
@@ -253,7 +243,7 @@ def excluir_atestado(
     atestado_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-):
+) -> Mensagem:
     """Exclui um atestado."""
     atestado = db.query(Atestado).filter(
         Atestado.id == atestado_id,
@@ -267,8 +257,8 @@ def excluir_atestado(
         )
 
     # Remover arquivo se existir
-    if atestado.arquivo_path and os.path.exists(atestado.arquivo_path):
-        os.remove(atestado.arquivo_path)
+    if atestado.arquivo_path:
+        safe_delete_file(atestado.arquivo_path)
 
     db.delete(atestado)
     db.commit()

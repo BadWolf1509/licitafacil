@@ -10,6 +10,39 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# === Helpers para leitura de variáveis de ambiente ===
+def env_bool(key: str, default: bool = False) -> bool:
+    """Lê variável de ambiente como booleano."""
+    val = os.getenv(key, "").lower()
+    if val in ("1", "true", "yes", "on"):
+        return True
+    if val in ("0", "false", "no", "off"):
+        return False
+    return default
+
+
+def env_int(key: str, default: int = 0) -> int:
+    """Lê variável de ambiente como inteiro."""
+    val = os.getenv(key)
+    if val is None:
+        return default
+    try:
+        return int(val)
+    except ValueError:
+        return default
+
+
+def env_float(key: str, default: float = 0.0) -> float:
+    """Lê variável de ambiente como float."""
+    val = os.getenv(key)
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except ValueError:
+        return default
+
+
 # === Diretórios ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
@@ -51,9 +84,9 @@ CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == 
 
 
 # === Rate Limiting ===
-RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "300"))  # requests per window
-RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # window in seconds
+RATE_LIMIT_ENABLED = env_bool("RATE_LIMIT_ENABLED", True)
+RATE_LIMIT_REQUESTS = env_int("RATE_LIMIT_REQUESTS", 300)  # requests per window
+RATE_LIMIT_WINDOW = env_int("RATE_LIMIT_WINDOW", 60)  # window in seconds
 
 
 # === Segurança ===
@@ -104,6 +137,11 @@ class Messages:
     UNAUTHORIZED = "Acesso não autorizado"
     FORBIDDEN = "Acesso proibido"
     CANNOT_DEACTIVATE_SELF = "Você não pode desativar sua própria conta"
+    EMAIL_EXISTS = "Email já cadastrado"
+    INVALID_CREDENTIALS = "Email ou senha incorretos"
+    USER_INACTIVE = "Usuário inativo"
+    USER_NOT_APPROVED = "Usuário aguardando aprovação do administrador"
+    JOB_INVALID_STATUS = "Job não pode ser processado no status atual"
     # Validação de arquivos
     INVALID_FILE = "Arquivo inválido"
     INVALID_EXTENSION = "Extensão de arquivo não permitida"
@@ -123,29 +161,29 @@ class Messages:
 
 
 # === Processamento ===
-OCR_PARALLEL_ENABLED = os.getenv("OCR_PARALLEL_ENABLED", "1").lower() in ("1", "true", "yes")
-OCR_MAX_WORKERS = int(os.getenv("OCR_MAX_WORKERS", "4"))
+OCR_PARALLEL_ENABLED = env_bool("OCR_PARALLEL_ENABLED", True)
+OCR_MAX_WORKERS = env_int("OCR_MAX_WORKERS", 4)
 
 
 # === Paginação ===
-DEFAULT_PAGE_SIZE = int(os.getenv("DEFAULT_PAGE_SIZE", "20"))
-MAX_PAGE_SIZE = int(os.getenv("MAX_PAGE_SIZE", "100"))
+DEFAULT_PAGE_SIZE = env_int("DEFAULT_PAGE_SIZE", 20)
+MAX_PAGE_SIZE = env_int("MAX_PAGE_SIZE", 100)
 
 
 # === Configurações de OCR ===
 class OCRConfig:
     """Configurações para processamento OCR."""
-    DPI = int(os.getenv("OCR_DPI", "300"))
-    MIN_TEXT_PER_PAGE = int(os.getenv("OCR_MIN_TEXT_PER_PAGE", "200"))
-    MIN_TEXT_LENGTH = int(os.getenv("OCR_MIN_TEXT_LENGTH", "100"))
-    MIN_CONFIDENT_CHARS = int(os.getenv("OCR_MIN_CONFIDENT_CHARS", "20"))
+    DPI = env_int("OCR_DPI", 300)
+    MIN_TEXT_PER_PAGE = env_int("OCR_MIN_TEXT_PER_PAGE", 200)
+    MIN_TEXT_LENGTH = env_int("OCR_MIN_TEXT_LENGTH", 100)
+    MIN_CONFIDENT_CHARS = env_int("OCR_MIN_CONFIDENT_CHARS", 20)
 
 
 # === Configurações do Pipeline ===
 class PipelineConfig:
     """Configurações de confiança do pipeline de extração."""
-    MIN_CONFIDENCE_LOCAL_OCR = float(os.getenv("MIN_CONFIDENCE_LOCAL_OCR", "0.70"))
-    MIN_CONFIDENCE_CLOUD_OCR = float(os.getenv("MIN_CONFIDENCE_CLOUD_OCR", "0.85"))
+    MIN_CONFIDENCE_LOCAL_OCR = env_float("MIN_CONFIDENCE_LOCAL_OCR", 0.70)
+    MIN_CONFIDENCE_CLOUD_OCR = env_float("MIN_CONFIDENCE_CLOUD_OCR", 0.85)
 
 
 # === Configurações de Modelos de IA ===
@@ -154,44 +192,81 @@ class AIModelConfig:
     # OpenAI
     OPENAI_TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", "gpt-4o-mini")
     OPENAI_VISION_MODEL = os.getenv("OPENAI_VISION_MODEL", "gpt-4o")
-    OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "16000"))
-    OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0"))
+    OPENAI_MAX_TOKENS = env_int("OPENAI_MAX_TOKENS", 16000)
+    OPENAI_TEMPERATURE = env_float("OPENAI_TEMPERATURE", 0)
     # Gemini
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-2.0-flash")
-    GEMINI_MAX_TOKENS = int(os.getenv("GEMINI_MAX_TOKENS", "16000"))
-    GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0"))
+    GEMINI_MAX_TOKENS = env_int("GEMINI_MAX_TOKENS", 16000)
+    GEMINI_TEMPERATURE = env_float("GEMINI_TEMPERATURE", 0)
 
 
 # === Configurações de Extração de Tabelas ===
 class TableExtractionConfig:
     """Configurações para extração e parsing de tabelas."""
-    HEADER_ROWS_LIMIT = int(os.getenv("TABLE_HEADER_ROWS_LIMIT", "5"))
-    HEADER_MIN_KEYWORD_MATCHES = int(os.getenv("TABLE_HEADER_MIN_KEYWORDS", "2"))
-    MIN_DESCRIPTION_LENGTH = int(os.getenv("TABLE_MIN_DESC_LENGTH", "5"))
+    HEADER_ROWS_LIMIT = env_int("TABLE_HEADER_ROWS_LIMIT", 5)
+    HEADER_MIN_KEYWORD_MATCHES = env_int("TABLE_HEADER_MIN_KEYWORDS", 2)
+    MIN_DESCRIPTION_LENGTH = env_int("TABLE_MIN_DESC_LENGTH", 5)
     # Validação de colunas
-    MIN_UNIT_RATIO = float(os.getenv("TABLE_MIN_UNIT_RATIO", "0.2"))
-    MIN_QTY_RATIO = float(os.getenv("TABLE_MIN_QTY_RATIO", "0.35"))
-    MIN_DESC_LEN = float(os.getenv("TABLE_MIN_DESC_LEN", "10.0"))
-    MAX_DESC_NUMERIC = float(os.getenv("TABLE_MAX_DESC_NUMERIC", "0.6"))
+    MIN_UNIT_RATIO = env_float("TABLE_MIN_UNIT_RATIO", 0.2)
+    MIN_QTY_RATIO = env_float("TABLE_MIN_QTY_RATIO", 0.35)
+    MIN_DESC_LEN = env_float("TABLE_MIN_DESC_LEN", 10.0)
+    MAX_DESC_NUMERIC = env_float("TABLE_MAX_DESC_NUMERIC", 0.6)
     # Pesos de scoring para detecção de coluna de item
-    ITEM_SCORE_PATTERN_WEIGHT = float(os.getenv("ITEM_SCORE_PATTERN_WEIGHT", "0.45"))
-    ITEM_SCORE_SEQ_WEIGHT = float(os.getenv("ITEM_SCORE_SEQ_WEIGHT", "0.2"))
-    ITEM_SCORE_UNIQUE_WEIGHT = float(os.getenv("ITEM_SCORE_UNIQUE_WEIGHT", "0.2"))
-    ITEM_SCORE_LEFT_BIAS_WEIGHT = float(os.getenv("ITEM_SCORE_LEFT_BIAS_WEIGHT", "0.1"))
-    ITEM_SCORE_LENGTH_BONUS_WEIGHT = float(os.getenv("ITEM_SCORE_LENGTH_BONUS_WEIGHT", "0.05"))
+    ITEM_SCORE_PATTERN_WEIGHT = env_float("ITEM_SCORE_PATTERN_WEIGHT", 0.45)
+    ITEM_SCORE_SEQ_WEIGHT = env_float("ITEM_SCORE_SEQ_WEIGHT", 0.2)
+    ITEM_SCORE_UNIQUE_WEIGHT = env_float("ITEM_SCORE_UNIQUE_WEIGHT", 0.2)
+    ITEM_SCORE_LEFT_BIAS_WEIGHT = env_float("ITEM_SCORE_LEFT_BIAS_WEIGHT", 0.1)
+    ITEM_SCORE_LENGTH_BONUS_WEIGHT = env_float("ITEM_SCORE_LENGTH_BONUS_WEIGHT", 0.05)
 
 
 # === Configurações de Deduplicação ===
 class DeduplicationConfig:
     """Configurações para detecção de duplicatas."""
-    SIMILARITY_THRESHOLD = float(os.getenv("DEDUP_SIMILARITY_THRESHOLD", "0.5"))
-    MAX_DESC_CHARS = int(os.getenv("DEDUP_MAX_DESC_CHARS", "50"))
-    ITEM_LENGTH_RATIO = float(os.getenv("ATTESTADO_ITEM_LEN_RATIO", "0.6"))
-    ITEM_LENGTH_KEEP_MIN_DESC = int(os.getenv("ATTESTADO_ITEM_LEN_KEEP_MIN_DESC", "20"))
-    ITEM_PREFIX_RATIO = float(os.getenv("ATTESTADO_ITEM_PREFIX_RATIO", "0.7"))
-    ITEM_PREFIX_KEEP_MIN_DESC = int(os.getenv("ATTESTADO_ITEM_PREFIX_KEEP_MIN_DESC", "15"))
-    ITEM_COL_MIN_SCORE = float(os.getenv("ATTESTADO_ITEM_COL_MIN_SCORE", "0.5"))
+    SIMILARITY_THRESHOLD = env_float("DEDUP_SIMILARITY_THRESHOLD", 0.5)
+    MAX_DESC_CHARS = env_int("DEDUP_MAX_DESC_CHARS", 50)
+    ITEM_LENGTH_RATIO = env_float("ATTESTADO_ITEM_LEN_RATIO", 0.6)
+    ITEM_LENGTH_KEEP_MIN_DESC = env_int("ATTESTADO_ITEM_LEN_KEEP_MIN_DESC", 20)
+    ITEM_PREFIX_RATIO = env_float("ATTESTADO_ITEM_PREFIX_RATIO", 0.7)
+    ITEM_PREFIX_KEEP_MIN_DESC = env_int("ATTESTADO_ITEM_PREFIX_KEEP_MIN_DESC", 15)
+    ITEM_COL_MIN_SCORE = env_float("ATTESTADO_ITEM_COL_MIN_SCORE", 0.5)
+
+
+# === Configurações de Processamento de Atestados ===
+class AtestadoProcessingConfig:
+    """Configurações centralizadas para processamento de atestados."""
+    # OCR e Layout
+    OCR_LAYOUT_CONFIDENCE = env_float("ATTESTADO_OCR_LAYOUT_CONFIDENCE", 0.3)
+    OCR_LAYOUT_DPI = env_int("ATTESTADO_OCR_LAYOUT_DPI", 300)
+    OCR_LAYOUT_PAGE_MIN_ITEMS = env_int("ATTESTADO_OCR_LAYOUT_PAGE_MIN_ITEMS", 3)
+    OCR_PAGE_MIN_DOMINANT_LEN = env_int("ATTESTADO_OCR_PAGE_MIN_DOMINANT_LEN", 2)
+    OCR_PAGE_MIN_ITEM_RATIO = env_float("ATTESTADO_OCR_PAGE_MIN_ITEM_RATIO", 0.6)
+    OCR_PAGE_MIN_UNIT_RATIO = env_float("ATTESTADO_OCR_PAGE_MIN_UNIT_RATIO", 0.2)
+    OCR_PAGE_FALLBACK_UNIT_RATIO = env_float("ATTESTADO_OCR_PAGE_FALLBACK_UNIT_RATIO", 0.4)
+    OCR_PAGE_FALLBACK_ITEM_RATIO = env_float("ATTESTADO_OCR_PAGE_FALLBACK_ITEM_RATIO", 0.8)
+    OCR_PAGE_MIN_ITEMS = env_int("ATTESTADO_OCR_PAGE_MIN_ITEMS", 5)
+    # Detecção de coluna de item
+    ITEM_COL_MIN_SCORE = env_float("ATTESTADO_ITEM_COL_MIN_SCORE", 0.5)
+    ITEM_COL_RATIO = env_float("ATTESTADO_ITEM_COL_RATIO", 0.35)
+    ITEM_COL_MAX_X_RATIO = env_float("ATTESTADO_ITEM_COL_MAX_X_RATIO", 0.35)
+    ITEM_COL_MAX_INDEX = env_int("ATTESTADO_ITEM_COL_MAX_INDEX", 2)
+    ITEM_COL_MIN_COUNT = env_int("ATTESTADO_ITEM_COL_MIN_COUNT", 6)
+    # Matching e Similaridade
+    DESC_SIM_THRESHOLD = env_float("ATTESTADO_DESC_SIM_THRESHOLD", 0.7)
+    CODE_MATCH_THRESHOLD = env_float("ATTESTADO_CODE_MATCH_THRESHOLD", 0.55)
+    SCORE_MARGIN = env_float("ATTESTADO_SCORE_MARGIN", 0.1)
+    # Tabelas
+    TABLE_CONFIDENCE_THRESHOLD = env_float("ATTESTADO_TABLE_CONFIDENCE_THRESHOLD", 0.7)
+    TABLE_MIN_ITEMS = env_int("ATTESTADO_TABLE_MIN_ITEMS", 10)
+    # Document AI
+    DOCUMENT_AI_ENABLED = env_bool("DOCUMENT_AI_ENABLED", False)
+    DOCUMENT_AI_FALLBACK_ONLY = env_bool("DOCUMENT_AI_FALLBACK_ONLY", True)
+    # LLM e Vision
+    LLM_FALLBACK_ONLY = env_bool("ATTESTADO_LLM_FALLBACK_ONLY", True)
+    PAGEWISE_VISION_ENABLED = env_bool("ATTESTADO_PAGEWISE_VISION", True)
+    VISION_QUALITY_THRESHOLD = env_float("ATTESTADO_VISION_QUALITY_THRESHOLD", 0.6)
+    PAGEWISE_MIN_PAGES = env_int("ATTESTADO_PAGEWISE_MIN_PAGES", 3)
+    PAGEWISE_MIN_ITEMS = env_int("ATTESTADO_PAGEWISE_MIN_ITEMS", 40)
 
 
 # === API Versioning ===

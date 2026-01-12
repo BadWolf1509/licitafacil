@@ -52,6 +52,17 @@ from .quality_assessor import (
     compute_quality_score,
 )
 
+from .base_extractor import (
+    BaseExtractor,
+    ExtractionMethod,
+    ExtractionResult,
+)
+
+from .native_text import NativeTextExtractor
+from .local_ocr import LocalOCRExtractor
+from .cloud_ocr import CloudOCRExtractor
+from .vision_ai import VisionAIExtractor
+
 __all__ = [
     # text_normalizer
     'normalize_description',
@@ -92,4 +103,13 @@ __all__ = [
     'compute_description_quality',
     'is_ocr_noisy',
     'compute_quality_score',
+    # base_extractor
+    'BaseExtractor',
+    'ExtractionMethod',
+    'ExtractionResult',
+    # extractors
+    'NativeTextExtractor',
+    'LocalOCRExtractor',
+    'CloudOCRExtractor',
+    'VisionAIExtractor',
 ]

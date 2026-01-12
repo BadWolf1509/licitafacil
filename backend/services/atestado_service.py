@@ -45,8 +45,9 @@ def sort_key_item(servico: dict) -> tuple:
     """
     Gera uma chave de ordenação para um serviço baseado no número do item.
 
-    Trata itens como "1.1", "2.10", "3.1.2" e aditivos "AD1-1.1" corretamente.
-    Itens de aditivo (AD1-, AD2-, etc.) vêm depois dos itens originais.
+    Trata itens como "1.1", "2.10", "3.1.2" e aditivos "AD-1.1" corretamente.
+    Também trata sufixos de duplicata (-A, -B, etc.) para ordenação correta.
+    Itens de aditivo (AD-) vêm depois dos itens originais.
 
     Args:
         servico: Dicionário do serviço com campo 'item'
@@ -56,15 +57,22 @@ def sort_key_item(servico: dict) -> tuple:
     """
     item = servico.get("item", "") or ""
     if not item:
-        return (float('inf'), 0)  # Itens sem número vão para o final
+        return (float('inf'), 0, 0)  # Itens sem número vão para o final
 
     try:
-        # Verificar se é item de aditivo (AD1-1.1, AD2-2.3, etc.)
+        # Verificar se é item de aditivo (AD-1.1, AD1-1.1, AD2-2.3, etc.)
         aditivo_num = 0
-        aditivo_match = re.match(r'^AD(\d+)-(.+)$', item)
+        aditivo_match = re.match(r'^AD(\d*)-(.+)$', item)
         if aditivo_match:
-            aditivo_num = int(aditivo_match.group(1))
+            aditivo_num = int(aditivo_match.group(1)) if aditivo_match.group(1) else 1
             item = aditivo_match.group(2)  # Pegar apenas a parte do item
+
+        # Extrair sufixo de duplicata (-A, -B, etc.) do final
+        suffix_num = 0
+        suffix_match = re.match(r'^(.+)-([A-Z])$', item)
+        if suffix_match:
+            item = suffix_match.group(1)  # Item sem sufixo
+            suffix_num = ord(suffix_match.group(2)) - ord('A') + 1  # A=1, B=2, C=3
 
         # Divide o item em partes numéricas (ex: "2.10.1" -> [2, 10, 1])
         parts = []
@@ -76,11 +84,14 @@ def sort_key_item(servico: dict) -> tuple:
             else:
                 parts.append(0)
 
-        # Retorna tupla: (numero_aditivo, partes_do_item...)
-        # Assim itens originais (aditivo=0) vêm antes dos aditivos (aditivo=1, 2, ...)
-        return (aditivo_num,) + tuple(parts) if parts else (float('inf'), 0)
+        # Retorna tupla: (numero_aditivo, partes_do_item..., sufixo_duplicata)
+        # Assim: originais (aditivo=0) < aditivos (aditivo=1, 2, ...)
+        # E: sem sufixo (0) < -A (1) < -B (2) ...
+        if parts:
+            return (aditivo_num,) + tuple(parts) + (suffix_num,)
+        return (float('inf'), 0, 0)
     except (ValueError, AttributeError):
-        return (float('inf'), 0)
+        return (float('inf'), 0, 0)
 
 
 def ordenar_servicos(servicos: List[dict]) -> List[dict]:

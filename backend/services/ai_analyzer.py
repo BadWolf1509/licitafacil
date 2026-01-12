@@ -109,19 +109,13 @@ class AIAnalyzer:
         except Exception as e:
             raise OpenAIError(str(e))
 
-    def extract_atestado_from_images(self, images: List[bytes]) -> Dict[str, Any]:
-        """
-        Extrai informações de um atestado diretamente das imagens usando GPT-4o Vision.
+    # ========================================================================
+    # Métodos auxiliares para extract_atestado_from_images
+    # ========================================================================
 
-        Esta abordagem elimina erros de OCR pois a IA interpreta as imagens diretamente.
-
-        Args:
-            images: Lista de imagens das páginas do documento (PNG bytes)
-
-        Returns:
-            Dicionário com as informações extraídas
-        """
-        system_prompt = """Você é um especialista em análise de atestados de capacidade técnica para licitações públicas no Brasil.
+    def _get_vision_system_prompt(self) -> str:
+        """Retorna o prompt de sistema para extração de atestado via vision."""
+        return """Você é um especialista em análise de atestados de capacidade técnica para licitações públicas no Brasil.
 
 Analise CUIDADOSAMENTE as imagens do documento e extraia as seguintes informações:
 
@@ -216,7 +210,9 @@ Retorne APENAS um JSON válido:
     ]
 }"""
 
-        user_text = """Analise as imagens e extraia ABSOLUTAMENTE TODOS os serviços listados.
+    def _get_vision_user_text(self) -> str:
+        """Retorna o texto de instrução do usuário para extração via vision."""
+        return """Analise as imagens e extraia ABSOLUTAMENTE TODOS os serviços listados.
 
 INSTRUÇÕES CRÍTICAS:
 1. Percorra TODAS as páginas e TODAS as séries de códigos (1.1, 1.2, 2.1, etc.)
@@ -247,65 +243,142 @@ REGRA CRÍTICA - COPIE A DESCRIÇÃO EXATA:
 CONTA FINAL: Conte as linhas numeradas na tabela. Cada número (3.1, 3.2, 3.3...) = 1 item.
 Se você vê 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 na tabela = extraia 8 itens da seção 3."""
 
+    def _process_vision_batch(
+        self,
+        batch: List[bytes],
+        system_prompt: str,
+        user_text: str,
+        batch_index: int,
+        total_images: int
+    ) -> Dict[str, Any]:
+        """
+        Processa um batch de imagens com GPT-4o Vision.
+
+        Args:
+            batch: Lista de imagens do batch
+            system_prompt: Prompt de sistema
+            user_text: Texto base do usuário
+            batch_index: Índice do batch (0-based)
+            total_images: Total de imagens no documento
+
+        Returns:
+            Resultado parseado do batch
+        """
+        batch_user_text = user_text
+        if batch_index > 0:
+            start_page = batch_index * 2 + 1
+            end_page = min(start_page + 1, total_images)
+            batch_user_text += f"\n\nEsta é a continuação do documento (páginas {start_page}-{end_page})."
+
+        response = self._call_openai_vision(system_prompt, batch, batch_user_text)
+        response = clean_json_response(response)
+        return json.loads(response)
+
+    def _deduplicate_servicos_by_item(self, servicos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Remove serviços duplicados baseado no código do item.
+
+        Args:
+            servicos: Lista de serviços (pode ter duplicatas)
+
+        Returns:
+            Lista de serviços únicos
+        """
+        seen_items: set[str] = set()
+        unique_servicos: List[Dict[str, Any]] = []
+
+        for s in servicos:
+            item = s.get("item", "")
+            if item and item not in seen_items:
+                seen_items.add(item)
+                unique_servicos.append(s)
+            elif not item:
+                # Serviços sem item são incluídos (podem ser legítimos)
+                unique_servicos.append(s)
+
+        return unique_servicos
+
+    def extract_atestado_from_images(self, images: List[bytes]) -> Dict[str, Any]:
+        """
+        Extrai informações de um atestado diretamente das imagens usando GPT-4o Vision.
+
+        Esta abordagem elimina erros de OCR pois a IA interpreta as imagens diretamente.
+
+        Args:
+            images: Lista de imagens das páginas do documento (PNG bytes)
+
+        Returns:
+            Dicionário com as informações extraídas
+        """
+        system_prompt = self._get_vision_system_prompt()
+        user_text = self._get_vision_user_text()
+
         try:
-            # Se houver mais de 2 páginas, processar em batches para garantir extração completa
             if len(images) > 2:
-                all_servicos = []
-                result = None
-
-                # Processar em batches de 2 páginas
-                for i in range(0, len(images), 2):
-                    batch = images[i:i+2]
-                    batch_user_text = user_text
-                    if i > 0:
-                        batch_user_text += f"\n\nEsta é a continuação do documento (páginas {i+1}-{min(i+2, len(images))})."
-
-                    response = self._call_openai_vision(system_prompt, batch, batch_user_text)
-                    response = clean_json_response(response)
-                    batch_result = json.loads(response)
-
-                    # Guardar metadados do primeiro batch
-                    if result is None:
-                        result = batch_result
-
-                    # Coletar serviços de todos os batches
-                    if "servicos" in batch_result and batch_result["servicos"]:
-                        all_servicos.extend(batch_result["servicos"])
-
-                # Merge: remover duplicatas por item
-                seen_items: set[str] = set()
-                unique_servicos: list[dict[str, Any]] = []
-                for s in all_servicos:
-                    item = s.get("item", "")
-                    if item and item not in seen_items:
-                        seen_items.add(item)
-                        unique_servicos.append(s)
-                    elif not item:
-                        unique_servicos.append(s)
-
-                # Garantir que result foi inicializado
-                if result is None:
-                    result = {}
-                result["servicos"] = unique_servicos
+                # Documentos longos: processar em batches de 2 páginas
+                result = self._process_multi_page_document(images, system_prompt, user_text)
             else:
-                response = self._call_openai_vision(system_prompt, images, user_text)
-                response = clean_json_response(response)
-                result = json.loads(response) or {}
+                # Documentos curtos: processar de uma vez
+                result = self._process_vision_batch(images, system_prompt, user_text, 0, len(images))
 
             # Filtrar serviços inválidos (classificações, caminhos com ">", etc.)
             if result and "servicos" in result and result["servicos"]:
                 result["servicos"] = filter_classification_paths(result["servicos"])
 
             return result or {}
+
         except json.JSONDecodeError:
-            return {
-                "descricao_servico": None,
-                "quantidade": None,
-                "unidade": None,
-                "contratante": None,
-                "data_emissao": None,
-                "servicos": []
-            }
+            return self._empty_atestado_result()
+
+    def _process_multi_page_document(
+        self,
+        images: List[bytes],
+        system_prompt: str,
+        user_text: str
+    ) -> Dict[str, Any]:
+        """
+        Processa documento com múltiplas páginas em batches.
+
+        Args:
+            images: Lista de imagens do documento
+            system_prompt: Prompt de sistema
+            user_text: Texto do usuário
+
+        Returns:
+            Resultado consolidado de todos os batches
+        """
+        all_servicos: List[Dict[str, Any]] = []
+        result: Dict[str, Any] = {}
+
+        # Processar em batches de 2 páginas
+        for batch_index, i in enumerate(range(0, len(images), 2)):
+            batch = images[i:i+2]
+            batch_result = self._process_vision_batch(
+                batch, system_prompt, user_text, batch_index, len(images)
+            )
+
+            # Guardar metadados do primeiro batch
+            if not result:
+                result = batch_result
+
+            # Coletar serviços de todos os batches
+            if "servicos" in batch_result and batch_result["servicos"]:
+                all_servicos.extend(batch_result["servicos"])
+
+        # Remover duplicatas e atribuir ao resultado
+        result["servicos"] = self._deduplicate_servicos_by_item(all_servicos)
+        return result
+
+    def _empty_atestado_result(self) -> Dict[str, Any]:
+        """Retorna resultado vazio padrão para atestado."""
+        return {
+            "descricao_servico": None,
+            "quantidade": None,
+            "unidade": None,
+            "contratante": None,
+            "data_emissao": None,
+            "servicos": []
+        }
 
     def extract_atestado_info(self, texto: str) -> Dict[str, Any]:
         """

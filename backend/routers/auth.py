@@ -25,6 +25,34 @@ from auth import (
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
+def _perform_login(email: str, password: str, db: Session) -> Token:
+    """
+    Lógica compartilhada de login.
+    Autentica usuário e retorna token JWT.
+    """
+    user = authenticate_user(db, email, password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Email ou senha incorretos",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário inativo"
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email, "user_id": user.id},
+        expires_delta=access_token_expires
+    )
+
+    return Token(access_token=access_token, token_type="bearer")
+
+
 @router.post("/registrar", response_model=Mensagem)
 def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
     """
@@ -62,28 +90,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     Realiza login e retorna token JWT.
     Funciona com OAuth2PasswordRequestForm para compatibilidade com Swagger UI.
     """
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário inativo"
-        )
-
-    # Criar token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
-    )
-
-    return Token(access_token=access_token, token_type="bearer")
+    return _perform_login(form_data.username, form_data.password, db)
 
 
 @router.post("/login-json", response_model=Token)
@@ -92,27 +99,7 @@ def login_json(credentials: UsuarioLogin, db: Session = Depends(get_db)):
     Realiza login via JSON e retorna token JWT.
     Alternativa ao endpoint /login para uso via JavaScript.
     """
-    user = authenticate_user(db, credentials.email, credentials.senha)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos"
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário inativo"
-        )
-
-    # Criar token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
-        expires_delta=access_token_expires
-    )
-
-    return Token(access_token=access_token, token_type="bearer")
+    return _perform_login(credentials.email, credentials.senha, db)
 
 
 @router.get("/me", response_model=UsuarioResponse)

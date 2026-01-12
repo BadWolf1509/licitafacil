@@ -710,7 +710,9 @@
         const notifiedJobs = new Set();
         const recentlyCompletedPaths = new Set();
         let refreshJobsInterval = null;
-        let jobsRenderInterval = null;
+        let renderScheduled = false;
+        let lastRenderedJobs = new Map(); // Cache para comparação de mudanças
+        let lastKnownPipeline = new Map(); // Cache para manter último pipeline válido por job
 
         function formatarTempo(ms) {
             const total = Math.max(0, Math.floor(ms / 1000));
@@ -799,6 +801,23 @@
             return stagePipeline[stage] || null;
         }
 
+        // Obtém pipeline efetivo (prioriza backend, fallback para cache local)
+        function getEffectivePipeline(job) {
+            // Prioridade 1: Pipeline do backend (persistido no banco)
+            if (job.pipeline) {
+                lastKnownPipeline.set(job.id, job.pipeline);
+                return job.pipeline;
+            }
+            // Prioridade 2: Detectar do stage atual
+            const currentPipeline = getPipelineFromStage(job.progress_stage);
+            if (currentPipeline) {
+                lastKnownPipeline.set(job.id, currentPipeline);
+                return currentPipeline;
+            }
+            // Prioridade 3: Cache local (fallback)
+            return lastKnownPipeline.get(job.id) || null;
+        }
+
         // Label amigável do pipeline
         function getPipelineLabel(pipeline) {
             const labels = {
@@ -881,6 +900,32 @@
             `;
         }
 
+        // Gera hash do estado do job para detectar mudanças
+        function getJobStateHash(job) {
+            const progress = getJobProgress(job);
+            const times = getJobTimes(job);
+            return JSON.stringify({
+                status: getDisplayStatus(job),
+                progress: progress.percent,
+                stage: progress.stage,
+                message: progress.message,
+                error: job.error,
+                poll_error: job.poll_error,
+                queueMs: Math.floor(times.queueMs / 1000),
+                processingMs: Math.floor(times.processingMs / 1000)
+            });
+        }
+
+        // Agenda renderização com debounce usando requestAnimationFrame
+        function scheduleRender() {
+            if (renderScheduled) return;
+            renderScheduled = true;
+            requestAnimationFrame(() => {
+                renderScheduled = false;
+                renderProcessingJobs();
+            });
+        }
+
         function getJobFileName(job) {
             if (job.original_filename) return job.original_filename;
             if (!job.file_path) return 'arquivo';
@@ -900,109 +945,174 @@
             return cleaned.length > 180 ? `${cleaned.slice(0, 177)}...` : cleaned;
         }
 
+        // Gera HTML de um job individual
+        function renderJobHtml(job) {
+            const displayStatus = getDisplayStatus(job);
+            const statusLabel = getJobStatusLabel(displayStatus);
+            const progress = getJobProgress(job);
+            const progressText = progress.total > 0 ? `${progress.current}/${progress.total} (${progress.percent}%)` : '';
+            const times = getJobTimes(job);
+
+            const queueTimeText = displayStatus === 'pending' && times.hasQueue
+                ? `Fila: ${formatarTempo(times.queueMs)}`
+                : '';
+
+            const processingTimeText = displayStatus === 'processing'
+                ? `Tempo: ${formatarTempo(times.processingMs)}`
+                : '';
+
+            const pipeline = getEffectivePipeline(job);
+            const pipelineText = displayStatus === 'processing' && pipeline
+                ? `Pipeline: ${getPipelineLabel(pipeline)}`
+                : '';
+
+            const showStage = displayStatus === 'processing';
+            const stageText = showStage ? progress.stageLabel : '';
+
+            const metaItems = [
+                queueTimeText ? `<span class="job-meta-item">⏱️ ${queueTimeText}</span>` : '',
+                processingTimeText ? `<span class="job-meta-item">⏱️ ${processingTimeText}</span>` : '',
+                pipelineText ? `<span class="job-meta-item">📊 ${pipelineText}</span>` : '',
+                stageText ? `<span class="job-meta-item">🔄 ${stageText}</span>` : '',
+                progressText ? `<span class="job-meta-item">📈 ${progressText}</span>` : ''
+            ].filter(Boolean).join('');
+
+            const fileName = getJobFileName(job);
+            const syncError = job.poll_error ? `<div class="processing-job-error">${job.poll_error}</div>` : '';
+            const errorMessage = formatJobError(job);
+            const errorHtml = displayStatus === 'failed' && errorMessage
+                ? `<div class="processing-job-error">${errorMessage}</div>`
+                : '';
+            const actionHtml = displayStatus === 'failed' || displayStatus === 'cancelled'
+                ? `
+                    <button class="btn btn-outline btn-sm" onclick="reprocessarJob('${job.id}')">Tentar novamente</button>
+                    <button class="btn btn-outline btn-sm" onclick="excluirJob('${job.id}')">Remover</button>
+                `
+                : `<button class="btn btn-outline btn-sm" onclick="cancelarJob('${job.id}')">Cancelar</button>`;
+
+            return `
+                <div class="processing-job-info">
+                    <div class="processing-job-head">
+                        <div class="processing-job-title" title="${fileName}">${fileName}</div>
+                        <span class="job-status ${displayStatus}">${statusLabel}</span>
+                    </div>
+                    <div class="processing-job-meta">
+                        ${metaItems}
+                    </div>
+                    ${renderProgressBar(job)}
+                    ${syncError}
+                    ${errorHtml}
+                </div>
+                <div class="processing-job-actions">
+                    ${actionHtml}
+                </div>
+            `;
+        }
+
+        // Atualiza um job específico no DOM (atualização cirúrgica)
+        function updateJobElement(job) {
+            const jobElement = document.querySelector(`[data-job-id="${job.id}"]`);
+            if (!jobElement) return false;
+
+            const displayStatus = getDisplayStatus(job);
+            jobElement.className = `processing-job ${displayStatus}`;
+            jobElement.innerHTML = renderJobHtml(job);
+            return true;
+        }
+
         function renderProcessingJobs() {
             const container = document.getElementById('processingJobs');
             if (!container) return;
             const jobs = Array.from(jobsEmProcessamento.values());
+
             if (jobs.length === 0) {
-                container.innerHTML = '';
+                if (container.innerHTML !== '') {
+                    container.innerHTML = '';
+                    lastRenderedJobs.clear();
+                }
                 return;
             }
 
-            const queuedCount = jobs.filter(job => getDisplayStatus(job) === 'pending').length;
-            const processingCount = jobs.filter(job => getDisplayStatus(job) === 'processing').length;
-            const attentionCount = jobs.filter(job => {
-                const status = getDisplayStatus(job);
-                return status === 'failed' || status === 'cancelled';
-            }).length;
-            const summaryParts = [];
-            if (queuedCount > 0) summaryParts.push(`${queuedCount} na fila`);
-            if (processingCount > 0) summaryParts.push(`${processingCount} processando`);
-            if (attentionCount > 0) summaryParts.push(`${attentionCount} com atencao`);
-            const summaryText = summaryParts.join(' | ');
+            // Verificar se precisamos fazer rebuild completo
+            const currentJobIds = new Set(jobs.map(j => j.id));
+            const renderedJobIds = new Set(lastRenderedJobs.keys());
+            const needsFullRebuild =
+                currentJobIds.size !== renderedJobIds.size ||
+                ![...currentJobIds].every(id => renderedJobIds.has(id)) ||
+                !container.querySelector('.processing-job');
 
-            const jobsHtml = jobs.map(job => {
-                const displayStatus = getDisplayStatus(job);
-                const statusLabel = getJobStatusLabel(displayStatus);
-                const progress = getJobProgress(job);
-                const progressText = progress.total > 0 ? `${progress.current}/${progress.total} (${progress.percent}%)` : '';
-                const times = getJobTimes(job);
+            if (needsFullRebuild) {
+                // Rebuild completo (apenas quando jobs são adicionados/removidos)
+                const queuedCount = jobs.filter(job => getDisplayStatus(job) === 'pending').length;
+                const processingCount = jobs.filter(job => getDisplayStatus(job) === 'processing').length;
+                const attentionCount = jobs.filter(job => {
+                    const status = getDisplayStatus(job);
+                    return status === 'failed' || status === 'cancelled';
+                }).length;
+                const summaryParts = [];
+                if (queuedCount > 0) summaryParts.push(`${queuedCount} na fila`);
+                if (processingCount > 0) summaryParts.push(`${processingCount} processando`);
+                if (attentionCount > 0) summaryParts.push(`${attentionCount} com atencao`);
+                const summaryText = summaryParts.join(' | ');
 
-                // Mostrar tempo de fila apenas se ainda está na fila (pending)
-                const queueTimeText = displayStatus === 'pending' && times.hasQueue
-                    ? `Fila: ${formatarTempo(times.queueMs)}`
-                    : '';
-
-                // Mostrar tempo de processamento quando está processando
-                const processingTimeText = displayStatus === 'processing'
-                    ? `Tempo: ${formatarTempo(times.processingMs)}`
-                    : '';
-
-                // Pipeline detectado pelo stage
-                const pipeline = getPipelineFromStage(progress.stage);
-                const pipelineText = displayStatus === 'processing' && pipeline
-                    ? `Pipeline: ${getPipelineLabel(pipeline)}`
-                    : '';
-
-                // Estágio atual
-                const showStage = displayStatus === 'processing';
-                const stageText = showStage ? progress.stageLabel : '';
-
-                // Detalhe adicional (mensagem do progress)
-                const detailText = displayStatus === 'processing' && progress.message && progress.message !== progress.stageLabel
-                    ? progress.message
-                    : '';
-
-                const metaItems = [
-                    queueTimeText ? `<span class="job-meta-item">⏱️ ${queueTimeText}</span>` : '',
-                    processingTimeText ? `<span class="job-meta-item">⏱️ ${processingTimeText}</span>` : '',
-                    pipelineText ? `<span class="job-meta-item">📊 ${pipelineText}</span>` : '',
-                    stageText ? `<span class="job-meta-item">🔄 ${stageText}</span>` : '',
-                    progressText ? `<span class="job-meta-item">📈 ${progressText}</span>` : ''
-                ].filter(Boolean).join('');
-                const fileName = getJobFileName(job);
-                const syncError = job.poll_error ? `<div class="processing-job-error">${job.poll_error}</div>` : '';
-                const errorMessage = formatJobError(job);
-                const errorHtml = displayStatus === 'failed' && errorMessage
-                    ? `<div class="processing-job-error">${errorMessage}</div>`
-                    : '';
-                const actionHtml = displayStatus === 'failed' || displayStatus === 'cancelled'
-                    ? `
-                        <button class="btn btn-outline btn-sm" onclick="reprocessarJob('${job.id}')">Tentar novamente</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirJob('${job.id}')">Remover</button>
-                    `
-                    : `<button class="btn btn-outline btn-sm" onclick="cancelarJob('${job.id}')">Cancelar</button>`;
-
-                return `
-                    <div class="processing-job ${displayStatus}">
-                        <div class="processing-job-info">
-                            <div class="processing-job-head">
-                                <div class="processing-job-title" title="${fileName}">${fileName}</div>
-                                <span class="job-status ${displayStatus}">${statusLabel}</span>
-                            </div>
-                            <div class="processing-job-meta">
-                            ${metaItems}
+                const jobsHtml = jobs.map(job => {
+                    const displayStatus = getDisplayStatus(job);
+                    return `
+                        <div class="processing-job ${displayStatus}" data-job-id="${job.id}">
+                            ${renderJobHtml(job)}
                         </div>
-                        ${renderProgressBar(job)}
-                        ${syncError}
-                        ${errorHtml}
-                    </div>
-                    <div class="processing-job-actions">
-                        ${actionHtml}
-                    </div>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <div class="card">
+                        <div class="processing-header">
+                            <h2 class="processing-header-title">Processamento de atestados</h2>
+                            <p class="processing-header-subtitle" data-summary>${summaryText}</p>
+                        </div>
+                        <div class="processing-jobs-list">
+                            ${jobsHtml}
+                        </div>
                     </div>
                 `;
-            }).join('');
 
-            container.innerHTML = `
-                <div class="card">
-                    <div class="processing-header">
-                        <h2 class="processing-header-title">Processamento de atestados</h2>
-                        ${summaryText ? `<p class="processing-header-subtitle">${summaryText}</p>` : ''}
-                    </div>
-                    ${jobsHtml}
-                </div>
-            `;
+                // Atualizar cache
+                lastRenderedJobs.clear();
+                jobs.forEach(job => {
+                    lastRenderedJobs.set(job.id, getJobStateHash(job));
+                });
+            } else {
+                // Atualização cirúrgica (apenas jobs que mudaram)
+                let hasChanges = false;
+                jobs.forEach(job => {
+                    const currentHash = getJobStateHash(job);
+                    const lastHash = lastRenderedJobs.get(job.id);
+
+                    if (currentHash !== lastHash) {
+                        updateJobElement(job);
+                        lastRenderedJobs.set(job.id, currentHash);
+                        hasChanges = true;
+                    }
+                });
+
+                // Atualizar sumário apenas se houve mudanças
+                if (hasChanges) {
+                    const summaryElement = container.querySelector('[data-summary]');
+                    if (summaryElement) {
+                        const queuedCount = jobs.filter(job => getDisplayStatus(job) === 'pending').length;
+                        const processingCount = jobs.filter(job => getDisplayStatus(job) === 'processing').length;
+                        const attentionCount = jobs.filter(job => {
+                            const status = getDisplayStatus(job);
+                            return status === 'failed' || status === 'cancelled';
+                        }).length;
+                        const summaryParts = [];
+                        if (queuedCount > 0) summaryParts.push(`${queuedCount} na fila`);
+                        if (processingCount > 0) summaryParts.push(`${processingCount} processando`);
+                        if (attentionCount > 0) summaryParts.push(`${attentionCount} com atencao`);
+                        summaryElement.textContent = summaryParts.join(' | ');
+                    }
+                }
+            }
         }
 
         function upsertJob(job) {
@@ -1016,13 +1126,15 @@
                 merged.created_at = merged.local_created_at;
             }
             jobsEmProcessamento.set(job.id, merged);
-            renderProcessingJobs();
+            scheduleRender(); // Usa debounce em vez de render direto
         }
 
         function removeJob(jobId) {
             if (!jobsEmProcessamento.has(jobId)) return;
             jobsEmProcessamento.delete(jobId);
-            renderProcessingJobs();
+            lastRenderedJobs.delete(jobId); // Limpa cache do job removido
+            lastKnownPipeline.delete(jobId); // Limpa cache de pipeline do job removido
+            scheduleRender(); // Usa debounce em vez de render direto
         }
 
         function dismissJob(jobId) {
@@ -1030,8 +1142,37 @@
                 clearInterval(jobTimers.get(jobId));
                 jobTimers.delete(jobId);
             }
+            notifiedJobs.delete(jobId); // Limpa notificação também
             removeJob(jobId);
         }
+
+        // Limpa timers órfãos e entradas antigas de notificações
+        function cleanupOrphanedResources() {
+            // Remove timers de jobs que não existem mais
+            jobTimers.forEach((timer, jobId) => {
+                if (!jobsEmProcessamento.has(jobId)) {
+                    clearInterval(timer);
+                    jobTimers.delete(jobId);
+                }
+            });
+
+            // Remove notificações de jobs que não existem mais
+            notifiedJobs.forEach(jobId => {
+                if (!jobsEmProcessamento.has(jobId)) {
+                    notifiedJobs.delete(jobId);
+                }
+            });
+
+            // Remove cache de render de jobs que não existem mais
+            lastRenderedJobs.forEach((hash, jobId) => {
+                if (!jobsEmProcessamento.has(jobId)) {
+                    lastRenderedJobs.delete(jobId);
+                }
+            });
+        }
+
+        // Executa limpeza a cada 30 segundos
+        setInterval(cleanupOrphanedResources, 30000);
 
         function markJobCompleted(job) {
             if (job?.file_path) {
@@ -1160,13 +1301,31 @@
             }, 10000);
         }
 
+        // Timer inteligente para atualizar apenas os contadores de tempo (não todo o DOM)
+        let timeUpdateInterval = null;
+
         function startJobsRenderer() {
-            if (jobsRenderInterval) return;
-            jobsRenderInterval = setInterval(() => {
-                if (jobsEmProcessamento.size > 0) {
-                    renderProcessingJobs();
+            if (timeUpdateInterval) return;
+            // Atualiza contadores de tempo a cada 5 segundos (não 1 segundo)
+            // Apenas invalida o cache dos jobs ativos para forçar re-render na próxima scheduleRender
+            timeUpdateInterval = setInterval(() => {
+                const hasActiveJobs = Array.from(jobsEmProcessamento.values())
+                    .some(job => {
+                        const status = getDisplayStatus(job);
+                        return status === 'pending' || status === 'processing';
+                    });
+
+                if (hasActiveJobs) {
+                    // Invalida cache dos jobs ativos para forçar atualização dos tempos
+                    jobsEmProcessamento.forEach((job, id) => {
+                        const status = getDisplayStatus(job);
+                        if (status === 'pending' || status === 'processing') {
+                            lastRenderedJobs.delete(id);
+                        }
+                    });
+                    scheduleRender();
                 }
-            }, 1000);
+            }, 5000); // 5 segundos em vez de 1 segundo
         }
 
         async function carregarAtestados() {
@@ -1559,16 +1718,30 @@
             return descricao.replace(/^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*/, '').trim();
         }
 
-        // Compara dois códigos de item numericamente (ex: "1.2" < "1.10" < "2.1")
+        // Compara dois códigos de item numericamente
+        // Itens numéricos vêm primeiro, depois itens com prefixo AD
+        // Ex: "1.1" < "1.2" < "2.1" < "AD-1.1" < "AD-1.2" < "AD-2.1"
         function compararItens(a, b) {
             const itemA = a.item || '';
             const itemB = b.item || '';
 
-            // Separar em partes numéricas
-            const partesA = itemA.split('.').map(p => parseInt(p, 10) || 0);
-            const partesB = itemB.split('.').map(p => parseInt(p, 10) || 0);
+            // Verificar se começa com número (item do contrato) ou AD (item do aditivo)
+            const isNumericA = /^\d/.test(itemA);
+            const isNumericB = /^\d/.test(itemB);
 
-            // Comparar cada parte
+            // Primeiro: itens numéricos vêm antes de itens com AD
+            if (isNumericA !== isNumericB) {
+                return isNumericA ? -1 : 1;
+            }
+
+            // Extrair número do item (removendo prefixo AD- ou ADx- se existir)
+            const itemNumA = itemA.replace(/^AD\d?-/, '');
+            const itemNumB = itemB.replace(/^AD\d?-/, '');
+
+            // Comparar partes numéricas do item
+            const partesA = itemNumA.split('.').map(p => parseInt(p, 10) || 0);
+            const partesB = itemNumB.split('.').map(p => parseInt(p, 10) || 0);
+
             const maxLen = Math.max(partesA.length, partesB.length);
             for (let i = 0; i < maxLen; i++) {
                 const valA = partesA[i] || 0;

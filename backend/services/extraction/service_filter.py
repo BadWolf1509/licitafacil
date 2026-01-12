@@ -3,11 +3,12 @@ Utilitários para filtro e deduplicação de serviços extraídos.
 
 Este módulo contém funções para remover duplicatas, filtrar serviços
 inválidos, e comparar serviços por similaridade.
+
+Otimizado para performance usando índices invertidos em vez de O(n²).
 """
 
-import os
-from typing import Optional, Set, Tuple
-from collections import Counter
+from typing import Optional, Set, Tuple, Dict, List
+from collections import Counter, defaultdict
 
 from .text_normalizer import (
     normalize_description,
@@ -15,6 +16,60 @@ from .text_normalizer import (
     extract_keywords,
 )
 from .table_processor import parse_item_tuple, item_tuple_to_str, parse_quantity
+from config import DeduplicationConfig
+
+
+def _build_keyword_index(servicos: list) -> Dict[str, List[int]]:
+    """
+    Constrói índice invertido de keywords -> índices de serviços.
+
+    Args:
+        servicos: Lista de serviços
+
+    Returns:
+        Dict mapeando keyword para lista de índices
+    """
+    index: Dict[str, List[int]] = defaultdict(list)
+    for i, servico in enumerate(servicos):
+        desc = str(servico.get("descricao", "") or "").strip()
+        if desc:
+            keywords = extract_keywords(desc)
+            for kw in keywords:
+                index[kw].append(i)
+    return index
+
+
+def _has_valid_item_and_quantity(servico: dict) -> bool:
+    """
+    Verifica se o serviço tem código de item válido e quantidade.
+
+    Itens com código e quantidade válidos devem ser preservados
+    mesmo que a descrição esteja incompleta (podem ser recuperados depois).
+
+    Args:
+        servico: Dicionário do serviço
+
+    Returns:
+        True se tem item válido e quantidade
+    """
+    import re
+    item = servico.get("item")
+    quantidade = servico.get("quantidade")
+
+    # Verificar se tem código de item válido (ex: "1.1", "6.3.4")
+    if not item:
+        return False
+    if not re.match(r'^\d+(\.\d+)+$', str(item)):
+        return False
+
+    # Verificar se tem quantidade válida
+    if quantidade is None:
+        return False
+    try:
+        qty = float(quantidade)
+        return qty > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def filter_classification_paths(servicos: list) -> list:
@@ -23,6 +78,8 @@ def filter_classification_paths(servicos: list) -> list:
 
     Isso inclui itens que contêm ">" (caminho de classificação) ou
     começam com padrões de classificação de CAT.
+
+    Preserva itens com código válido e quantidade mesmo se descrição curta.
 
     Args:
         servicos: Lista de serviços
@@ -37,7 +94,13 @@ def filter_classification_paths(servicos: list) -> list:
     for servico in servicos:
         descricao = servico.get("descricao", "") or ""
 
+        # Preservar itens com código e quantidade válidos (descrição pode ser recuperada)
+        has_valid_item_qty = _has_valid_item_and_quantity(servico)
+
         if not descricao.strip():
+            # Só continuar se tiver item e quantidade válidos
+            if has_valid_item_qty:
+                filtered.append(servico)
             continue
 
         # Ignorar itens que contêm ">" (caminho de classificação)
@@ -65,8 +128,10 @@ def filter_classification_paths(servicos: list) -> list:
         if is_invalid:
             continue
 
-        # Ignorar itens muito curtos
+        # Ignorar itens muito curtos, MAS preservar se tiver código e quantidade
         if len(descricao.strip()) < 5:
+            if has_valid_item_qty:
+                filtered.append(servico)
             continue
 
         filtered.append(servico)
@@ -80,6 +145,8 @@ def remove_duplicate_services(servicos: list) -> list:
 
     Mantém serviços com código de item e remove sem código que têm
     descrição similar a algum serviço com código.
+
+    Otimizado com índice invertido para O(n) ao invés de O(n²).
 
     Args:
         servicos: Lista de serviços
@@ -99,8 +166,21 @@ def remove_duplicate_services(servicos: list) -> list:
         else:
             sem_item.append(servico)
 
-    # Criar lista de palavras-chave dos serviços COM item
-    com_item_keywords = []
+    if not com_item:
+        # Sem serviços com item, apenas deduplicar sem_item
+        seen: Set[str] = set()
+        result = []
+        for servico in sem_item:
+            desc = str(servico.get("descricao", "") or "").strip()
+            desc_norm = normalize_description(desc)[:50] if desc else ""
+            if desc_norm and desc_norm not in seen:
+                seen.add(desc_norm)
+                result.append(servico)
+        return result
+
+    # Construir índice invertido e conjunto de keywords distintas
+    com_item_index = _build_keyword_index(com_item)
+    com_item_keywords_list = []
     com_item_distinctive: Set[str] = set()
 
     common_terms = {
@@ -116,16 +196,28 @@ def remove_duplicate_services(servicos: list) -> list:
         desc = str(servico.get("descricao", "") or "").strip()
         if desc:
             keywords = extract_keywords(desc)
-            com_item_keywords.append(keywords)
+            com_item_keywords_list.append(keywords)
             for kw in keywords:
                 if len(kw) >= 6 and kw.lower() not in common_terms:
                     com_item_distinctive.add(kw.lower())
 
-    def is_similar_to_any_com_item(desc: str, threshold: float = 0.5) -> bool:
+    def is_similar_to_any_com_item_optimized(desc: str, threshold: float = 0.5) -> bool:
+        """Usa índice invertido para encontrar candidatos rapidamente."""
         keywords = extract_keywords(desc)
         if not keywords:
             return False
-        for com_kw in com_item_keywords:
+
+        # Encontrar índices de serviços com_item que compartilham keywords
+        candidate_indices: Set[int] = set()
+        for kw in keywords:
+            if kw in com_item_index:
+                candidate_indices.update(com_item_index[kw])
+
+        # Verificar similaridade apenas com candidatos
+        for idx in candidate_indices:
+            if idx >= len(com_item_keywords_list):
+                continue
+            com_kw = com_item_keywords_list[idx]
             if not com_kw:
                 continue
             intersection = len(keywords & com_kw)
@@ -156,7 +248,7 @@ def remove_duplicate_services(servicos: list) -> list:
             continue
         if desc_norm in desc_sem_item_vistos:
             continue
-        if is_similar_to_any_com_item(desc):
+        if is_similar_to_any_com_item_optimized(desc):
             continue
         if shares_distinctive_keyword(desc):
             continue
@@ -194,10 +286,7 @@ def filter_servicos_by_item_length(servicos: list) -> Tuple[list, dict]:
     dominant_len, dominant_count = max(counts.items(), key=lambda kv: kv[1])
     ratio = dominant_count / max(1, len(lengths))
 
-    try:
-        min_ratio = float(os.getenv("ATTESTADO_ITEM_LEN_RATIO", "0.6"))
-    except ValueError:
-        min_ratio = 0.6
+    min_ratio = DeduplicationConfig.ITEM_LENGTH_RATIO
 
     info = {
         "dominant_len": dominant_len,
@@ -210,10 +299,7 @@ def filter_servicos_by_item_length(servicos: list) -> Tuple[list, dict]:
     if ratio < min_ratio or dominant_len < 2:
         return servicos, info
 
-    try:
-        min_desc_len = int(os.getenv("ATTESTADO_ITEM_LEN_KEEP_MIN_DESC", "20"))
-    except ValueError:
-        min_desc_len = 20
+    min_desc_len = DeduplicationConfig.ITEM_LENGTH_KEEP_MIN_DESC
 
     filtered = []
     for servico in servicos:
@@ -261,10 +347,7 @@ def filter_servicos_by_item_prefix(servicos: list) -> Tuple[list, dict]:
     dominant_prefix, dominant_count = max(counts.items(), key=lambda kv: kv[1])
     ratio = dominant_count / max(1, len(prefixes))
 
-    try:
-        min_ratio = float(os.getenv("ATTESTADO_ITEM_PREFIX_RATIO", "0.7"))
-    except ValueError:
-        min_ratio = 0.7
+    min_ratio = DeduplicationConfig.ITEM_PREFIX_RATIO
 
     info = {
         "dominant_prefix": dominant_prefix,
@@ -484,6 +567,8 @@ def merge_servicos_prefer_primary(primary: list, secondary: list) -> list:
     """
     Mescla duas listas de serviços dando preferência à lista primária.
 
+    Otimizado com índice invertido para O(n) ao invés de O(n²).
+
     Args:
         primary: Lista primária (preferida)
         secondary: Lista secundária
@@ -499,17 +584,31 @@ def merge_servicos_prefer_primary(primary: list, secondary: list) -> list:
     # Chaves dos serviços primários
     primary_keys = {servico_key(s) for s in primary}
 
+    # Construir índice invertido para busca rápida de similaridade
+    primary_index = _build_keyword_index(primary)
+
     # Adicionar serviços secundários que não estão no primário
     result = list(primary)
     for servico in secondary:
         key = servico_key(servico)
         if key not in primary_keys:
-            # Verificar se é similar a algum primário
+            # Usar índice para encontrar candidatos rapidamente
+            desc = str(servico.get("descricao", "") or "").strip()
+            keywords = extract_keywords(desc) if desc else set()
+
+            # Encontrar candidatos que compartilham keywords
+            candidate_indices: Set[int] = set()
+            for kw in keywords:
+                if kw in primary_index:
+                    candidate_indices.update(primary_index[kw])
+
+            # Verificar similaridade apenas com candidatos
             is_dup = False
-            for prim in primary:
-                if items_similar(servico, prim):
+            for idx in candidate_indices:
+                if idx < len(primary) and items_similar(servico, primary[idx]):
                     is_dup = True
                     break
+
             if not is_dup:
                 result.append(servico)
                 primary_keys.add(key)

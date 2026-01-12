@@ -3,11 +3,14 @@ Utilitários de normalização de texto para extração de documentos.
 
 Este módulo contém funções para normalizar descrições, unidades,
 extrair palavras-chave e calcular similaridade entre textos.
+
+Usa lru_cache para melhorar performance em chamadas repetidas.
 """
 
 import unicodedata
 import re
-from typing import Set
+from functools import lru_cache
+from typing import Set, FrozenSet
 
 
 # Unidades comuns de medida
@@ -23,6 +26,7 @@ STOPWORDS: Set[str] = {
 }
 
 
+@lru_cache(maxsize=2048)
 def normalize_description(desc: str) -> str:
     """
     Normaliza descrição para comparação.
@@ -63,6 +67,7 @@ def normalize_description(desc: str) -> str:
     return ' '.join(text.split())
 
 
+@lru_cache(maxsize=1024)
 def normalize_unit(unit: str) -> str:
     """
     Normaliza unidade para comparação.
@@ -117,6 +122,14 @@ def normalize_desc_for_match(desc: str) -> str:
     return normalize_description(cleaned)
 
 
+@lru_cache(maxsize=2048)
+def _extract_keywords_cached(desc: str) -> FrozenSet[str]:
+    """Versão cacheada de extract_keywords usando stopwords padrão."""
+    normalized = normalize_description(desc)
+    words = frozenset(normalized.split())
+    return words - STOPWORDS
+
+
 def extract_keywords(desc: str, stopwords: Set[str] = STOPWORDS) -> Set[str]:
     """
     Extrai palavras-chave significativas da descrição.
@@ -128,6 +141,10 @@ def extract_keywords(desc: str, stopwords: Set[str] = STOPWORDS) -> Set[str]:
     Returns:
         Conjunto de palavras-chave
     """
+    # Se usando stopwords padrão, usar versão cacheada
+    if stopwords is STOPWORDS:
+        return set(_extract_keywords_cached(desc))
+
     normalized = normalize_description(desc)
     words = set(normalized.split())
     return words - stopwords

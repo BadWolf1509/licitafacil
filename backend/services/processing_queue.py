@@ -1,61 +1,24 @@
 """
 Fila de Processamento Assíncrono para Atestados.
+
 Permite processar documentos em background com suporte a batch.
+Utiliza JobRepository para persistência, JobExecutor para execução
+e models compartilhados.
 """
 
 import asyncio
-import json
 import os
-import sqlite3
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Callable
-from enum import Enum
-from dataclasses import dataclass, asdict
 from collections import deque
 import threading
-import traceback
 
 from logging_config import get_logger
+from .models import JobStatus, ProcessingJob
+from .job_repository import JobRepository
+from .job_executor import JobExecutor
+
 logger = get_logger('services.processing_queue')
-
-
-class JobStatus(str, Enum):
-    """Status de um job de processamento."""
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-@dataclass
-class ProcessingJob:
-    """Representa um job de processamento."""
-    id: str
-    user_id: int
-    file_path: str
-    job_type: str  # "atestado" ou "edital"
-    status: JobStatus = JobStatus.PENDING
-    created_at: str = ""
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    canceled_at: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    attempts: int = 0
-    max_attempts: int = 3
-    progress_current: int = 0
-    progress_total: int = 0
-    progress_stage: Optional[str] = None
-    progress_message: Optional[str] = None
-
-    def __post_init__(self):
-        if not self.created_at:
-            self.created_at = datetime.now().isoformat()
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Converte para dicionário."""
-        return asdict(self)
 
 
 class ProcessingQueue:
@@ -73,7 +36,6 @@ class ProcessingQueue:
         self._queue: deque = deque()
         self._processing: Dict[str, ProcessingJob] = {}
         self._lock = threading.Lock()
-        self._db_path = db_path
         self._is_running = False
         self._worker_task = None
         self._callbacks: Dict[str, Callable] = {}
@@ -84,202 +46,31 @@ class ProcessingQueue:
         self._max_concurrent = int(os.getenv("QUEUE_MAX_CONCURRENT", "3"))
         self._poll_interval = float(os.getenv("QUEUE_POLL_INTERVAL", "1.0"))
 
-        # Inicializar tabela de jobs
-        self._init_db()
+        # Repositório para persistência
+        self._repository = JobRepository(db_path)
 
-    def _init_db(self):
-        """Cria tabela de jobs se não existir."""
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS processing_jobs (
-                id TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                file_path TEXT NOT NULL,
-                job_type TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                started_at TEXT,
-                completed_at TEXT,
-                canceled_at TEXT,
-                result TEXT,
-                error TEXT,
-                attempts INTEGER DEFAULT 0,
-                max_attempts INTEGER DEFAULT 3,
-                progress_current INTEGER DEFAULT 0,
-                progress_total INTEGER DEFAULT 0,
-                progress_stage TEXT,
-                progress_message TEXT
-            )
-        """)
-        self._ensure_columns(cursor)
-        conn.commit()
-        conn.close()
-
-    def _ensure_columns(self, cursor):
-        """Garante que colunas novas existem (compatibilidade com DB antigo)."""
-        cursor.execute("PRAGMA table_info(processing_jobs)")
-        existing = {row[1] for row in cursor.fetchall()}
-        columns = {
-            "canceled_at": "TEXT",
-            "progress_current": "INTEGER DEFAULT 0",
-            "progress_total": "INTEGER DEFAULT 0",
-            "progress_stage": "TEXT",
-            "progress_message": "TEXT"
-        }
-        for name, col_type in columns.items():
-            if name not in existing:
-                cursor.execute(f"ALTER TABLE processing_jobs ADD COLUMN {name} {col_type}")
-
-    def _save_job(self, job: ProcessingJob):
-        """Salva job no banco de dados."""
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO processing_jobs
-            (id, user_id, file_path, job_type, status, created_at, started_at,
-             completed_at, canceled_at, result, error, attempts, max_attempts,
-             progress_current, progress_total, progress_stage, progress_message)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            job.id,
-            job.user_id,
-            job.file_path,
-            job.job_type,
-            job.status.value if isinstance(job.status, JobStatus) else job.status,
-            job.created_at,
-            job.started_at,
-            job.completed_at,
-            job.canceled_at,
-            json.dumps(job.result) if job.result else None,
-            job.error,
-            job.attempts,
-            job.max_attempts,
-            job.progress_current,
-            job.progress_total,
-            job.progress_stage,
-            job.progress_message
-        ))
-        conn.commit()
-        conn.close()
-
-    def _load_pending_jobs(self) -> List[ProcessingJob]:
-        """Carrega jobs pendentes do banco."""
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, canceled_at, result, error,
-                   attempts, max_attempts, progress_current, progress_total,
-                   progress_stage, progress_message
-            FROM processing_jobs
-            WHERE status IN ('pending', 'processing')
-            ORDER BY created_at ASC
-        """)
-        rows = cursor.fetchall()
-        conn.close()
-
-        jobs = []
-        for row in rows:
-            job = ProcessingJob(
-                id=row[0],
-                user_id=row[1],
-                file_path=row[2],
-                job_type=row[3],
-                status=JobStatus(row[4]),
-                created_at=row[5],
-                started_at=row[6],
-                completed_at=row[7],
-                canceled_at=row[8],
-                result=json.loads(row[9]) if row[9] else None,
-                error=row[10],
-                attempts=row[11],
-                max_attempts=row[12],
-                progress_current=row[13] or 0,
-                progress_total=row[14] or 0,
-                progress_stage=row[15],
-                progress_message=row[16]
-            )
-            jobs.append(job)
-        return jobs
-
-    def get_job(self, job_id: str) -> Optional[ProcessingJob]:
-        """Busca um job pelo ID."""
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, canceled_at, result, error,
-                   attempts, max_attempts, progress_current, progress_total,
-                   progress_stage, progress_message
-            FROM processing_jobs
-            WHERE id = ?
-        """, (job_id,))
-        row = cursor.fetchone()
-        conn.close()
-
-        if not row:
-            return None
-
-        return ProcessingJob(
-            id=row[0],
-            user_id=row[1],
-            file_path=row[2],
-            job_type=row[3],
-            status=JobStatus(row[4]),
-            created_at=row[5],
-            started_at=row[6],
-            completed_at=row[7],
-            canceled_at=row[8],
-            result=json.loads(row[9]) if row[9] else None,
-            error=row[10],
-            attempts=row[11],
-            max_attempts=row[12],
-            progress_current=row[13] or 0,
-            progress_total=row[14] or 0,
-            progress_stage=row[15],
-            progress_message=row[16]
+        # Executor para processamento de jobs
+        self._executor = JobExecutor(
+            save_job_callback=self._save_job,
+            update_progress_callback=self.update_job_progress,
+            is_cancel_requested_callback=self.is_cancel_requested
         )
 
-    def get_user_jobs(self, user_id: int, limit: int = 20) -> List[ProcessingJob]:
-        """Busca jobs de um usuário."""
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, user_id, file_path, job_type, status, created_at,
-                   started_at, completed_at, canceled_at, result, error,
-                   attempts, max_attempts, progress_current, progress_total,
-                   progress_stage, progress_message
-            FROM processing_jobs
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            LIMIT ?
-        """, (user_id, limit))
-        rows = cursor.fetchall()
-        conn.close()
+    def _save_job(self, job: ProcessingJob):
+        """Salva job no banco de dados via repositório."""
+        self._repository.save(job)
 
-        return [
-            ProcessingJob(
-                id=row[0],
-                user_id=row[1],
-                file_path=row[2],
-                job_type=row[3],
-                status=JobStatus(row[4]),
-                created_at=row[5],
-                started_at=row[6],
-                completed_at=row[7],
-                canceled_at=row[8],
-                result=json.loads(row[9]) if row[9] else None,
-                error=row[10],
-                attempts=row[11],
-                max_attempts=row[12],
-                progress_current=row[13] or 0,
-                progress_total=row[14] or 0,
-                progress_stage=row[15],
-                progress_message=row[16]
-            )
-            for row in rows
-        ]
+    def _load_pending_jobs(self) -> List[ProcessingJob]:
+        """Carrega jobs pendentes do banco via repositório."""
+        return self._repository.get_pending()
+
+    def get_job(self, job_id: str) -> Optional[ProcessingJob]:
+        """Busca um job pelo ID via repositório."""
+        return self._repository.get_by_id(job_id)
+
+    def get_user_jobs(self, user_id: int, limit: int = 20) -> List[ProcessingJob]:
+        """Busca jobs de um usuário via repositório."""
+        return self._repository.get_by_user(user_id, limit)
 
     def register_callback(self, job_type: str, callback: Callable):
         """Registra callback padrÆo por tipo de job."""
@@ -291,6 +82,7 @@ class ProcessingQueue:
         user_id: int,
         file_path: str,
         job_type: str = "atestado",
+        original_filename: Optional[str] = None,
         callback: Optional[Callable] = None
     ) -> ProcessingJob:
         """
@@ -301,6 +93,7 @@ class ProcessingQueue:
             user_id: ID do usuário
             file_path: Caminho do arquivo a processar
             job_type: Tipo de job (atestado ou edital)
+            original_filename: Nome original do arquivo enviado pelo usuário
             callback: Função a chamar após conclusão
 
         Returns:
@@ -310,6 +103,7 @@ class ProcessingQueue:
             id=job_id,
             user_id=user_id,
             file_path=file_path,
+            original_filename=original_filename,
             job_type=job_type,
             progress_stage="queued",
             progress_message="Aguardando na fila"
@@ -326,6 +120,13 @@ class ProcessingQueue:
         self._save_job(job)
         return job
 
+    # Mapeamento de stage para pipeline
+    STAGE_TO_PIPELINE = {
+        'texto': 'NATIVE_TEXT',
+        'ocr': 'LOCAL_OCR',
+        'vision': 'VISION_AI',
+    }
+
     def update_job_progress(
         self,
         job_id: str,
@@ -334,9 +135,12 @@ class ProcessingQueue:
         stage: Optional[str] = None,
         message: Optional[str] = None
     ):
-        """Atualiza progresso do job em mem¢ria e no banco."""
+        """Atualiza progresso do job em memória e no banco."""
         if self.is_cancel_requested(job_id):
             return
+
+        # Detecta pipeline baseado no stage
+        new_pipeline = self.STAGE_TO_PIPELINE.get(stage) if stage else None
 
         with self._lock:
             job = self._processing.get(job_id)
@@ -350,16 +154,14 @@ class ProcessingQueue:
                 job.progress_total = total
                 job.progress_stage = stage
                 job.progress_message = message
+                # Atualiza pipeline apenas se detectado um novo (não sobrescreve com None)
+                if new_pipeline:
+                    job.pipeline = new_pipeline
 
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE processing_jobs
-            SET progress_current = ?, progress_total = ?, progress_stage = ?, progress_message = ?
-            WHERE id = ?
-        """, (current, total, stage, message, job_id))
-        conn.commit()
-        conn.close()
+        # Atualiza no banco via repositório
+        self._repository.update_progress(
+            job_id, current, total, stage, message, new_pipeline
+        )
 
     def is_cancel_requested(self, job_id: str) -> bool:
         """Verifica se o cancelamento foi solicitado."""
@@ -392,24 +194,18 @@ class ProcessingQueue:
         return job
 
     def delete_job(self, job_id: str) -> bool:
-        """Remove um job do banco e da fila/memoria."""
+        """Remove um job do banco e da fila/memória."""
         with self._lock:
             self._queue = deque([j for j in self._queue if j.id != job_id])
             self._processing.pop(job_id, None)
             self._cancel_requested.discard(job_id)
             self._callbacks.pop(job_id, None)
 
-        conn = sqlite3.connect(self._db_path)
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM processing_jobs WHERE id = ?", (job_id,))
-        deleted = cursor.rowcount > 0
-        conn.commit()
-        conn.close()
-        return deleted
+        return self._repository.delete(job_id)
 
     async def _process_job(self, job: ProcessingJob) -> ProcessingJob:
         """
-        Processa um job individual.
+        Processa um job individual delegando ao JobExecutor.
 
         Args:
             job: Job a processar
@@ -417,76 +213,7 @@ class ProcessingQueue:
         Returns:
             Job atualizado com resultado ou erro
         """
-        from .document_processor import DocumentProcessor, ProcessingCancelled
-        from .ai_provider import ai_provider
-
-        if self.is_cancel_requested(job.id):
-            job.status = JobStatus.CANCELLED
-            job.completed_at = datetime.now().isoformat()
-            job.canceled_at = job.completed_at
-            job.error = "Cancelado pelo usuario"
-            self._save_job(job)
-            return job
-
-        job.status = JobStatus.PROCESSING
-        job.started_at = datetime.now().isoformat()
-        job.attempts += 1
-        job.progress_current = 0
-        job.progress_total = 0
-        job.progress_stage = "processing"
-        job.progress_message = "Iniciando processamento"
-        self._save_job(job)
-
-        try:
-            processor = DocumentProcessor()
-
-            def progress_callback(current, total, stage=None, message=None):
-                self.update_job_progress(job.id, current, total, stage, message)
-
-            def cancel_check():
-                return self.is_cancel_requested(job.id)
-
-            if job.job_type == "atestado":
-                # Processar atestado com Vision se disponivel
-                use_vision = ai_provider.is_configured
-                result = processor.process_atestado(
-                    job.file_path,
-                    use_vision=use_vision,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check
-                )
-            else:
-                # Processar edital
-                result = processor.process_edital(
-                    job.file_path,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check
-                )
-
-            job.status = JobStatus.COMPLETED
-            job.completed_at = datetime.now().isoformat()
-            job.result = result
-
-        except ProcessingCancelled:
-            job.status = JobStatus.CANCELLED
-            job.completed_at = datetime.now().isoformat()
-            job.canceled_at = job.completed_at
-            job.error = "Cancelado pelo usuario"
-        except Exception as e:
-            error_msg = f"{str(e)}\n{traceback.format_exc()}"
-
-            if job.attempts < job.max_attempts:
-                # Retry
-                job.status = JobStatus.PENDING
-                job.error = f"Tentativa {job.attempts}/{job.max_attempts}: {error_msg}"
-            else:
-                # Falha definitiva
-                job.status = JobStatus.FAILED
-                job.completed_at = datetime.now().isoformat()
-                job.error = f"Falhou apos {job.attempts} tentativas: {error_msg}"
-
-        self._save_job(job)
-        return job
+        return await self._executor.execute(job)
 
     async def _worker(self):
         """Worker que processa jobs da fila."""
@@ -504,6 +231,9 @@ class ProcessingQueue:
                 tasks = [self._process_job(job) for job in jobs_to_process]
                 completed_jobs = await asyncio.gather(*tasks, return_exceptions=True)
 
+                # Coletar callbacks para executar fora do lock
+                callbacks_to_run = []
+
                 for job in completed_jobs:
                     if isinstance(job, ProcessingJob):
                         with self._lock:
@@ -517,13 +247,18 @@ class ProcessingQueue:
                             if job.status == JobStatus.PENDING:
                                 self._queue.append(job)
 
-                            # Executar callback apenas quando concluido
+                            # Coletar callback para executar fora do lock
                             callback = self._callbacks.pop(job.id, None)
                             if callback and job.status == JobStatus.COMPLETED:
-                                try:
-                                    callback(job)
-                                except Exception as e:
-                                    logger.error(f"Erro no callback do job {job.id}: {e}")
+                                callbacks_to_run.append((callback, job))
+
+                # Executar callbacks fora do lock, em threads separadas
+                for callback, job in callbacks_to_run:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        await loop.run_in_executor(None, callback, job)
+                    except Exception as e:
+                        logger.error(f"Erro no callback do job {job.id}: {e}")
 
             await asyncio.sleep(self._poll_interval)
 

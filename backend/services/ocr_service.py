@@ -171,6 +171,24 @@ class OCRService:
             )
         return self._reader
 
+    def initialize(self):
+        """
+        Pré-inicializa o reader OCR.
+        Chamar no startup da aplicação para evitar delay na primeira requisição.
+        A inicialização pode demorar 30-60 segundos.
+        """
+        if self._reader is None:
+            from logging_config import get_logger
+            logger = get_logger('services.ocr_service')
+            logger.info("Inicializando EasyOCR reader (pode demorar 30-60s)...")
+            _ = self.reader  # Força inicialização lazy
+            logger.info("EasyOCR reader inicializado com sucesso")
+
+    @property
+    def is_initialized(self) -> bool:
+        """Retorna True se o reader já foi inicializado."""
+        return self._reader is not None
+
     def extract_text_from_image(self, image_path: str) -> str:
         """
         Extrai texto de uma imagem.

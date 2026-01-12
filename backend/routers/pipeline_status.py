@@ -2,7 +2,7 @@
 Endpoints para status e controle do pipeline de extração em cascata.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from typing import Dict, Any, Optional
 import tempfile
 import os
@@ -124,7 +124,7 @@ async def process_with_cascade(
             pipeline_override = ExtractionPipeline(force_pipeline)
         except ValueError:
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Pipeline inválido: {force_pipeline}. "
                        f"Use: native_text, local_ocr, cloud_ocr, vision_ai"
             )
@@ -150,7 +150,7 @@ async def process_with_cascade(
 
         if not result.success:
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Erro no processamento: {', '.join(result.errors)}"
             )
 
