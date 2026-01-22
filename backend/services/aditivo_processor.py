@@ -117,7 +117,8 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     """
     Prefixa itens do aditivo contratual para diferenciá-los do contrato.
 
-    Detecta seções de aditivo e adiciona prefixo "AD-" aos itens.
+    Detecta seções de aditivo e adiciona prefixo de reinício (Sx-) aos itens.
+    O aditivo é indicado via metadado _section="AD".
 
     A lógica identifica itens do aditivo buscando-os no texto após a linha
     de reinício de numeração. Apenas itens com números 1, 2 ou 3 são
@@ -144,11 +145,40 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     aditivo_start_line = min(s["start_line"] for s in aditivo_sections)
     lines = texto.split("\n")
 
-    # Criar mapeamento de prefixo de item para seção do aditivo
+    def strip_restart_prefix(item_value: str) -> str:
+        if not item_value:
+            return ""
+        return re.sub(r"^(S\d+-|AD-)", "", item_value, flags=re.IGNORECASE).strip()
+
+    def max_restart_prefix_index(items: list) -> int:
+        max_idx = 1
+        for s in items:
+            item_val = str(s.get("item") or "").strip()
+            match = re.match(r"^S(\d+)-", item_val, re.IGNORECASE)
+            if match:
+                try:
+                    max_idx = max(max_idx, int(match.group(1)))
+                except ValueError:
+                    continue
+        return max_idx
+
+    def apply_restart_prefix(item_value: str, segment_idx: int) -> tuple[str, str]:
+        item_str = strip_restart_prefix(str(item_value or "").strip())
+        if not item_str:
+            return "", ""
+        if segment_idx <= 1:
+            return item_str, ""
+        prefix = f"S{segment_idx}"
+        return f"{prefix}-{item_str}", prefix
+
+    # Criar mapeamento de prefixo de item para seção do aditivo (Sx)
     aditivo_prefixes = {}
-    for section in aditivo_sections:
+    next_segment = max_restart_prefix_index(servicos) + 1
+    for section in sorted(aditivo_sections, key=lambda s: s.get("start_line", 0)):
         section_num = section["section_num"]
-        aditivo_prefixes[section_num] = section["prefix"]
+        if section_num not in aditivo_prefixes:
+            aditivo_prefixes[section_num] = next_segment
+            next_segment += 1
 
     # Função para verificar se um item aparece após a linha de início do aditivo
     def find_item_in_text(item_str: str) -> tuple:
@@ -291,10 +321,21 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     # Criar índice de itens para detectar headers
     # Um item X.Y é header se existem sub-itens X.Y.Z no documento
     item_set = set()
+    planilha_candidates: dict[str, dict[int, int]] = {}
     for s in servicos:
         item_val = s.get("item")
         if item_val:
-            item_set.add(str(item_val))
+            base_item = strip_restart_prefix(str(item_val))
+            if base_item:
+                item_set.add(base_item)
+                planilha_id = s.get("_planilha_id")
+                if planilha_id is not None:
+                    counts = planilha_candidates.setdefault(base_item, {})
+                    counts[planilha_id] = counts.get(planilha_id, 0) + 1
+
+    planilha_by_code: dict[str, int] = {}
+    for code, counts in planilha_candidates.items():
+        planilha_by_code[code] = max(counts.items(), key=lambda x: x[1])[0]
 
     def is_header_item(item_str: str) -> bool:
         """
@@ -319,7 +360,7 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
             result.append(s)
             continue
 
-        item_tuple = parse_item_tuple(str(item))
+        item_tuple = parse_item_tuple(strip_restart_prefix(str(item)))
         if not item_tuple:
             result.append(s)
             continue
@@ -339,7 +380,7 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
             continue
 
         # Verificar onde o item aparece no texto
-        item_str = str(item)
+        item_str = strip_restart_prefix(str(item))
         found_before, found_after, aditivo_has_qty = find_item_in_text(item_str)
         logger.debug(f"[ADITIVO] Item {item_str}: antes={found_before}, depois={found_after}, desc_orig={s.get('descricao', '')[:30]}")
 
@@ -350,8 +391,15 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
         if found_after and not found_before:
             # Item exclusivo do aditivo - prefixar
             s_copy = s.copy()
-            s_copy["item"] = f"AD-{item}"
+            new_item, prefix = apply_restart_prefix(item, aditivo_prefixes.get(major, 1))
+            s_copy["item"] = new_item
             s_copy["_section"] = "AD"
+            if prefix:
+                s_copy["_item_prefix"] = prefix
+            if s.get("_planilha_id") is not None:
+                s_copy["_planilha_id"] = s.get("_planilha_id")
+            if s.get("_planilha_label"):
+                s_copy["_planilha_label"] = s.get("_planilha_label")
 
             # HÍBRIDO: tentar extrair do texto, fallback para IA
             aditivo_info = extract_aditivo_item_info(item_str, major)
@@ -399,14 +447,21 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
             logger.debug(f"[ADITIVO] Híbrido: text_desc={text_desc[:40] if text_desc else 'None'}, usando={desc_source}")
 
             # Criar versão do aditivo
+            new_item, prefix = apply_restart_prefix(item, aditivo_prefixes.get(major, 1))
             s_aditivo = {
-                "item": f"AD-{item}",
+                "item": new_item,
                 "_section": "AD",
                 "_desc_source": desc_source,
                 "descricao": final_desc,
                 "quantidade": aditivo_info["quantidade"] if aditivo_info["quantidade"] is not None else s.get("quantidade", 0),
                 "unidade": aditivo_info["unidade"] or s.get("unidade", ""),
             }
+            if prefix:
+                s_aditivo["_item_prefix"] = prefix
+            if s.get("_planilha_id") is not None:
+                s_aditivo["_planilha_id"] = s.get("_planilha_id")
+            if s.get("_planilha_label"):
+                s_aditivo["_planilha_label"] = s.get("_planilha_label")
             result.append(s_aditivo)
             logger.debug(f"[ADITIVO] Criada versão aditivo: {s_aditivo['item']} -> {s_aditivo['descricao'][:40]} (fonte: {desc_source})")
         else:
@@ -507,7 +562,7 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
         if major not in aditivo_prefixes:
             continue
 
-        ad_item = f"AD-{item_str}"
+        ad_item, ad_prefix = apply_restart_prefix(item_str, aditivo_prefixes.get(major, 1))
 
         # Verificar se este item já existe no resultado
         if ad_item in result_items or item_str in result_items:
@@ -529,6 +584,11 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
                 "quantidade": aditivo_info.get("quantidade") or 0,
                 "unidade": aditivo_info.get("unidade") or "",
             }
+            if ad_prefix:
+                s_new["_item_prefix"] = ad_prefix
+            base_planilha = planilha_by_code.get(item_str)
+            if base_planilha is not None:
+                s_new["_planilha_id"] = base_planilha
             result.append(s_new)
             result_items.add(ad_item)
             logger.info(f"[ADITIVO] Adicionado item auto-detectado: {ad_item} -> {str(s_new['descricao'])[:40]}")
@@ -536,7 +596,7 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     logger.info(f"[ADITIVO-FASE2] FIM. Linhas verificadas: {lines_checked}")
 
     # FASE 2.5: Remover duplicatas EXATAS (mesmo item + descrição + quantidade + unidade)
-    # ANTES de renomear com sufixo. Isso evita criar AD-1.1-A quando é duplicata exata de AD-1.1
+    # ANTES de renomear com sufixo. Isso evita criar sufixo -A quando é duplicata exata
     seen_exact: set[tuple] = set()
     exact_deduped = []
     exact_removed = 0
@@ -596,8 +656,8 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     items_removed_secao = 0
     for r in deduped_result:
         item = r.get("item", "")
-        # Ignorar itens do aditivo (AD-X.Y)
-        if item.startswith("AD-"):
+        # Ignorar itens do aditivo
+        if r.get("_section") == "AD":
             filtered_result.append(r)
             continue
 
@@ -626,17 +686,16 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
         logger.info(f"[VALIDACAO] {items_removed_secao} itens removidos por seção pai inexistente")
 
     # 3.2: Filtrar duplicatas entre contrato e aditivo
-    # Se item do contrato X.Y-S tem mesma desc+qtd que AD-X.Y, é erro de extração
+    # Se item do contrato tem mesma desc+qtd que item do aditivo, é erro de extração
     aditivo_map: dict[tuple, str] = {}
     for r in filtered_result:
         item = r.get("item", "")
-        if item.startswith("AD-"):
+        if r.get("_section") == "AD":
             # Criar chave: descrição normalizada + quantidade
             desc = (r.get("descricao") or "").strip()[:50].lower()
             qtd = r.get("quantidade", 0)
-            # Item base sem prefixo AD- e sem sufixo
-            base_item = re.sub(r"^AD-", "", item)
-            base_item = re.sub(r"-[A-Z]$", "", base_item)
+            # Item base sem prefixo e sem sufixo
+            base_item = re.sub(r"-[A-Z]$", "", strip_restart_prefix(item))
             aditivo_map[(desc, qtd, base_item)] = item
 
     final_result = []
@@ -644,16 +703,16 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     for r in filtered_result:
         item = r.get("item", "")
         # Verificar apenas itens do contrato com sufixo (-A, -B, etc.)
-        if not item.startswith("AD-") and re.search(r"-[A-Z]$", item):
+        if r.get("_section") != "AD" and re.search(r"-[A-Z]$", item):
             desc = (r.get("descricao") or "").strip()[:50].lower()
             qtd = r.get("quantidade", 0)
             base_item = re.sub(r"-[A-Z]$", "", item)
-            key = (desc, qtd, base_item)
+            dup_key = (desc, qtd, base_item)
 
-            if key in aditivo_map:
+            if dup_key in aditivo_map:
                 # Item do contrato é duplicata de item do aditivo
                 items_removed_dup += 1
-                logger.info(f"[VALIDACAO] Removido duplicata contrato/aditivo: {item} (duplicata de {aditivo_map[key]})")
+                logger.info(f"[VALIDACAO] Removido duplicata contrato/aditivo: {item} (duplicata de {aditivo_map[dup_key]})")
                 continue
         final_result.append(r)
 
@@ -663,7 +722,7 @@ def prefix_aditivo_items(servicos: list, texto: str) -> list:
     deduped_result = final_result
 
     # Log resumo
-    aditivo_count = sum(1 for r in deduped_result if r.get("item", "").startswith("AD"))
+    aditivo_count = sum(1 for r in deduped_result if r.get("_section") == "AD")
     contrato_count = len(deduped_result) - aditivo_count
     auto_detected = sum(1 for r in deduped_result if r.get("_auto_detected"))
     logger.info(f"[ADITIVO] Resultado: {len(deduped_result)} itens total ({contrato_count} contrato, {aditivo_count} aditivo, {auto_detected} auto-detectados)")

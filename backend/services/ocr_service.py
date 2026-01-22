@@ -9,10 +9,11 @@ from exceptions import OCRError
 import easyocr
 from typing import List, Optional, Dict, Any
 import io
-import os
 from PIL import Image
 import numpy as np
 import cv2
+
+from config import OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK
 
 # Tesseract é opcional - só usa se estiver instalado
 try:
@@ -28,8 +29,8 @@ class OCRService:
     def __init__(self):
         self._reader: Optional[easyocr.Reader] = None
         self._languages = ['pt', 'en']  # Português e inglês
-        self._preprocess_enabled = os.getenv("OCR_PREPROCESS", "1").lower() in {"1", "true", "yes"}
-        self._tesseract_enabled = os.getenv("OCR_TESSERACT_FALLBACK", "1").lower() in {"1", "true", "yes"}
+        self._preprocess_enabled = OCR_PREPROCESS_ENABLED
+        self._tesseract_enabled = OCR_TESSERACT_FALLBACK
         self._tesseract_available = TESSERACT_AVAILABLE and self._check_tesseract()
 
     def _check_tesseract(self) -> bool:

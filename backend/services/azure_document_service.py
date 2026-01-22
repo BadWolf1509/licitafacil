@@ -110,10 +110,13 @@ class AzureDocumentService:
 
         try:
             # Usar modelo "prebuilt-read" para OCR
+            # API v1.0.0+ usa 'body' com bytes_source
+            from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+
             poller = self._client.begin_analyze_document(
                 model_id="prebuilt-read",
-                analyze_request=content,
-                content_type="application/octet-stream"
+                body=AnalyzeDocumentRequest(bytes_source=content),
+                content_type="application/json"
             )
 
             result = poller.result()

@@ -525,6 +525,52 @@ Exemplo de resposta:
                 "servicos": []
             }
 
+    def extract_atestado_metadata(self, texto: str) -> Dict[str, Any]:
+        """
+        Extrai apenas metadados do atestado (sem lista de servi‡os).
+        """
+        system_prompt = """Vocˆ ‚ um especialista em an lise de atestados de capacidade t‚cnica para licita‡äes p£blicas no Brasil.
+
+Extraia APENAS os metadados do documento, sem listar servi‡os:
+1. descricao_servico: descri‡Æo resumida da obra/servi‡o principal (1-2 linhas)
+2. contratante: nome do contratante
+3. quantidade: valor do contrato em R$ (opcional)
+4. unidade: "R$" quando houver valor do contrato (opcional)
+5. data_emissao: data de emissÆo (YYYY-MM-DD, opcional)
+
+Retorne APENAS um JSON v lido. Se algum campo nÆo estiver dispon¡vel, use null.
+
+Formato:
+{
+  "descricao_servico": "...",
+  "quantidade": 0.0,
+  "unidade": "R$",
+  "contratante": "...",
+  "data_emissao": "YYYY-MM-DD"
+}"""
+
+        user_prompt = f"Analise o seguinte atestado e extraia apenas os metadados:\n\n{texto}"
+
+        try:
+            response = self._call_openai(system_prompt, user_prompt)
+            response = clean_json_response(response)
+            result = json.loads(response)
+            return {
+                "descricao_servico": result.get("descricao_servico"),
+                "quantidade": result.get("quantidade"),
+                "unidade": result.get("unidade"),
+                "contratante": result.get("contratante"),
+                "data_emissao": result.get("data_emissao")
+            }
+        except json.JSONDecodeError:
+            return {
+                "descricao_servico": None,
+                "quantidade": None,
+                "unidade": None,
+                "contratante": None,
+                "data_emissao": None
+            }
+
     def extract_edital_requirements(self, texto: str) -> List[Dict[str, Any]]:
         """
         Extrai as exigências de capacidade técnica de um edital.
@@ -535,28 +581,34 @@ Exemplo de resposta:
         Returns:
             Lista de exigências com descrição, quantidade e unidade
         """
-        system_prompt = """Você é um especialista em análise de editais de licitação de obras públicas no Brasil.
+        system_prompt = """Voce e um especialista em analise de editais de licitacao de obras publicas no Brasil.
 
-Extraia TODAS as exigências de capacidade técnica operacional do texto, incluindo:
-1. descricao: Descrição do serviço exigido
-2. quantidade_minima: Quantidade mínima exigida (número)
-3. unidade: Unidade de medida
-4. percentual_exigido: Se houver menção a percentual (ex: 50% do quantitativo), caso contrário null
+Extraia TODAS as exigencias de capacidade tecnica operacional do texto, incluindo:
+1. descricao: descricao do servico exigido
+2. quantidade_minima: quantidade minima exigida (numero)
+3. unidade: unidade de medida
+4. percentual_exigido: se houver mencao a percentual (ex: 50% do quantitativo), caso contrario null
+5. permitir_soma: true se o edital permitir somar atestados, false se vedar soma, null se nao explicito
+6. exige_unico: true se o edital exigir um unico atestado, false se permitir soma, null se nao explicito
 
-Retorne APENAS um JSON válido com uma lista de exigências.
+Retorne APENAS um JSON valido com uma lista de exigencias.
 Exemplo de resposta:
 [
     {
-        "descricao": "Pavimentação asfáltica em CBUQ",
+        "descricao": "Pavimentacao asfaltica em CBUQ",
         "quantidade_minima": 2500.0,
-        "unidade": "m²",
-        "percentual_exigido": 50
+        "unidade": "M2",
+        "percentual_exigido": 50,
+        "permitir_soma": null,
+        "exige_unico": null
     },
     {
-        "descricao": "Execução de meio-fio",
+        "descricao": "Execucao de meio-fio",
         "quantidade_minima": 1000.0,
-        "unidade": "ml",
-        "percentual_exigido": null
+        "unidade": "M",
+        "percentual_exigido": null,
+        "permitir_soma": null,
+        "exige_unico": null
     }
 ]"""
 

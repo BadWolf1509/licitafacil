@@ -653,7 +653,7 @@
     <div class="modal" id="modalEditarServico">
         <div class="modal-content modal-sm">
             <div class="modal-header">
-                <h2>Editar Item de Servico</h2>
+                <h2 id="modalServicoTitle">Editar Item de Servico</h2>
                 <button class="modal-close" onclick="fecharModal('modalEditarServico')">&times;</button>
             </div>
             <form id="formEditarServico" onsubmit="salvarServicoItem(event)">
@@ -709,6 +709,7 @@
         const jobTimers = new Map();
         const notifiedJobs = new Set();
         const recentlyCompletedPaths = new Set();
+        const openServicosByAtestado = new Set();
         let refreshJobsInterval = null;
         let renderScheduled = false;
         let lastRenderedJobs = new Map(); // Cache para comparação de mudanças
@@ -1332,6 +1333,12 @@
             try {
                 const response = await api.get('/atestados/');
                 const atestados = response.items || [];
+                const idsAtestados = new Set(atestados.map((a) => a.id));
+                openServicosByAtestado.forEach((id) => {
+                    if (!idsAtestados.has(id)) {
+                        openServicosByAtestado.delete(id);
+                    }
+                });
                 atestadosCache = atestados;
                 const container = document.getElementById('listaAtestados');
                 const btnRelatorioGeral = document.getElementById('btnRelatorioGeral');
@@ -1373,6 +1380,7 @@
                             </div>
                             <div class="atestado-actions">
                                 <button class="btn btn-primary btn-sm" onclick="verResultadoConsolidado(${a.id})">Resultado Consolidado</button>
+                                <button class="btn btn-outline btn-sm" onclick="adicionarServicoItem(${a.id})">+ Item</button>
                                 <button class="btn btn-outline btn-sm" onclick="editarAtestado(${a.id})">Editar</button>
                                 <button class="btn btn-danger btn-sm" onclick="excluirAtestado(${a.id})">Excluir</button>
                             </div>
@@ -1382,7 +1390,7 @@
                 `).join('');
 
             } catch (error) {
-                ui.showAlert('Erro ao carregar atestados', 'error');
+                ui.showAlert(error.message || 'Erro ao carregar atestados', 'error');
             }
         }
 
@@ -1506,6 +1514,7 @@
 
             try {
                 await api.delete(`/atestados/${id}`);
+                openServicosByAtestado.delete(id);
                 ui.showAlert('Atestado excluido com sucesso!', 'success');
                 carregarAtestados();
             } catch (error) {
@@ -1542,7 +1551,19 @@
             }
         }
 
-        // Abre modal para editar um item de serviço
+        // Abre modal para adicionar um item de serviço
+        function adicionarServicoItem(atestadoId) {
+            document.getElementById('modalServicoTitle').textContent = 'Adicionar Item de Servico';
+            document.getElementById('editServicoAtestadoId').value = atestadoId;
+            document.getElementById('editServicoIndex').value = -1;
+            document.getElementById('editServicoItem').value = '';
+            document.getElementById('editServicoDescricao').value = '';
+            document.getElementById('editServicoQuantidade').value = '';
+            document.getElementById('editServicoUnidade').value = '';
+            document.getElementById('modalEditarServico').classList.add('active');
+        }
+
+
         async function editarServicoItem(atestadoId, itemIndex) {
             try {
                 const atestado = await api.get(`/atestados/${atestadoId}`);
@@ -1556,6 +1577,7 @@
                 const parsed = extrairItemDescricao(servico);
 
                 // Preencher formulário
+                document.getElementById('modalServicoTitle').textContent = 'Editar Item de Servico';
                 document.getElementById('editServicoAtestadoId').value = atestadoId;
                 document.getElementById('editServicoIndex').value = itemIndex;
                 document.getElementById('editServicoItem').value = servico.item || parsed.item || '';
@@ -1576,6 +1598,7 @@
 
             const atestadoId = document.getElementById('editServicoAtestadoId').value;
             const itemIndex = parseInt(document.getElementById('editServicoIndex').value);
+            const isNew = Number.isNaN(itemIndex) || itemIndex < 0;
             const item = document.getElementById('editServicoItem').value.trim();
             const descricao = document.getElementById('editServicoDescricao').value.trim();
             const quantidade = parseFloat(document.getElementById('editServicoQuantidade').value);
@@ -1589,19 +1612,27 @@
             try {
                 const atestado = await api.get(`/atestados/${atestadoId}`);
 
-                if (!atestado.servicos_json || itemIndex >= atestado.servicos_json.length) {
-                    ui.showAlert('Item nao encontrado', 'error');
-                    return;
-                }
-
                 // Atualizar item no array
-                const novosServicos = [...atestado.servicos_json];
-                novosServicos[itemIndex] = {
-                    item: item || null,
-                    descricao: descricao,
-                    quantidade: quantidade,
-                    unidade: unidade
-                };
+                const novosServicos = [...(atestado.servicos_json || [])];
+                if (isNew) {
+                    novosServicos.push({
+                        item: item || null,
+                        descricao: descricao,
+                        quantidade: quantidade,
+                        unidade: unidade
+                    });
+                } else {
+                    if (itemIndex >= novosServicos.length) {
+                        ui.showAlert('Item nao encontrado', 'error');
+                        return;
+                    }
+                    novosServicos[itemIndex] = {
+                        item: item || null,
+                        descricao: descricao,
+                        quantidade: quantidade,
+                        unidade: unidade
+                    };
+                }
 
                 // Atualizar atestado via PATCH
                 await api.patch(`/atestados/${atestadoId}/servicos`, {
@@ -1609,7 +1640,7 @@
                 });
 
                 fecharModal('modalEditarServico');
-                ui.showAlert('Item atualizado com sucesso!', 'success');
+                ui.showAlert(isNew ? 'Item adicionado com sucesso!' : 'Item atualizado com sucesso!', 'success');
                 carregarAtestados();
             } catch (error) {
                 ui.showAlert(error.message || 'Erro ao salvar item', 'error');
@@ -1627,6 +1658,8 @@
 
             // Ordenar serviços pelo código do item
             const servicosOrdenados = ordenarServicosPorItem(servicosComIndice);
+
+            const isOpen = openServicosByAtestado.has(atestado.id);
 
             const servicosHtml = servicosOrdenados.map((s) => {
                 const parsed = extrairItemDescricao(s);
@@ -1646,11 +1679,11 @@
 
             return `
                 <div style="margin-top: var(--spacing-md);">
-                    <button class="servicos-toggle" onclick="toggleServicos(this)">
-                        <span class="chevron">&#9654;</span>
+                    <button class="servicos-toggle" onclick="toggleServicos(this, ${atestado.id})">
+                        <span class="chevron">${isOpen ? '&#9660;' : '&#9654;'}</span>
                         Ver detalhes (${atestado.servicos_json.length} servico(s))
                     </button>
-                    <div class="servicos-lista">
+                    <div class="servicos-lista ${isOpen ? 'active' : ''}">
                         ${servicosHtml}
                     </div>
                 </div>
@@ -1658,12 +1691,19 @@
         }
 
         // Toggle para expandir/recolher lista de serviços
-        function toggleServicos(btn) {
+        function toggleServicos(btn, atestadoId) {
             const lista = btn.nextElementSibling;
             const chevron = btn.querySelector('.chevron');
 
-            lista.classList.toggle('active');
-            chevron.innerHTML = lista.classList.contains('active') ? '&#9660;' : '&#9654;';
+            const isOpen = lista.classList.toggle('active');
+            chevron.innerHTML = isOpen ? '&#9660;' : '&#9654;';
+            if (atestadoId !== undefined && atestadoId !== null) {
+                if (isOpen) {
+                    openServicosByAtestado.add(atestadoId);
+                } else {
+                    openServicosByAtestado.delete(atestadoId);
+                }
+            }
         }
 
         // Abre modal com resultado consolidado do atestado
@@ -1686,16 +1726,18 @@
                 return { item: servico.item, descricao: descricaoOriginal };
             }
         
-            const itemRegex = /^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*/;
+            const itemRegex = /^(S\d+-|AD\d*-)?(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*/i;
             const match = descricaoOriginal.match(itemRegex);
             if (!match) {
                 return { item: null, descricao: descricaoOriginal };
             }
         
-            const item = match[1]
+            const prefix = (match[1] || '').toUpperCase();
+            const itemBase = match[2]
                 .replace(/\s+/g, '.')
                 .replace(/\.+/g, '.')
                 .replace(/^\.+|\.+$/g, '');
+            const item = `${prefix}${itemBase}`;
             const descricao = descricaoOriginal.replace(itemRegex, '').trim();
             return { item, descricao: descricao || descricaoOriginal };
         }
@@ -1710,48 +1752,91 @@
                 .replace('M^3', 'M3')
                 .replace(/\s+/g, '');
         }
-        
-        // Remove codigo do item (ex: "001.03.11" -> "")
-        function removerCodigoItem(descricao) {
-            // Padrão: 3 dígitos + separador + 2 dígitos + separador + 2 dígitos + espaço
-            // Ex: "001.03.11 PORTÃO..." -> "PORTÃO..."
-            return descricao.replace(/^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*/, '').trim();
+
+        function normalizarDescricaoParaAgrupamento(descricao) {
+            return (descricao || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toUpperCase()
+                .replace(/[^A-Z0-9]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
-        // Compara dois códigos de item numericamente
-        // Itens numéricos vêm primeiro, depois itens com prefixo AD
-        // Ex: "1.1" < "1.2" < "2.1" < "AD-1.1" < "AD-1.2" < "AD-2.1"
-        function compararItens(a, b) {
-            const itemA = a.item || '';
-            const itemB = b.item || '';
-
-            // Verificar se começa com número (item do contrato) ou AD (item do aditivo)
-            const isNumericA = /^\d/.test(itemA);
-            const isNumericB = /^\d/.test(itemB);
-
-            // Primeiro: itens numéricos vêm antes de itens com AD
-            if (isNumericA !== isNumericB) {
-                return isNumericA ? -1 : 1;
+        function parseItemSortKey(item) {
+            const raw = (item || '').toString().trim();
+            if (!raw) {
+                return { prefixWeight: 99, prefixValue: 0, parts: [], suffix: 0, raw: '' };
             }
 
-            // Extrair número do item (removendo prefixo AD- ou ADx- se existir)
-            const itemNumA = itemA.replace(/^AD\d?-/, '');
-            const itemNumB = itemB.replace(/^AD\d?-/, '');
+            let prefixWeight = 0;
+            let prefixValue = 0;
+            let core = raw;
 
-            // Comparar partes numéricas do item
-            const partesA = itemNumA.split('.').map(p => parseInt(p, 10) || 0);
-            const partesB = itemNumB.split('.').map(p => parseInt(p, 10) || 0);
+            const restartMatch = core.match(/^S(\d+)-(.+)$/i);
+            if (restartMatch) {
+                prefixWeight = 1;
+                prefixValue = parseInt(restartMatch[1], 10) || 0;
+                core = restartMatch[2].trim();
+            }
 
-            const maxLen = Math.max(partesA.length, partesB.length);
-            for (let i = 0; i < maxLen; i++) {
-                const valA = partesA[i] || 0;
-                const valB = partesB[i] || 0;
-                if (valA !== valB) {
-                    return valA - valB;
+            const aditivoMatch = core.match(/^AD(\d*)-(.+)$/i);
+            if (aditivoMatch) {
+                prefixWeight = 2;
+                prefixValue = aditivoMatch[1] ? parseInt(aditivoMatch[1], 10) : 1;
+                core = aditivoMatch[2].trim();
+            }
+
+            let suffix = 0;
+            const suffixMatch = core.match(/^(.+)-([A-Z])$/i);
+            if (suffixMatch) {
+                core = suffixMatch[1].trim();
+                suffix = suffixMatch[2].toUpperCase().charCodeAt(0) - 64;
+            }
+
+            const parts = core.split('.').map(part => {
+                const digits = part.replace(/\D/g, '');
+                return digits ? parseInt(digits, 10) : 0;
+            });
+
+            return { prefixWeight, prefixValue, parts, suffix, raw };
+        }
+
+        function compararItens(a, b) {
+            const itemA = (extrairItemDescricao(a).item || '').toString();
+            const itemB = (extrairItemDescricao(b).item || '').toString();
+
+            if (!itemA && !itemB) return 0;
+            if (!itemA) return 1;
+            if (!itemB) return -1;
+
+            const keyA = parseItemSortKey(itemA);
+            const keyB = parseItemSortKey(itemB);
+
+            if (keyA.prefixWeight !== keyB.prefixWeight) {
+                return keyA.prefixWeight - keyB.prefixWeight;
+            }
+            if (keyA.prefixValue !== keyB.prefixValue) {
+                return keyA.prefixValue - keyB.prefixValue;
+            }
+
+            const maxLen = Math.max(keyA.parts.length, keyB.parts.length);
+            for (let i = 0; i < maxLen; i += 1) {
+                const partA = keyA.parts[i] ?? 0;
+                const partB = keyB.parts[i] ?? 0;
+                if (partA !== partB) {
+                    return partA - partB;
                 }
             }
-            return 0;
+
+            if (keyA.suffix !== keyB.suffix) {
+                return keyA.suffix - keyB.suffix;
+            }
+
+            return itemA.localeCompare(itemB, 'pt-BR', { numeric: true });
         }
+
 
         // Ordena serviços pelo código do item
         function ordenarServicosPorItem(servicos) {
@@ -1764,13 +1849,16 @@
             servicos.forEach(s => {
                 const parsed = extrairItemDescricao(s);
                 const unidade = normalizarUnidade(s.unidade);
-                const chave = `${parsed.descricao.toUpperCase()}|||${unidade}`;
+                const descricaoKey = normalizarDescricaoParaAgrupamento(parsed.descricao);
+                const chave = `${descricaoKey || (parsed.descricao || '').toUpperCase().trim()}|||${unidade}`;
                 if (!agrupados[chave]) {
                     agrupados[chave] = {
                         descricao: parsed.descricao,
                         unidade: unidade,
                         quantidade: 0
                     };
+                } else if (parsed.descricao && parsed.descricao.length > agrupados[chave].descricao.length) {
+                    agrupados[chave].descricao = parsed.descricao;
                 }
                 agrupados[chave].quantidade += parseFloat(s.quantidade) || 0;
             });

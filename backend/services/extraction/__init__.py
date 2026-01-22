@@ -19,6 +19,7 @@ from .table_processor import (
     parse_item_tuple,
     item_tuple_to_str,
     parse_quantity,
+    is_valid_item_context,
     score_item_column,
     detect_header_row,
     guess_columns_by_header,
@@ -52,17 +53,6 @@ from .quality_assessor import (
     compute_quality_score,
 )
 
-from .base_extractor import (
-    BaseExtractor,
-    ExtractionMethod,
-    ExtractionResult,
-)
-
-from .native_text import NativeTextExtractor
-from .local_ocr import LocalOCRExtractor
-from .cloud_ocr import CloudOCRExtractor
-from .vision_ai import VisionAIExtractor
-
 __all__ = [
     # text_normalizer
     'normalize_description',
@@ -76,6 +66,7 @@ __all__ = [
     'parse_item_tuple',
     'item_tuple_to_str',
     'parse_quantity',
+    'is_valid_item_context',
     'score_item_column',
     'detect_header_row',
     'guess_columns_by_header',
@@ -103,13 +94,4 @@ __all__ = [
     'compute_description_quality',
     'is_ocr_noisy',
     'compute_quality_score',
-    # base_extractor
-    'BaseExtractor',
-    'ExtractionMethod',
-    'ExtractionResult',
-    # extractors
-    'NativeTextExtractor',
-    'LocalOCRExtractor',
-    'CloudOCRExtractor',
-    'VisionAIExtractor',
 ]

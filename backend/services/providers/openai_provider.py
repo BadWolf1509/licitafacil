@@ -78,6 +78,7 @@ class OpenAIProvider(BaseAIProvider):
 
         try:
             start_time = time.time()
+            assert self._client is not None
             response = self._client.chat.completions.create(
                 model=self._text_model,
                 messages=[
@@ -140,6 +141,7 @@ class OpenAIProvider(BaseAIProvider):
                 })
 
             start_time = time.time()
+            assert self._client is not None
             response = self._client.chat.completions.create(
                 model=self._vision_model,
                 messages=[
@@ -176,6 +178,11 @@ class OpenAIProvider(BaseAIProvider):
         """Extrai informações de atestado a partir de texto."""
         from services.ai_analyzer import ai_analyzer
         return ai_analyzer.extract_atestado_info(texto)
+
+    def extract_atestado_metadata(self, texto: str) -> Dict[str, Any]:
+        """Extrai apenas metadados de atestado a partir de texto."""
+        from services.ai_analyzer import ai_analyzer
+        return ai_analyzer.extract_atestado_metadata(texto)
 
     def extract_edital_requirements(self, texto: str) -> List[Dict[str, Any]]:
         """Extrai requisitos de edital."""

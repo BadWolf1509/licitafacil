@@ -26,6 +26,7 @@ class GeminiAnalyzer:
             self._client = None
             self._model = None
         else:
+            allow_legacy = AIModelConfig.GEMINI_ALLOW_LEGACY
             try:
                 from google import genai
                 from google.genai import types
@@ -35,15 +36,19 @@ class GeminiAnalyzer:
                 self._model = AIModelConfig.GEMINI_MODEL
                 self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
             except ImportError:
-                try:
-                    import google.generativeai as genai_old
-                    genai_old.configure(api_key=api_key)
-                    self._client = genai_old
-                    self._model = AIModelConfig.GEMINI_MODEL
-                    self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
-                except ImportError:
+                if not allow_legacy:
                     self._client = None
                     self._model = None
+                else:
+                    try:
+                        import google.generativeai as genai_old
+                        genai_old.configure(api_key=api_key)
+                        self._client = genai_old
+                        self._model = AIModelConfig.GEMINI_MODEL
+                        self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
+                    except ImportError:
+                        self._client = None
+                        self._model = None
 
     @property
     def is_configured(self) -> bool:
@@ -230,6 +235,50 @@ INSTRUÇÕES:
                 "servicos": []
             }
 
+    def extract_atestado_metadata(self, texto: str) -> Dict[str, Any]:
+        """
+        Extrai apenas metadados do atestado (sem lista de servi‡os).
+        """
+        system_prompt = """Vocˆ ‚ um especialista em an lise de atestados de capacidade t‚cnica para licita‡äes p£blicas no Brasil.
+
+Extraia APENAS os metadados do documento, sem listar servi‡os:
+1. descricao_servico: descri‡Æo resumida da obra/servi‡o principal
+2. contratante: nome do contratante
+3. quantidade: valor do contrato em R$ (opcional)
+4. unidade: "R$" quando houver valor do contrato (opcional)
+5. data_emissao: data de emissÆo (YYYY-MM-DD, opcional)
+
+Retorne APENAS um JSON v lido. Se algum campo nÆo estiver dispon¡vel, use null.
+
+Formato:
+{
+    "descricao_servico": "...",
+    "quantidade": 0.0,
+    "unidade": "R$",
+    "contratante": "...",
+    "data_emissao": "YYYY-MM-DD"
+}"""
+
+        try:
+            response = self._call_gemini(system_prompt, f"Analise este atestado e extraia apenas os metadados:\n\n{texto}")
+            response = clean_json_response(response)
+            result = json.loads(response)
+            return {
+                "descricao_servico": result.get("descricao_servico"),
+                "quantidade": result.get("quantidade"),
+                "unidade": result.get("unidade"),
+                "contratante": result.get("contratante"),
+                "data_emissao": result.get("data_emissao")
+            }
+        except json.JSONDecodeError:
+            return {
+                "descricao_servico": None,
+                "quantidade": None,
+                "unidade": None,
+                "contratante": None,
+                "data_emissao": None
+            }
+
     def extract_atestado_info(self, texto: str) -> Dict[str, Any]:
         """
         Extrai informações de um atestado de capacidade técnica a partir de texto.
@@ -289,26 +338,31 @@ REGRAS:
         Returns:
             Lista de exigências extraídas
         """
-        system_prompt = """Você é um especialista em licitações públicas no Brasil.
+        system_prompt = """Voce e um especialista em licitacoes publicas no Brasil.
 
-Analise o texto e extraia as exigências de qualificação técnica.
+Analise o texto e extraia as exigencias de qualificacao tecnica.
 
-FORMATO DE SAÍDA (JSON):
+FORMATO DE SAIDA (JSON):
 {
     "exigencias": [
         {
-            "descricao": "Descrição do serviço exigido",
+            "descricao": "Descricao do servico exigido",
             "quantidade_minima": 100.0,
             "unidade": "M2",
-            "percentual_minimo": 50.0
+            "percentual_exigido": 50.0,
+            "permitir_soma": null,
+            "exige_unico": null
         }
     ]
 }
 
 REGRAS:
-- Identifique quantitativos mínimos exigidos
-- Use o percentual mencionado (geralmente 50%)
-- Converta números BR para padrão"""
+- Identifique quantitativos minimos exigidos
+- Use o percentual mencionado quando houver (ex: 50%)
+- Se o edital vedar soma de atestados, marque permitir_soma=false e exige_unico=true
+- Se o edital permitir soma, marque permitir_soma=true e exige_unico=false
+- Se nao houver regra explicita, use null para permitir_soma e exige_unico
+- Converta numeros BR para padrao"""
 
         try:
             response = self._call_gemini(system_prompt, f"Analise este edital:\n\n{texto}")

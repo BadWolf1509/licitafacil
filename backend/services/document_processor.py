@@ -6,19 +6,19 @@ Inclui processamento paralelo opcional para melhor performance.
 """
 
 from typing import Dict, Any, List, Optional
+from collections import Counter
 from pathlib import Path
-import io
 import re
 import pdfplumber
-import fitz  # PyMuPDF
-from PIL import Image
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
 
 from .pdf_extractor import pdf_extractor
 from .ocr_service import ocr_service
 from .ai_provider import ai_provider
+from .matching_service import matching_service
 from .document_ai_service import document_ai_service
+from .pdf_extraction_service import pdf_extraction_service, ProcessingCancelled  # noqa: F401 (re-export)
+from .table_extraction_service import table_extraction_service
+from .document_analysis_service import document_analysis_service
 # Módulos extraídos para migração gradual - noqa: F401
 from .pdf_converter import pdf_converter  # noqa: F401
 from .extraction import (  # noqa: F401
@@ -71,23 +71,16 @@ from exceptions import (
     AzureAPIError,
     OpenAIError,
 )
-from .text_utils import is_garbage_text
-from config import (
-    OCR_PARALLEL_ENABLED,
-    OCR_MAX_WORKERS,
-    AtestadoProcessingConfig as APC,
-)
+from config import AtestadoProcessingConfig as APC
 
 from logging_config import get_logger
 logger = get_logger('services.document_processor')
 
 
-class ProcessingCancelled(Exception):
-    """Processamento cancelado pelo usuario."""
-
-
 class DocumentProcessor:
     """Processador integrado de documentos."""
+
+    # ==================== Delegação ao PDFExtractionService ====================
 
     def _pdf_to_images(
         self,
@@ -97,37 +90,10 @@ class DocumentProcessor:
         cancel_check=None,
         stage: str = "vision"
     ) -> List[bytes]:
-        """
-        Converte páginas de PDF em imagens PNG.
-
-        Args:
-            file_path: Caminho para o arquivo PDF
-            dpi: Resolução em DPI (300 para melhor qualidade de OCR)
-
-        Returns:
-            Lista de imagens em bytes (PNG)
-        """
-        images = []
-        doc = fitz.open(file_path)
-        zoom = dpi / 72
-        matrix = fitz.Matrix(zoom, zoom)
-
-        total_pages = doc.page_count
-        for page_index, page in enumerate(doc):
-            self._check_cancel(cancel_check)
-            self._notify_progress(
-                progress_callback,
-                page_index + 1,
-                total_pages,
-                stage,
-                f"Convertendo pagina {page_index + 1} de {total_pages}"
-            )
-            pix = page.get_pixmap(matrix=matrix)
-            img_bytes = pix.tobytes("png")
-            images.append(img_bytes)
-
-        doc.close()
-        return images
+        """Delega conversão de PDF para imagens ao PDFExtractionService."""
+        return pdf_extraction_service.pdf_to_images(
+            file_path, dpi, progress_callback, cancel_check, stage
+        )
 
     def _extract_pdf_with_ocr_fallback(
         self,
@@ -135,173 +101,22 @@ class DocumentProcessor:
         progress_callback=None,
         cancel_check=None
     ) -> str:
-        """
-        Extrai texto de PDF, aplicando OCR em páginas que são imagens.
-
-        Args:
-            file_path: Caminho para o arquivo PDF
-
-        Returns:
-            Texto completo extraído (texto + OCR)
-        """
-        MIN_TEXT_PER_PAGE = 200  # Mínimo de caracteres para considerar página como texto
-        text_parts = []
-        pages_needing_ocr = []
-
-        try:
-            # Primeiro, tentar extrair texto de cada página
-            with pdfplumber.open(file_path) as pdf:
-                total_pages = len(pdf.pages)
-                for i, page in enumerate(pdf.pages):
-                    self._check_cancel(cancel_check)
-                    self._notify_progress(
-                        progress_callback,
-                        i + 1,
-                        total_pages,
-                        "texto",
-                        f"Extraindo texto da pagina {i + 1} de {total_pages}"
-                    )
-                    page_text = page.extract_text() or ""
-                    text_stripped = page_text.strip()
-
-                    # Se a página tem pouco texto OU texto é lixo/marca d'água, marcar para OCR
-                    needs_ocr = len(text_stripped) < MIN_TEXT_PER_PAGE or is_garbage_text(text_stripped)
-
-                    if needs_ocr:
-                        pages_needing_ocr.append(i)
-                        text_parts.append(f"[PÁGINA {i+1} - AGUARDANDO OCR]")
-                    else:
-                        text_parts.append(f"Página {i+1}/{len(pdf.pages)}\n{page_text}")
-
-            # Se há páginas que precisam de OCR, processar
-            if pages_needing_ocr:
-                import fitz
-                doc = fitz.open(file_path)
-                zoom = 300 / 72  # 300 DPI para melhor qualidade de OCR
-                matrix = fitz.Matrix(zoom, zoom)
-
-                total_ocr = len(pages_needing_ocr)
-                for ocr_index, page_idx in enumerate(pages_needing_ocr):
-                    self._check_cancel(cancel_check)
-                    self._notify_progress(
-                        progress_callback,
-                        ocr_index + 1,
-                        total_ocr,
-                        "ocr",
-                        f"OCR na pagina {ocr_index + 1} de {total_ocr}"
-                    )
-                    try:
-                        page = doc[page_idx]
-                        pix = page.get_pixmap(matrix=matrix)
-                        img_bytes = pix.tobytes("png")
-
-                        # Aplicar OCR na página
-                        ocr_text = ocr_service.extract_text_from_bytes(img_bytes)
-
-                        if ocr_text and len(ocr_text.strip()) > 20:
-                            # Substituir placeholder pelo texto do OCR
-                            placeholder = f"[PÁGINA {page_idx+1} - AGUARDANDO OCR]"
-                            text_parts = [
-                                f"Página {page_idx+1}/{len(doc)}\n{ocr_text}" if part == placeholder else part
-                                for part in text_parts
-                            ]
-                    except OCRError as e:
-                        logger.warning(f"Erro no OCR da pagina {page_idx+1}: {e}")
-
-                doc.close()
-
-            return "\n\n".join(text_parts)
-
-        except (IOError, ValueError, RuntimeError, PDFError, OCRError) as e:
-            raise PDFError("processar", str(e))
+        """Delega extração de texto com OCR ao PDFExtractionService."""
+        return pdf_extraction_service.extract_text_with_ocr_fallback(
+            file_path, progress_callback, cancel_check
+        )
 
     def _notify_progress(self, progress_callback, current: int, total: int, stage: str, message: str):
-        if progress_callback:
-            progress_callback(current, total, stage, message)
+        """Delega notificação de progresso ao PDFExtractionService."""
+        pdf_extraction_service._notify_progress(progress_callback, current, total, stage, message)
 
     def _check_cancel(self, cancel_check):
-        if cancel_check and cancel_check():
-            raise ProcessingCancelled("Processamento cancelado.")
-
-    def _ocr_single_page(self, args) -> tuple:
-        """Processa uma única página para OCR (usado em paralelo)."""
-        page_index, image_bytes = args
-        try:
-            page_text = ocr_service.extract_text_from_bytes(image_bytes)
-            if page_text.strip():
-                return (page_index, f"--- Pagina {page_index + 1} ---\n{page_text}")
-            return (page_index, "")
-        except OCRError as e:
-            logger.debug(f"Erro OCR na pagina {page_index + 1}: {e}")
-            return (page_index, f"--- Pagina {page_index + 1} ---\n[Erro no OCR: {e}]")
+        """Delega verificação de cancelamento ao PDFExtractionService."""
+        pdf_extraction_service._check_cancel(cancel_check)
 
     def _ocr_image_list(self, image_list, progress_callback=None, cancel_check=None) -> str:
-        total = len(image_list)
-
-        # Usar processamento paralelo se habilitado e houver múltiplas páginas
-        if OCR_PARALLEL_ENABLED and total > 1:
-            return self._ocr_image_list_parallel(image_list, progress_callback, cancel_check)
-
-        # Processamento sequencial (padrão)
-        all_texts = []
-        for i, image_bytes in enumerate(image_list):
-            self._check_cancel(cancel_check)
-            self._notify_progress(
-                progress_callback,
-                i + 1,
-                total,
-                "ocr",
-                f"OCR na pagina {i + 1} de {total}"
-            )
-            try:
-                page_text = ocr_service.extract_text_from_bytes(image_bytes)
-                if page_text.strip():
-                    all_texts.append(f"--- Pagina {i + 1} ---\n{page_text}")
-            except OCRError as e:
-                logger.debug(f"Erro OCR na pagina {i + 1}: {e}")
-                all_texts.append(f"--- Pagina {i + 1} ---\n[Erro no OCR: {e}]")
-
-        return "\n\n".join(all_texts)
-
-    def _ocr_image_list_parallel(self, image_list, progress_callback=None, cancel_check=None) -> str:
-        """
-        Processa múltiplas páginas em paralelo.
-        Útil quando há muitas páginas e CPU com múltiplos núcleos.
-        """
-        total = len(image_list)
-        results = {}
-        completed_count = 0
-        lock = threading.Lock()
-
-        def update_progress():
-            nonlocal completed_count
-            with lock:
-                completed_count += 1
-                self._notify_progress(
-                    progress_callback,
-                    completed_count,
-                    total,
-                    "ocr",
-                    f"OCR paralelo: {completed_count} de {total} paginas"
-                )
-
-        with ThreadPoolExecutor(max_workers=OCR_MAX_WORKERS) as executor:
-            # Submeter todas as páginas para processamento
-            futures = {
-                executor.submit(self._ocr_single_page, (i, img)): i
-                for i, img in enumerate(image_list)
-            }
-
-            # Coletar resultados conforme completam
-            for future in as_completed(futures):
-                self._check_cancel(cancel_check)
-                page_index, text = future.result()
-                results[page_index] = text
-                update_progress()
-
-        # Ordenar resultados por índice de página
-        all_texts = [results[i] for i in sorted(results.keys()) if results[i]]
-        return "\n\n".join(all_texts)
+        """Delega OCR de lista de imagens ao PDFExtractionService."""
+        return pdf_extraction_service.ocr_image_list(image_list, progress_callback, cancel_check)
 
     def _remove_duplicate_pairs(self, servicos: list) -> list:
         """
@@ -321,18 +136,21 @@ class DocumentProcessor:
         for s in servicos:
             item = s.get("item")
             if item:
-                by_item_code[str(item)] = s
+                planilha_id = s.get("_planilha_id") or 0
+                by_item_code[(planilha_id, str(item))] = s
 
         # Identificar itens a remover
         items_to_remove = set()
 
-        for item_code, servico in by_item_code.items():
+        for item_key, servico in by_item_code.items():
+            planilha_id, item_code = item_key
             # Verificar se existe item pai (X.Y para X.Y.1)
             parts = item_code.split(".")
             if len(parts) >= 2:
                 parent_code = ".".join(parts[:-1])
-                if parent_code in by_item_code:
-                    parent = by_item_code[parent_code]
+                parent_key = (planilha_id, parent_code)
+                if parent_key in by_item_code:
+                    parent = by_item_code[parent_key]
 
                     # Comparar quantidade
                     qty_filho = parse_quantity(servico.get("quantidade"))
@@ -366,27 +184,80 @@ class DocumentProcessor:
 
                         # Caso 1: Pai é header curto - remover pai, manter filho
                         if len(desc_pai_norm) < 20:
-                            items_to_remove.add(parent_code)
+                            items_to_remove.add(parent_key)
                         # Caso 2: Itens do aditivo (11.x) - manter filho (são os serviços reais)
                         elif parent_code.startswith("11"):
-                            items_to_remove.add(parent_code)
+                            items_to_remove.add(parent_key)
                         # Caso 3: Itens do contrato - remover filho (provavelmente fantasma do OCR)
                         else:
-                            items_to_remove.add(item_code)
+                            items_to_remove.add(item_key)
 
         # Filtrar serviços removendo os duplicados
-        return [s for s in servicos if s.get("item") not in items_to_remove]
+        return [
+            s for s in servicos
+            if (s.get("_planilha_id") or 0, s.get("item")) not in items_to_remove
+        ]
+
+    def _filter_section_headers(self, servicos: list) -> list:
+        """
+        Remove cabeçalhos de seção que não são itens reais.
+
+        Cabeçalhos de seção são itens como "1.4.10 COBERTURA" que servem apenas
+        para agrupar sub-itens (1.4.10.1, 1.4.10.2, etc.) e não devem ser
+        contabilizados como serviços.
+
+        Critérios para identificar cabeçalhos:
+        1. Descrição muito curta (menos de 25 caracteres)
+        2. Tem pelo menos um item filho (código que começa com o código do pai + ".")
+
+        Args:
+            servicos: Lista de serviços
+
+        Returns:
+            Lista filtrada sem cabeçalhos de seção
+        """
+        if not servicos:
+            return servicos
+
+        # Construir set de códigos para busca rápida
+        all_codes = set()
+        for s in servicos:
+            code = s.get("item")
+            if code:
+                # Remover prefixo S1-, S2-, etc.
+                clean_code = re.sub(r'^S\d+-', '', str(code))
+                all_codes.add(clean_code)
+
+        filtered = []
+        removed = 0
+        for s in servicos:
+            code = s.get("item")
+            desc = s.get("descricao") or ""
+
+            # Só verificar itens com código e descrição curta
+            if code and len(desc.strip()) < 25:
+                clean_code = re.sub(r'^S\d+-', '', str(code))
+                # Verificar se tem filhos (códigos que começam com este + ".")
+                has_children = any(
+                    c.startswith(clean_code + ".") for c in all_codes if c != clean_code
+                )
+                if has_children:
+                    removed += 1
+                    logger.info(f"[FILTRO] Removido cabeçalho de seção: {code} ({desc[:30]})")
+                    continue
+
+            filtered.append(s)
+
+        if removed > 0:
+            logger.info(f"[FILTRO] {removed} cabeçalhos de seção removidos")
+
+        return filtered
 
     def _filter_items_without_quantity(self, servicos: list) -> list:
         """
-        Remove itens que não têm quantidade definida.
+        Remove itens que nao tem quantidade definida.
 
-        Itens sem quantidade geralmente são headers de seção ou linhas de título
-        que foram erroneamente extraídos como serviços.
-
-        Preserva itens do aditivo que foram prefixados (têm _section metadata),
-        pois esses itens foram identificados como tendo quantidade no texto original
-        mesmo que a extração não tenha capturado a quantidade corretamente.
+        Filtro estrito: remove itens com quantidade nula ou zero.
         """
         if not servicos:
             return servicos
@@ -394,7 +265,6 @@ class DocumentProcessor:
         return [
             s for s in servicos
             if parse_quantity(s.get("quantidade")) not in (None, 0)
-            or s.get("_section")  # Preservar itens do aditivo prefixados
         ]
 
     def _filter_items_without_code(self, servicos: list, min_items_with_code: int = 5) -> list:
@@ -435,6 +305,1537 @@ class DocumentProcessor:
 
         return com_codigo
 
+    def _normalize_item_code(self, item: Any) -> Optional[str]:
+        if item is None:
+            return None
+        item_str = str(item).strip()
+        if not item_str:
+            return None
+        if item_str.upper().startswith("AD-"):
+            item_str = item_str[3:].strip()
+        item_tuple = parse_item_tuple(item_str)
+        if not item_tuple:
+            return None
+        return item_tuple_to_str(item_tuple)
+
+    def _item_code_in_text(self, item_code: str, texto: str) -> bool:
+        if not item_code or not texto:
+            return False
+        escaped = re.escape(item_code)
+        escaped = escaped.replace(r"\.", r"\s*\.\s*")
+        pattern = rf"(?<!\d){escaped}(?!\d)"
+        return re.search(pattern, texto) is not None
+
+    def _count_item_codes_in_text(self, texto: str) -> int:
+        if not texto:
+            return 0
+        codes = set()
+        pattern = re.compile(r'(?<!\d)(\d{1,3}\s*\.\s*\d{1,3}(?:\s*\.\s*\d{1,3}){0,3})(?!\d)')
+        for match in pattern.finditer(texto):
+            raw = match.group(1)
+            raw = re.sub(r'\s+', '', raw)
+            item_tuple = parse_item_tuple(raw)
+            if item_tuple:
+                codes.add(item_tuple_to_str(item_tuple))
+        return len(codes)
+
+    def _extract_item_codes_from_text_lines(self, texto: str) -> list:
+        if not texto:
+            return []
+        codes = []
+        lines = texto.split('\n')
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(r'^(\d+\.\d+(?:\.\d+){0,3})\b', line)
+            item_raw = None
+            if match:
+                item_raw = match.group(1)
+            else:
+                matches = re.findall(r'(?<!\d)(\d+\.\d+(?:\.\d+){0,3})(?!\d)', line)
+                if matches:
+                    item_raw = matches[0]
+            if not item_raw:
+                continue
+            item_tuple = parse_item_tuple(item_raw)
+            if not item_tuple:
+                continue
+            codes.append(item_tuple_to_str(item_tuple))
+        return codes
+
+    def _extract_items_from_text_lines(self, texto: str) -> list:
+        if not texto:
+            return []
+        items = []
+        lines = texto.split('\n')
+        segment_index = 1
+        last_tuple = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            match = re.match(r'^(\d+\.\d+(?:\.\d+){0,3})\s+(.+)$', line)
+            if not match:
+                continue
+            item_raw = match.group(1)
+            rest = match.group(2).strip()
+            unit_match = re.search(r'\b([A-Za-z0-9\u00ba\u00b0/%\u00b2\u00b3\.]+)\s+([\d.,]+)\s*$', rest)
+            if not unit_match:
+                continue
+            unit_raw = unit_match.group(1)
+            qty_raw = unit_match.group(2)
+            if parse_quantity(qty_raw) is None:
+                continue
+            item_tuple = parse_item_tuple(item_raw)
+            if not item_tuple:
+                continue
+            if last_tuple and item_tuple < last_tuple:
+                segment_index += 1
+            last_tuple = item_tuple
+            desc = rest[:unit_match.start()].strip()
+            unit_norm = normalize_unit(unit_raw)
+            if not unit_norm:
+                continue
+            prefix = f"S{segment_index}-" if segment_index > 1 else ""
+            items.append({
+                'item': f"{prefix}{item_tuple_to_str(item_tuple)}",
+                'descricao': desc,
+                'unidade': unit_norm,
+                'quantidade': qty_raw,
+                '_source': 'text_line'
+            })
+        return items
+
+    def _split_text_by_pages(self, texto: str) -> list:
+        if not texto:
+            return []
+        matches = list(re.finditer(r'P[aá]gina\s+(\d+)\s*/\s*(\d+)', texto, re.IGNORECASE))
+        if not matches:
+            return []
+        segments = []
+        for idx, match in enumerate(matches):
+            start = match.start()
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else len(texto)
+            try:
+                page_num = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            segments.append((page_num, texto[start:end]))
+        merged = {}
+        order = []
+        for page_num, segment in segments:
+            if page_num not in merged:
+                order.append(page_num)
+                merged[page_num] = segment
+            else:
+                merged[page_num] += "\n" + segment
+        return [(page_num, merged[page_num]) for page_num in order]
+
+    def _detect_planilha_signature(self, texto: str) -> Optional[str]:
+        normalized = normalize_description(texto or "")
+        if not normalized:
+            return None
+        has_orcamento = "ORCAMENTO" in normalized
+        has_fisico = "FISICO" in normalized
+        has_geobras = "GEOBRAS" in normalized
+        has_contrato = "CONTRATO" in normalized
+        if has_fisico:
+            if has_geobras or has_contrato:
+                return "FISICO_CONTRATO"
+            return "FISICO"
+        if has_orcamento:
+            return "ORCAMENTO"
+        return None
+
+    def _build_page_planilha_map(self, page_segments: list) -> tuple[Dict[int, int], list]:
+        if not page_segments:
+            return {}, []
+        page_map: Dict[int, int] = {}
+        audit: list = []
+        current_sig = None
+        planilha_id = 0
+        found_signature = False
+        for page_num, page_text in page_segments:
+            sig = self._detect_planilha_signature(page_text)
+            if sig:
+                found_signature = True
+                if sig != current_sig:
+                    planilha_id += 1
+                    current_sig = sig
+            page_map[page_num] = planilha_id if planilha_id else 0
+            audit.append({
+                "page": page_num,
+                "planilha_id": page_map[page_num],
+                "signature": sig or current_sig
+            })
+        if not found_signature:
+            return {}, []
+        return page_map, audit
+
+    def _apply_page_planilha_map(self, servicos: list, page_map: Dict[int, int]) -> int:
+        if not servicos or not page_map:
+            return 0
+        remapped = 0
+        for servico in servicos:
+            page = servico.get("_page")
+            if page is None:
+                continue
+            try:
+                page_num = int(page)
+            except (TypeError, ValueError):
+                continue
+            target_id = page_map.get(page_num)
+            if not target_id:
+                continue
+            current_id = int(servico.get("_planilha_id") or 0)
+            if current_id != target_id:
+                servico["_planilha_id"] = target_id
+                servico.pop("_planilha_label", None)
+                remapped += 1
+        return remapped
+
+    def _split_restart_prefix(self, item: Any) -> tuple[Optional[str], str]:
+        item_str = str(item or "").strip()
+        if not item_str:
+            return None, ""
+        match = re.match(r'^(S\d+)-(.+)$', item_str, re.IGNORECASE)
+        if match:
+            return match.group(1).upper(), match.group(2).strip()
+        return None, item_str
+
+    def _build_restart_prefix_maps(self, servicos: list) -> tuple[Dict[tuple, str], Dict[str, str]]:
+        prefix_map: Dict[tuple, str] = {}
+        prefixes_by_code: Dict[str, set] = {}
+        codes_without_prefix: set = set()
+        for servico in servicos or []:
+            if servico.get("_section") == "AD":
+                continue
+            prefix, core = self._split_restart_prefix(servico.get("item"))
+            code = self._normalize_item_code(core)
+            if not code:
+                continue
+            if not prefix:
+                codes_without_prefix.add(code)
+                continue
+            unit = normalize_unit(servico.get("unidade") or "")
+            qty = parse_quantity(servico.get("quantidade"))
+            prefix_map[(code, unit, qty)] = prefix
+            prefixes_by_code.setdefault(code, set()).add(prefix)
+        unique_prefix_by_code = {
+            code: next(iter(prefixes))
+            for code, prefixes in prefixes_by_code.items()
+            if len(prefixes) == 1 and code not in codes_without_prefix
+        }
+        return prefix_map, unique_prefix_by_code
+
+    def _merge_fragmented_planilhas(self, servicos: list) -> list:
+        """
+        Mescla planilhas fragmentadas que deveriam ser uma só.
+
+        Critério de mesclagem:
+        - Planilhas com baixo overlap (< MIN_OVERLAP) são candidatas a mesclagem
+        - Planilhas sem _page são mescladas com a planilha principal (maior)
+        - Resultado: planilhas corretamente agrupadas
+        """
+        if not servicos:
+            return servicos
+
+        # Agrupa serviços por planilha
+        servicos_by_planilha: dict = {}
+        codes_by_planilha: dict = {}
+        pages_by_planilha: dict = {}
+
+        for servico in servicos:
+            planilha_id = int(servico.get("_planilha_id") or 0)
+            servicos_by_planilha.setdefault(planilha_id, []).append(servico)
+
+            # Coleta códigos de item
+            item_val = servico.get("item")
+            if item_val:
+                prefix, core = self._split_restart_prefix(item_val)
+                code = self._normalize_item_code(core or item_val)
+                if code:
+                    codes_by_planilha.setdefault(planilha_id, set()).add(code)
+
+            # Coleta páginas
+            page = servico.get("_page")
+            if page:
+                pages_by_planilha.setdefault(planilha_id, set()).add(page)
+
+        planilha_ids = sorted(servicos_by_planilha.keys())
+        if len(planilha_ids) <= 1:
+            return servicos
+
+        # Identifica planilha principal (maior quantidade de itens)
+        main_planilha = max(planilha_ids, key=lambda pid: len(servicos_by_planilha.get(pid, [])))
+        main_codes = codes_by_planilha.get(main_planilha, set())
+        main_pages = pages_by_planilha.get(main_planilha, set())
+
+        # Identifica planilhas a mesclar com a principal
+        # Critérios: sem páginas OU baixo overlap com principal
+        planilhas_to_merge = []
+        for pid in planilha_ids:
+            if pid == main_planilha:
+                continue
+
+            pid_pages = pages_by_planilha.get(pid, set())
+            pid_codes = codes_by_planilha.get(pid, set())
+
+            # Calcula overlap com a principal
+            overlap = pid_codes & main_codes
+            overlap_count = len(overlap)
+
+            # Regra fundamental: NUNCA mesclar planilhas com alto overlap
+            # Alto overlap significa que são planilhas DIFERENTES com itens repetidos
+            # Só mesclar se overlap < MIN_OVERLAP (indica continuação, não nova planilha)
+            if overlap_count >= APC.RESTART_MIN_OVERLAP:
+                # Alto overlap - são planilhas diferentes, não mesclar
+                continue
+
+            # Mesclar apenas se overlap é baixo E uma das condições:
+            # 1. Ambas sem páginas
+            # 2. Uma tem páginas e são adjacentes/contidas no range da principal
+            should_merge = False
+
+            if not pid_pages and not main_pages:
+                # Ambas sem página e baixo overlap - mesclar
+                should_merge = True
+            elif not pid_pages or not main_pages:
+                # Uma sem página e baixo overlap - provavelmente fragmentada
+                should_merge = True
+            else:
+                # Ambas têm páginas - verificar se são consecutivas ou sobrepostas
+                min_main = min(main_pages)
+                max_main = max(main_pages)
+                min_pid = min(pid_pages)
+                max_pid = max(pid_pages)
+
+                # Páginas dentro ou adjacentes ao range da principal
+                pages_adjacent = (min_pid >= min_main - 1 and max_pid <= max_main + 1)
+                if pages_adjacent:
+                    should_merge = True
+
+            if should_merge:
+                planilhas_to_merge.append(pid)
+
+        # Mescla planilhas
+        if planilhas_to_merge:
+            for servico in servicos:
+                pid = int(servico.get("_planilha_id") or 0)
+                if pid in planilhas_to_merge:
+                    servico["_planilha_id"] = main_planilha
+                    servico["_merged_from"] = pid
+
+        return servicos
+
+    def _normalize_restart_prefixes_by_planilha(self, servicos: list) -> list:
+        """
+        Normaliza prefixos de reinício baseado em overlap de códigos entre planilhas.
+
+        Critério:
+        - Primeira planilha (a com mais itens) NUNCA recebe prefixo
+        - Planilhas subsequentes recebem prefixo APENAS se houver overlap
+          (mesmo código de item já existe em planilha anterior)
+        """
+        if not servicos:
+            return servicos
+
+        # Passo 1: Mesclar planilhas fragmentadas antes de processar
+        servicos = self._merge_fragmented_planilhas(servicos)
+
+        # Agrupa serviços por planilha e coleta códigos
+        servicos_by_planilha: dict = {}
+        codes_by_planilha: dict = {}
+        for servico in servicos:
+            planilha_id = int(servico.get("_planilha_id") or 0)
+            servicos_by_planilha.setdefault(planilha_id, []).append(servico)
+            item_val = servico.get("item")
+            if item_val:
+                prefix, core = self._split_restart_prefix(item_val)
+                code = self._normalize_item_code(core or item_val)
+                if code:
+                    codes_by_planilha.setdefault(planilha_id, set()).add(code)
+
+        planilha_ids = sorted(servicos_by_planilha.keys())
+        if len(planilha_ids) <= 1:
+            # Só uma planilha, remove todos os prefixos
+            for servico in servicos:
+                item_val = servico.get("item")
+                if not item_val:
+                    continue
+                prefix, core = self._split_restart_prefix(item_val)
+                if prefix:
+                    servico["item"] = core
+                    servico.pop("_item_prefix", None)
+            return servicos
+
+        # Ordena planilhas por quantidade de itens (maior primeiro = planilha principal)
+        # A planilha com mais itens é considerada a principal e não recebe prefixo
+        planilha_order = sorted(
+            planilha_ids,
+            key=lambda pid: len(servicos_by_planilha.get(pid, [])),
+            reverse=True
+        )
+        main_planilha = planilha_order[0]  # Planilha com mais itens
+
+        # Determina quais planilhas precisam de prefixo (têm overlap com a principal)
+        main_codes = codes_by_planilha.get(main_planilha, set())
+        planilhas_with_prefix: dict = {}  # planilha_id -> prefix_idx
+        prefix_counter = 0
+
+        # Processa planilhas secundárias em ordem de ID
+        secondary_planilhas = [pid for pid in sorted(planilha_ids) if pid != main_planilha]
+        for planilha_id in secondary_planilhas:
+            planilha_codes = codes_by_planilha.get(planilha_id, set())
+            overlap = planilha_codes & main_codes
+            if overlap and len(overlap) >= APC.RESTART_MIN_OVERLAP:
+                prefix_counter += 1
+                planilhas_with_prefix[planilha_id] = prefix_counter
+
+        # Aplica prefixos apenas onde necessário
+        for servico in servicos:
+            item_val = servico.get("item")
+            if not item_val:
+                continue
+            prefix, core = self._split_restart_prefix(item_val)
+            item_str = str(core or item_val).strip()
+            if item_str.upper().startswith("AD-"):
+                item_str = item_str[3:].strip()
+            if not item_str:
+                continue
+            planilha_id = int(servico.get("_planilha_id") or 0)
+            prefix_idx = planilhas_with_prefix.get(planilha_id)
+            if prefix_idx:
+                servico["item"] = f"S{prefix_idx}-{item_str}"
+                servico["_item_prefix"] = f"S{prefix_idx}"
+            else:
+                servico["item"] = item_str
+                if "_item_prefix" in servico:
+                    servico.pop("_item_prefix", None)
+        return servicos
+
+    def _item_key(self, item: dict) -> Optional[tuple]:
+        prefix, core = self._split_restart_prefix(item.get("item"))
+        code = self._normalize_item_code(core)
+        if not code:
+            return None
+        code_key = f"{prefix}-{code}" if prefix else code
+        unit = normalize_unit(item.get("unidade") or "")
+        qty = parse_quantity(item.get("quantidade"))
+        return (code_key, unit, qty)
+
+    def _is_section_header_desc(self, desc: str) -> bool:
+        normalized = normalize_description(desc or "")
+        if not normalized:
+            return False
+        headers = {
+            "SERVICOS PRELIMINARES",
+            "DEMOLICOES",
+            "PAVIMENTACAO",
+            "URBANIZACAO",
+            "INSTALACOES",
+            "REVESTIMENTOS",
+            "SERVICOS EXECUTADOS",
+            "SERVICOS",
+            "PRACA",
+        }
+        if normalized in headers:
+            return True
+        for token in headers:
+            if normalized.startswith(token) and len(normalized) <= len(token) + 6:
+                return True
+        return False
+
+    def _is_narrative_desc(self, desc: str) -> bool:
+        normalized = normalize_description(desc or "")
+        if not normalized:
+            return False
+        tokens = (
+            "ATESTAMOS",
+            "CERTIFICAMOS",
+            "DECLARAMOS",
+            "RESPONSAVEL TECNICO",
+            "CAPACIDADE TECNICA",
+            "CONSELHO REGIONAL",
+            "ENGENHEIRO",
+            "CREA",
+            "CNPJ",
+            "CPF",
+            "PREFEITURA",
+            "DATA",
+        )
+        return any(token in normalized for token in tokens)
+
+    def _should_replace_desc(self, current_desc: str, candidate_desc: str) -> bool:
+        if not candidate_desc:
+            return False
+        if self._is_section_header_desc(candidate_desc):
+            return False
+        current = (current_desc or "").strip()
+        candidate = candidate_desc.strip()
+        if not current:
+            return True
+        if self._is_section_header_desc(current):
+            return True
+        if len(current) < 12:
+            return True
+        sim = description_similarity(current, candidate)
+        if sim < 0.3 and len(candidate) >= len(current) + 8:
+            return True
+        return False
+
+    def _build_text_item_map(self, items: list) -> dict:
+        text_map: Dict[tuple, str] = {}
+        for item in items or []:
+            key = self._item_key(item)
+            if not key:
+                continue
+            desc = (item.get("descricao") or "").strip()
+            if not desc or self._is_section_header_desc(desc) or self._is_narrative_desc(desc):
+                continue
+            existing = text_map.get(key)
+            if not existing or len(desc) > len(existing):
+                text_map[key] = desc
+        return text_map
+
+    def _apply_text_descriptions(self, servicos: list, text_map: dict) -> int:
+        if not servicos or not text_map:
+            return 0
+        updated = 0
+        for servico in servicos:
+            key = self._item_key(servico)
+            if not key:
+                continue
+            candidate = text_map.get(key)
+            if not candidate:
+                continue
+            if self._is_narrative_desc(candidate):
+                continue
+            if self._should_replace_desc(servico.get("descricao"), candidate):
+                servico["descricao"] = candidate
+                servico["_desc_from_text"] = True
+                updated += 1
+        return updated
+
+    def _dedupe_restart_prefix_duplicates(self, servicos: list) -> list:
+        if not servicos:
+            return servicos
+        groups: Dict[tuple, list] = {}
+        for idx, servico in enumerate(servicos):
+            item_val = servico.get("item")
+            if not item_val:
+                continue
+            item_str = str(item_val).strip()
+            if not item_str:
+                continue
+            if item_str.upper().startswith("AD-"):
+                continue
+            prefix, core = self._split_restart_prefix(item_str)
+            code = self._normalize_item_code(core)
+            if not code:
+                continue
+            planilha_id = servico.get("_planilha_id") or 0
+            section = servico.get("_section") or ""
+            unit = normalize_unit(servico.get("unidade") or "")
+            qty = parse_quantity(servico.get("quantidade"))
+            if not unit or qty in (None, 0):
+                continue
+            key = (section, planilha_id, code, unit, qty)
+            groups.setdefault(key, []).append((idx, servico, prefix))
+
+        to_drop = set()
+        for key, entries in groups.items():
+            if len(entries) < 2:
+                continue
+            prefixes = {entry[2] for entry in entries}
+            if len(prefixes) < 2:
+                continue
+
+            def score(entry: tuple) -> float:
+                _, servico, prefix = entry
+                desc = (servico.get("descricao") or "").strip()
+                score_val = 0.0
+                if desc:
+                    score_val += min(len(desc), 120)
+                    if not self._is_section_header_desc(desc):
+                        score_val += 10
+                if servico.get("_desc_from_text"):
+                    score_val += 6
+                if servico.get("_source") in ("text_section", "text_line"):
+                    score_val += 4
+                if servico.get("_desc_recovered"):
+                    score_val -= 8
+                segment_num = 1
+                if prefix:
+                    try:
+                        segment_num = int(prefix[1:])
+                    except ValueError:
+                        segment_num = 1
+                score_val -= segment_num * 0.01
+                return score_val
+
+            best = max(entries, key=score)
+            for entry in entries:
+                if entry is best:
+                    continue
+                to_drop.add(entry[0])
+
+        if not to_drop:
+            return servicos
+        return [s for idx, s in enumerate(servicos) if idx not in to_drop]
+
+    def _dedupe_same_code_within_planilha(self, servicos: list) -> list:
+        """
+        Remove duplicatas de itens com mesmo código dentro da mesma planilha.
+
+        Mantém o item com melhor descrição e dados mais completos.
+        """
+        if not servicos:
+            return servicos
+
+        # Agrupa por (planilha_id, código normalizado)
+        groups: Dict[tuple, list] = {}
+        for idx, servico in enumerate(servicos):
+            item_val = servico.get("item")
+            if not item_val:
+                continue
+            item_str = str(item_val).strip()
+            if not item_str:
+                continue
+            # Extrair código sem prefixo
+            prefix, core = self._split_restart_prefix(item_str)
+            code = self._normalize_item_code(core)
+            if not code:
+                continue
+            planilha_id = servico.get("_planilha_id") or 0
+            key = (planilha_id, code)
+            groups.setdefault(key, []).append((idx, servico))
+
+        to_drop = set()
+        for key, entries in groups.items():
+            if len(entries) < 2:
+                continue
+
+            # Função de score para escolher o melhor item
+            def score(entry: tuple) -> float:
+                _, servico = entry
+                score_val = 0.0
+                # Preferir descrição mais longa e completa
+                desc = (servico.get("descricao") or "").strip()
+                if desc:
+                    score_val += min(len(desc), 150)
+                    if not self._is_section_header_desc(desc):
+                        score_val += 20
+                # Preferir itens com unidade e quantidade
+                if servico.get("unidade"):
+                    score_val += 10
+                if servico.get("quantidade"):
+                    score_val += 10
+                # Preferir itens do Document AI / tabela
+                source = servico.get("_source", "")
+                if source in ("document_ai", "table", "pdfplumber"):
+                    score_val += 15
+                elif source in ("text_section", "text_line"):
+                    score_val += 5
+                # Preferir itens com página definida
+                if servico.get("_page"):
+                    score_val += 5
+                return score_val
+
+            # Manter o melhor, remover os outros
+            best = max(entries, key=score)
+            for entry in entries:
+                if entry is best:
+                    continue
+                to_drop.add(entry[0])
+
+        if not to_drop:
+            return servicos
+
+        logger.info(f"[DEDUP-CODIGO] {len(to_drop)} itens duplicados removidos por código")
+        return [s for idx, s in enumerate(servicos) if idx not in to_drop]
+
+    def _find_unit_qty_in_line(self, line: str) -> Optional[tuple]:
+        if not line:
+            return None
+        pattern = re.compile(r'([\w\u00ba\u00b0/%\u00b2\u00b3\.]+)\s+([\d.,]+)')
+        matches = list(pattern.finditer(line))
+        if not matches:
+            return None
+        stop_units = {"DE", "DA", "DO", "EM", "COM", "PARA", "POR", "QUE"}
+        allowed_units = set(UNIT_TOKENS) | {"MES"}
+        last_valid = None
+        for match in matches:
+            unit_raw = match.group(1)
+            qty_raw = match.group(2)
+            qty = parse_quantity(qty_raw)
+            if qty in (None, 0):
+                continue
+            unit_norm = normalize_unit(unit_raw)
+            if not unit_norm or unit_norm in ("MM", "CM"):
+                continue
+            if unit_norm in stop_units:
+                continue
+            if unit_norm not in allowed_units:
+                continue
+            last_valid = (unit_norm, qty, match.start(), match.end())
+        return last_valid
+
+    def _extract_items_without_codes_from_text(self, texto: str) -> list:
+        if not texto:
+            return []
+        lines = [line.strip() for line in texto.splitlines()]
+        anchor_idx = self._find_servicos_anchor_line(lines)
+        if anchor_idx is None:
+            return []
+
+        items = []
+        pending_desc = ""
+        last_item = None
+        stop_prefixes = (
+            "CNPJ",
+            "CPF CNPJ",
+            "PREFEITURA",
+            "CONSELHO REGIONAL",
+            "CREA",
+            "CEP",
+            "E MAIL",
+            "EMAIL",
+            "TEL",
+            "TELEFONE",
+            "IMPRESSO",
+            "DOCUSIGN",
+        )
+        footer_tokens = (
+            "CNPJ",
+            "CPF",
+            "PREFEITURA",
+            "CONSELHO REGIONAL",
+            "CREA",
+            "DOCUSIGN",
+            "CEP",
+            "JOAO PESSOA",
+            "ARARUNA",
+            "RUA",
+            "EMAIL",
+            "TEL",
+            "IMPRESSO",
+            "AGRONOMIA",
+        )
+
+        for idx in range(anchor_idx + 1, len(lines)):
+            line = lines[idx]
+            if not line:
+                continue
+            normalized = normalize_description(line)
+            if not normalized:
+                continue
+            if normalized.startswith("PAGINA"):
+                continue
+            if normalized.startswith(stop_prefixes):
+                continue
+            if "SERVICOS EXECUTADOS" in normalized:
+                continue
+            if "DESCRICAO" in normalized and "QUANT" in normalized and "UND" in normalized:
+                pending_desc = ""
+                continue
+
+            unit_match = self._find_unit_qty_in_line(line)
+            if unit_match:
+                unit, qty, start, end = unit_match
+                before = line[:start].strip()
+                after = line[end:].strip()
+                anchors = [
+                    "FORNEC", "LOCAÇÃO", "LOCACAO", "EXECUÇÃO", "EXECUCAO", "ESCAVAÇÃO",
+                    "ESCAVACAO", "REATERRO", "LASTRO", "FUNDAÇÃO", "FUNDACAO", "CONCRETO",
+                    "ADMINISTRAÇÃO", "ADMINISTRACAO", "MOBILIZAÇÃO", "MOBILIZACAO",
+                    "PLACA", "PERFURAÇÃO", "PERFURACAO"
+                ]
+                if before:
+                    upper_before = before.upper()
+                    anchor_pos = None
+                    for anchor in anchors:
+                        pos = upper_before.find(anchor)
+                        if pos == -1:
+                            continue
+                        if anchor_pos is None or pos < anchor_pos:
+                            anchor_pos = pos
+                    if anchor_pos is not None and anchor_pos > 0:
+                        before = before[anchor_pos:].strip()
+                        pending_desc = ""
+                parts = []
+                if pending_desc:
+                    parts.append(pending_desc)
+                    pending_desc = ""
+                if before:
+                    parts.append(before)
+                if after:
+                    parts.append(after)
+                desc = " ".join(parts).strip()
+                desc = self._strip_footer_prefix_from_desc(desc)
+                desc = self._strip_trailing_unit_qty(desc, unit, qty)
+                if desc:
+                    item = {
+                        "item": None,
+                        "descricao": desc,
+                        "unidade": unit,
+                        "quantidade": qty,
+                        "_source": "text_no_code"
+                    }
+                    items.append(item)
+                    last_item = item
+                continue
+
+            has_footer = False
+            for token in footer_tokens:
+                if re.search(rf'\\b{re.escape(token)}\\b', normalized):
+                    has_footer = True
+                    break
+            if has_footer:
+                pending_desc = ""
+                continue
+
+            cont_prefixes = (
+                "A ", "DE ", "DO ", "DA ", "DOS ", "DAS ", "COM ", "SEM ", "INCLUINDO",
+                "INCLUSIVE", "BORRACHA", "AF_"
+            )
+            if last_item and line.upper().startswith(cont_prefixes):
+                last_desc = (last_item.get("descricao") or "").strip()
+                last_item["descricao"] = (last_desc + " " + line).strip() if last_desc else line
+                continue
+
+            if not re.search(r'\d', line):
+                if len(normalized) <= 40 and line == line.upper():
+                    pending_desc = ""
+                    continue
+            pending_desc = (pending_desc + " " + line).strip() if pending_desc else line
+
+        return items
+
+    def _find_servicos_anchor_line(self, lines: list) -> Optional[int]:
+        if not lines:
+            return None
+        anchors = ("SERVICOS EXECUTADOS", "SERVICOS EXECUTADO")
+        for idx, line in enumerate(lines):
+            normalized = normalize_description(line)
+            if not normalized:
+                continue
+            for anchor in anchors:
+                if anchor in normalized:
+                    return idx
+        return None
+
+    def _extract_items_from_text_section(self, texto: str, existing_keys: Optional[set] = None) -> list:
+        if not texto:
+            return []
+        lines = [line.strip() for line in texto.splitlines()]
+        anchor_idx = self._find_servicos_anchor_line(lines)
+        if anchor_idx is None:
+            return []
+
+        pattern = re.compile(r'^\s*(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4})\b')
+        code_lines = []
+        for idx in range(anchor_idx + 1, len(lines)):
+            line = lines[idx]
+            if not line:
+                continue
+            match = pattern.match(line)
+            if not match:
+                continue
+            raw_code = match.group(1)
+            code = self._normalize_item_code(raw_code)
+            if not code:
+                continue
+            code_lines.append((idx, code, match.end(), line))
+
+        if not code_lines:
+            return []
+
+        code_counts = Counter(code for _, code, _, _ in code_lines)
+        dup_codes = {code for code, count in code_counts.items() if count > 1}
+        dup_ratio = (len(dup_codes) / len(code_counts)) if code_counts else 0.0
+        allow_restart = (
+            len(code_counts) >= APC.RESTART_MIN_CODES
+            and len(dup_codes) >= APC.RESTART_MIN_OVERLAP
+            and dup_ratio >= APC.RESTART_MIN_OVERLAP_RATIO
+        )
+        if not allow_restart:
+            logger.info(
+                "[TEXTO] restart_prefix desativado no text_section: "
+                f"codes={len(code_counts)}, dup_codes={len(dup_codes)}, dup_ratio={dup_ratio:.2f}"
+            )
+
+        item_codes = {code for _, code, _, _ in code_lines}
+        qty_map = self._extract_quantities_from_text(texto, item_codes)
+        if not qty_map:
+            return []
+
+        added = []
+        qty_remaining = {code: list(entries) for code, entries in qty_map.items()}
+        stop_prefixes = (
+            "CNPJ",
+            "CPF CNPJ",
+            "PREFEITURA",
+            "CONSELHO REGIONAL",
+            "CREA",
+            "CEP",
+            "E MAIL",
+            "EMAIL",
+            "TEL",
+            "TELEFONE",
+            "IMPRESSO",
+        )
+        segment_index = 1
+        max_tuple = None
+        for pos, (line_idx, code, code_end, line) in enumerate(code_lines):
+            code_tuple = parse_item_tuple(code)
+            if allow_restart and code_tuple and max_tuple and code_tuple < max_tuple and code in dup_codes:
+                segment_index += 1
+            if code_tuple and (max_tuple is None or code_tuple > max_tuple):
+                max_tuple = code_tuple
+            item_code = f"S{segment_index}-{code}" if segment_index > 1 else code
+            unit_qty = None
+            line_unit_qty = self._parse_unit_qty_from_line(line)
+            if line_unit_qty:
+                unit_qty = line_unit_qty
+                candidates = qty_remaining.get(code) or []
+                for idx, entry in enumerate(candidates):
+                    if (
+                        isinstance(entry, (tuple, list))
+                        and len(entry) >= 2
+                        and entry[0] == unit_qty[0]
+                        and abs(entry[1] - unit_qty[1]) <= 0.01
+                    ):
+                        candidates.pop(idx)
+                        break
+            if not unit_qty:
+                candidates = qty_remaining.get(code) or []
+                if candidates:
+                    unit_qty = candidates.pop(0)
+            if not unit_qty or not isinstance(unit_qty, (tuple, list)) or len(unit_qty) < 2:
+                continue
+            unit, qty = unit_qty[0], unit_qty[1]
+            if qty in (None, 0) or not unit:
+                continue
+            if existing_keys:
+                key = (item_code, unit, qty)
+                if key in existing_keys:
+                    continue
+
+            desc_parts = []
+            rest = line[code_end:].strip()
+            if rest.startswith("-"):
+                rest = rest[1:].strip()
+            if rest:
+                tokens = rest.split()
+                if len(tokens) >= 2:
+                    lead_unit = normalize_unit(tokens[0])
+                    lead_qty = parse_quantity(tokens[1])
+                    if lead_unit == unit and lead_qty == qty:
+                        rest = " ".join(tokens[2:]).strip()
+                rest = self._strip_trailing_unit_qty(rest, unit, qty)
+                if rest:
+                    desc_parts.append(rest)
+
+            next_idx = code_lines[pos + 1][0] if pos + 1 < len(code_lines) else len(lines)
+            for j in range(line_idx + 1, next_idx):
+                cont = lines[j].strip()
+                if not cont:
+                    continue
+                normalized = normalize_description(cont)
+                if not normalized:
+                    continue
+                if normalized.startswith("PAGINA") or normalized.startswith("DOCUSIGN"):
+                    continue
+                if "SERVICOS EXECUTADOS" in normalized:
+                    continue
+                if self._is_section_header_desc(cont):
+                    break
+                if self._is_narrative_desc(cont):
+                    break
+                if re.match(r'^\d+\s*/\s*\d+$', cont):
+                    continue
+                if normalized.startswith(stop_prefixes):
+                    break
+                if re.search(r'\bAF_\d+/\d+\b', cont, re.I):
+                    cleaned = self._strip_trailing_unit_qty(cont, unit, qty)
+                    if cleaned:
+                        desc_parts.append(cleaned)
+                    break
+                if self._parse_unit_qty_from_line(cont):
+                    cleaned = self._strip_trailing_unit_qty(cont, unit, qty)
+                    if cleaned and cleaned != cont:
+                        desc_parts.append(cleaned)
+                    break
+                desc_parts.append(cont)
+                if sum(len(part) for part in desc_parts) >= APC.TEXT_SECTION_MAX_DESC_LEN:
+                    break
+
+            desc = " ".join(desc_parts).strip()
+            added.append({
+                "item": item_code,
+                "descricao": desc,
+                "unidade": unit,
+                "quantidade": qty,
+                "_source": "text_section"
+            })
+
+        return added
+
+    def _item_qty_matches_code(self, item_code: str, qty: float) -> bool:
+        if not item_code or qty is None:
+            return False
+        digits = re.sub(r'\D', '', item_code)
+        if not digits:
+            return False
+        try:
+            return float(digits) == float(qty)
+        except (TypeError, ValueError):
+            return False
+
+    def _clear_item_code_quantities(self, servicos: list, min_ratio: float = 0.7, min_samples: int = 10) -> int:
+        if not servicos:
+            return 0
+        total = 0
+        matches = 0
+        for s in servicos:
+            item_code = self._normalize_item_code(s.get("item"))
+            qty = parse_quantity(s.get("quantidade"))
+            if not item_code or qty is None:
+                continue
+            total += 1
+            if self._item_qty_matches_code(item_code, qty):
+                matches += 1
+        ratio = (matches / total) if total else 0.0
+        if total < min_samples or ratio < min_ratio:
+            return 0
+
+        cleared = 0
+        for s in servicos:
+            item_code = self._normalize_item_code(s.get("item"))
+            qty = parse_quantity(s.get("quantidade"))
+            if item_code and qty is not None and self._item_qty_matches_code(item_code, qty):
+                s["quantidade"] = None
+                cleared += 1
+        if cleared:
+            logger.info(f"[QTY] Quantidades removidas por vazamento de coluna: {cleared} (ratio={ratio:.0%})")
+        return cleared
+
+    def _parse_unit_qty_from_line(self, line: str) -> Optional[tuple]:
+        tokens = line.split()
+        if len(tokens) < 2:
+            return None
+        last_match = None
+        for idx in range(len(tokens) - 1):
+            unit_token = tokens[idx]
+            raw_unit = re.sub(r'[^A-Za-z0-9]', '', unit_token).upper()
+            if raw_unit in ("MM", "CM"):
+                continue
+            qty_token = tokens[idx + 1]
+            if not re.fullmatch(r'[\d.,]+', qty_token):
+                continue
+            qty = parse_quantity(qty_token)
+            if qty in (None, 0):
+                continue
+            unit_norm = normalize_unit(unit_token)
+            if not unit_norm or unit_norm not in UNIT_TOKENS:
+                continue
+            last_match = (unit_norm, qty)
+        return last_match
+
+    def _strip_trailing_unit_qty(
+        self,
+        text: str,
+        unit: Optional[str] = None,
+        qty: Optional[float] = None
+    ) -> str:
+        if not text:
+            return text
+        match = re.search(r'\b([\w\u00ba\u00b0/%\u00b2\u00b3\.]+)\s+([\d.,]+)\s*$', text)
+        if not match:
+            return text
+        unit_raw = match.group(1)
+        qty_raw = match.group(2)
+        parsed_qty = parse_quantity(qty_raw)
+        if parsed_qty is None:
+            return text
+        unit_norm = normalize_unit(unit_raw)
+        if not unit_norm or unit_norm not in UNIT_TOKENS:
+            return text
+        if unit:
+            unit_expected = normalize_unit(unit)
+            if unit_expected and unit_norm != unit_expected:
+                return text
+        if qty is not None and abs(parsed_qty - qty) > 0.01:
+            return text
+        return text[:match.start()].strip()
+
+    def _strip_unit_qty_prefix(self, desc: str) -> str:
+        """
+        Fix B2: Remove prefixo de unidade/quantidade da descrição.
+
+        Exemplo: "UN 1,00 FORNECIMENTO..." -> "FORNECIMENTO..."
+        Exemplo: "M 2,05 inclusive roldanas" -> "inclusive roldanas"
+        """
+        if not desc:
+            return desc
+        # Padrão: unidade + quantidade no início
+        pattern = r'^(UN|M|M2|M3|M²|M³|KG|L|CJ|VB|PC|PÇ|JG|CONJ)\s+[\d.,]+\s+'
+        match = re.match(pattern, desc, re.IGNORECASE)
+        if match:
+            cleaned = desc[match.end():].strip()
+            # Garantir que sobrou descrição significativa
+            if len(cleaned) >= 5:
+                return cleaned
+        return desc
+
+    def _extract_hidden_items_from_servicos(self, servicos: list) -> list:
+        """
+        Fix A3 (pós-processamento): Extrai itens ocultos de descrições.
+
+        Escaneia todas as descrições procurando códigos de item embutidos
+        (ex: "TE, PVC... JUNTA 6.14 ELÁSTICA...") e extrai como serviços separados.
+
+        Args:
+            servicos: Lista de serviços
+
+        Returns:
+            Lista atualizada com itens ocultos extraídos
+        """
+        from services.extraction import parse_item_tuple, is_valid_item_context
+
+        # Padrão para detectar item oculto no meio do texto
+        hidden_pattern = re.compile(
+            r'(.{5,}?)\s+(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+([A-ZÀ-ÚÇ].{10,})',
+            re.IGNORECASE
+        )
+
+        new_servicos = []
+        for servico in servicos:
+            desc = servico.get("descricao") or ""
+            if len(desc) < 25:
+                new_servicos.append(servico)
+                continue
+
+            match = hidden_pattern.search(desc)
+            if not match:
+                new_servicos.append(servico)
+                continue
+
+            prefix = match.group(1).strip()
+            hidden_code = match.group(2)
+            suffix = match.group(3).strip()
+
+            # Verificar contexto
+            if not is_valid_item_context(desc, match.start(2)):
+                new_servicos.append(servico)
+                continue
+
+            # Verificar se o código é válido
+            hidden_tuple = parse_item_tuple(hidden_code)
+            if not hidden_tuple:
+                new_servicos.append(servico)
+                continue
+
+            # Atualizar descrição do serviço original com o prefix
+            servico["descricao"] = prefix
+
+            # Criar novo serviço para o item oculto
+            hidden_servico = {
+                "item": hidden_code,
+                "descricao": suffix,
+                "unidade": None,
+                "quantidade": None,
+                "_planilha_id": servico.get("_planilha_id"),
+                "_page": servico.get("_page"),
+                "_hidden_from": servico.get("item"),
+            }
+
+            new_servicos.append(servico)
+            new_servicos.append(hidden_servico)
+            logger.info(f"[HIDDEN-ITEM] Extraído item oculto {hidden_code} de {servico.get('item')}")
+
+        return new_servicos
+
+    def _strip_footer_prefix_from_desc(self, desc: str) -> str:
+        if not desc:
+            return desc
+        upper = desc.upper()
+        anchors = [
+            "FORNEC", "LOCAÇÃO", "LOCACAO", "EXECUÇÃO", "EXECUCAO", "ESCAVAÇÃO",
+            "ESCAVACAO", "REATERRO", "LASTRO", "FUNDAÇÃO", "FUNDACAO", "CONCRETO",
+            "ADMINISTRAÇÃO", "ADMINISTRACAO", "MOBILIZAÇÃO", "MOBILIZACAO",
+            "PLACA", "PERFURAÇÃO", "PERFURACAO"
+        ]
+        anchor_pos = None
+        for anchor in anchors:
+            pos = upper.find(anchor)
+            if pos == -1:
+                continue
+            if anchor_pos is None or pos < anchor_pos:
+                anchor_pos = pos
+        if anchor_pos is None or anchor_pos == 0:
+            return desc
+
+        prefix = upper[:anchor_pos]
+        prefix_norm = normalize_description(prefix)
+        if re.search(r'\b\d{2,4}/\d{2}/\d{2}\b', prefix_norm):
+            return desc[anchor_pos:].strip()
+        footer_tokens = (
+            "AV", "RUA", "CEP", "CREA", "CONSELHO", "PREFEITURA", "JOAO PESSOA",
+            "ARARUNA", "CNPJ", "DOCUSIGN", "EMAIL", "TEL", "IMPRESSO", "AGRONOMIA"
+        )
+        for token in footer_tokens:
+            if re.search(rf'\b{re.escape(token)}\b', prefix_norm):
+                return desc[anchor_pos:].strip()
+        return desc
+
+    def _extract_quantities_from_text(self, texto: str, item_codes: set) -> dict:
+        if not texto or not item_codes:
+            return {}
+        pattern = re.compile(r'(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4})(?!\s*/\s*\d)')
+        qty_map: Dict[str, list] = {}
+        current_code = None
+        pending_unit = None
+        next_line_qty_hits = 0
+
+        def add_qty(code: str, unit_qty: tuple) -> None:
+            qty_map.setdefault(code, []).append(unit_qty)
+
+        def find_unit_in_text(segment: str) -> Optional[str]:
+            for token in reversed(re.findall(r'[\w\u00ba\u00b0/%\u00b2\u00b3\.]+', segment)):
+                unit_norm = normalize_unit(token)
+                if unit_norm and unit_norm in UNIT_TOKENS:
+                    return unit_norm
+            return None
+
+        def find_last_qty(line: str) -> Optional[float]:
+            for token in reversed(re.findall(r'[\d.,]+', line)):
+                qty = parse_quantity(token)
+                if qty in (None, 0):
+                    continue
+                return qty
+            return None
+
+        for raw_line in texto.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            any_code_match = bool(pattern.search(line))
+            raw_matches = list(pattern.finditer(line))
+            matches: List[tuple[int, int, str]] = []
+            for match in raw_matches:
+                raw_code = re.sub(r'\s+', '', match.group(1))
+                code = self._normalize_item_code(raw_code)
+                if code and code in item_codes:
+                    matches.append((match.start(), match.end(), code))
+            if matches:
+                if current_code:
+                    prefix = line[:matches[0][0]].strip()
+                    if prefix:
+                        parsed = self._parse_unit_qty_from_line(prefix)
+                        if parsed:
+                            add_qty(current_code, parsed)
+                            current_code = None
+                            pending_unit = None
+                        elif pending_unit:
+                            qty = find_last_qty(prefix)
+                            if qty is not None:
+                                add_qty(current_code, (pending_unit, qty))
+                                next_line_qty_hits += 1
+                                current_code = None
+                                pending_unit = None
+
+                current_code = None
+                pending_unit = None
+                last_unfilled = None
+                for idx, item_match in enumerate(matches):
+                    start = item_match[0]
+                    end = matches[idx + 1][0] if idx + 1 < len(matches) else len(line)
+                    segment = line[start:end].strip()
+                    code = item_match[2]
+                    parsed = self._parse_unit_qty_from_line(segment)
+                    if parsed:
+                        add_qty(code, parsed)
+                        continue
+                    unit_norm = find_unit_in_text(segment)
+                    if unit_norm:
+                        pending_unit = unit_norm
+                    last_unfilled = code
+                if last_unfilled:
+                    current_code = last_unfilled
+                continue
+
+            if current_code:
+                if any_code_match:
+                    current_code = None
+                    pending_unit = None
+                    continue
+
+                parsed = self._parse_unit_qty_from_line(line)
+                if parsed:
+                    add_qty(current_code, parsed)
+                    current_code = None
+                    pending_unit = None
+                    continue
+
+                if pending_unit:
+                    qty = find_last_qty(line)
+                    if qty is not None:
+                        add_qty(current_code, (pending_unit, qty))
+                        next_line_qty_hits += 1
+                        current_code = None
+                        pending_unit = None
+                        continue
+
+                if not re.search(r'\d', line):
+                    unit_norm = normalize_unit(line)
+                    if unit_norm and unit_norm in UNIT_TOKENS:
+                        pending_unit = unit_norm
+                        continue
+
+        if next_line_qty_hits:
+            logger.info(f"[QTY] Quantidades detectadas em linha seguinte: {next_line_qty_hits}")
+        return qty_map
+
+    def _backfill_quantities_from_text(self, servicos: list, texto: str) -> int:
+        if not servicos or not texto:
+            return 0
+        item_codes = {
+            self._normalize_item_code(s.get("item"))
+            for s in servicos
+            if self._normalize_item_code(s.get("item"))
+        }
+        if not item_codes:
+            return 0
+
+        qty_map = self._extract_quantities_from_text(texto, item_codes)
+        if not qty_map:
+            return 0
+        normalized_map: Dict[str, list] = {}
+        for code, entries in qty_map.items():
+            if isinstance(entries, list):
+                normalized_map[code] = list(entries)
+            else:
+                normalized_map[code] = [entries]
+
+        # Remover quantidades já presentes para evitar reuse em códigos duplicados
+        for s in servicos:
+            code = self._normalize_item_code(s.get("item"))
+            if not code or code not in normalized_map:
+                continue
+            qty = parse_quantity(s.get("quantidade"))
+            if qty in (None, 0):
+                continue
+            unit = normalize_unit(s.get("unidade") or "")
+            entries = normalized_map.get(code) or []
+            idx = None
+            if unit:
+                for i, (u, q) in enumerate(entries):
+                    if u == unit and abs(q - qty) <= 0.01:
+                        idx = i
+                        break
+            if idx is None:
+                for i, (u, q) in enumerate(entries):
+                    if abs(q - qty) <= 0.01:
+                        idx = i
+                        break
+            if idx is not None:
+                entries.pop(idx)
+
+        updated = 0
+        for s in servicos:
+            code = self._normalize_item_code(s.get("item"))
+            if not code or code not in normalized_map:
+                continue
+            if parse_quantity(s.get("quantidade")) not in (None, 0):
+                continue
+            entries = normalized_map.get(code) or []
+            if not entries:
+                continue
+            unit_expected = normalize_unit(s.get("unidade") or "")
+            idx = None
+            if unit_expected:
+                for i, (u, q) in enumerate(entries):
+                    if u == unit_expected:
+                        idx = i
+                        break
+            if idx is None:
+                idx = 0
+            unit, qty = entries.pop(idx)
+            s["quantidade"] = qty
+            if not s.get("unidade") and unit:
+                s["unidade"] = unit
+            updated += 1
+
+        if updated:
+            logger.info(f"[QTY] Quantidades preenchidas do texto: {updated}")
+        return updated
+
+    def _refine_item_codes_from_text(
+        self,
+        servicos: list,
+        text_items: list,
+        text_codes: Optional[list] = None
+    ) -> int:
+        if not servicos or (not text_items and not text_codes):
+            return 0
+
+        candidates_by_prefix: Dict[str, list] = {}
+        for item in text_items or []:
+            code = self._normalize_item_code(item.get("item"))
+            if not code:
+                continue
+            parts = code.split(".")
+            if len(parts) < 3:
+                continue
+            prefix = ".".join(parts[:-1])
+            desc = (item.get("descricao") or "").strip()
+            unit = normalize_unit(item.get("unidade") or "")
+            qty = parse_quantity(item.get("quantidade"))
+            candidates_by_prefix.setdefault(prefix, []).append({
+                "code": code,
+                "desc": desc,
+                "unit": unit,
+                "qty": qty,
+            })
+
+        updated = 0
+        used_codes = {
+            self._normalize_item_code(s.get("item"))
+            for s in servicos
+            if self._normalize_item_code(s.get("item"))
+        }
+        score_threshold = 0.55
+        sim_floor = 0.2
+
+        processed_prefixes = set()
+        if text_codes:
+            ordered_by_prefix: Dict[str, list] = {}
+            for code in text_codes:
+                normalized = self._normalize_item_code(code)
+                if not normalized:
+                    continue
+                parts = normalized.split(".")
+                if len(parts) < 3:
+                    continue
+                prefix = ".".join(parts[:-1])
+                ordered_by_prefix.setdefault(prefix, []).append(normalized)
+
+            for prefix, codes in ordered_by_prefix.items():
+                prefix_indices = [
+                    idx for idx, s in enumerate(servicos)
+                    if self._normalize_item_code(s.get("item")) == prefix
+                ]
+                if not prefix_indices or len(codes) < 2:
+                    continue
+                if len(codes) != len(prefix_indices):
+                    continue
+                if any(code in used_codes for code in codes):
+                    continue
+                for idx, code in zip(prefix_indices, codes):
+                    servicos[idx]["item"] = code
+                    used_codes.add(code)
+                    updated += 1
+                processed_prefixes.add(prefix)
+
+        for prefix, candidates in candidates_by_prefix.items():
+            if prefix in processed_prefixes:
+                continue
+            prefix_indices = [
+                idx for idx, s in enumerate(servicos)
+                if self._normalize_item_code(s.get("item")) == prefix
+            ]
+            if not prefix_indices:
+                continue
+
+            pairs = []
+            for idx in prefix_indices:
+                servico = servicos[idx]
+                serv_desc = (servico.get("descricao") or "").strip()
+                serv_unit = normalize_unit(servico.get("unidade") or "")
+                serv_qty = parse_quantity(servico.get("quantidade"))
+                for cand in candidates:
+                    if cand["code"] in used_codes:
+                        continue
+                    sim = description_similarity(serv_desc, cand["desc"])
+                    unit_match = bool(serv_unit and cand["unit"] and serv_unit == cand["unit"])
+                    qty_match = False
+                    if serv_qty is not None and cand["qty"] is not None:
+                        if serv_qty != 0 and cand["qty"] != 0:
+                            diff = abs(serv_qty - cand["qty"])
+                            denom = max(abs(serv_qty), abs(cand["qty"]))
+                            if denom > 0:
+                                qty_match = (diff / denom) <= 0.02 or diff <= 0.01
+                    score = sim
+                    if unit_match:
+                        score += 0.2
+                    if qty_match:
+                        score += 0.2
+                    if serv_desc and cand["desc"]:
+                        serv_upper = serv_desc.upper()
+                        cand_upper = cand["desc"].upper()
+                        if cand_upper in serv_upper or serv_upper in cand_upper:
+                            score += 0.1
+                    if score < score_threshold:
+                        if sim < sim_floor and not (unit_match and qty_match):
+                            continue
+                    pairs.append((score, sim, idx, cand["code"]))
+
+            if not pairs:
+                continue
+            pairs.sort(key=lambda x: (-x[0], -x[1]))
+
+            used_indices = set()
+            for score, sim, idx, code in pairs:
+                if idx in used_indices or code in used_codes:
+                    continue
+                servicos[idx]["item"] = code
+                used_indices.add(idx)
+                used_codes.add(code)
+                updated += 1
+
+        return updated
+
+    def _filter_items_not_in_text_or_table(
+        self,
+        servicos: list,
+        texto: str,
+        servicos_table: list
+    ) -> list:
+        if not servicos or not texto:
+            return servicos
+
+        table_items = set()
+        for s in servicos_table or []:
+            code = self._normalize_item_code(s.get("item"))
+            if code:
+                table_items.add(code)
+
+        filtered = []
+        removed = []
+        for s in servicos:
+            item = s.get("item")
+            code = self._normalize_item_code(item)
+            if not code:
+                filtered.append(s)
+                continue
+            if self._item_code_in_text(code, texto):
+                filtered.append(s)
+                continue
+            removed.append((item, s.get("descricao"), code in table_items))
+
+        if removed:
+            logger.info(
+                f"[FILTRO] Removendo {len(removed)} itens sem codigo no texto"
+            )
+            for item, desc, in_table in removed:
+                desc_preview = (desc or "")[:60]
+                origem = "tabela" if in_table else "ia"
+                logger.info(f"[FILTRO] Removido item {item} (origem={origem}): {desc_preview}...")
+
+        return filtered
     def _extract_servicos_from_table(self, table: list, preferred_item_col: Optional[int] = None) -> tuple[list, float, dict]:
         if not table:
             return [], 0.0, {}
@@ -454,7 +1855,7 @@ class DocumentProcessor:
             header_map = guess_columns_by_header(normalized_rows[header_index])
             data_rows = normalized_rows[header_index + 1:]
 
-        item_col = header_map.get("item")
+        item_col: Optional[int] = header_map.get("item")
         item_score_data = {"score": 0.0}
         preferred_score_data = None
         preferred_used = False
@@ -480,6 +1881,9 @@ class DocumentProcessor:
         else:
             col_cells = [row[item_col] for row in data_rows if item_col < len(row)]
             item_score_data = score_item_column(col_cells, item_col, max_cols)
+
+        if header_map.get("item") is None and item_col is not None:
+            header_map["item"] = item_col  # type: ignore[assignment]
 
         col_stats = compute_column_stats(data_rows, max_cols)
         header_map = guess_columns_by_content(data_rows, max_cols, header_map, col_stats)
@@ -616,8 +2020,8 @@ class DocumentProcessor:
                 if not best_debug or confidence > best_debug.get("confidence", 0):
                     best_debug = debug
 
-                # Adicionar servicos - NÃO prefixar aqui, deixar para _prefix_aditivo_items
-                # que usa detecção inteligente de reinício de numeração
+                # Adicionar serviços - NÃO prefixar aqui; o prefixo de reinício
+                # é aplicado posteriormente no processamento de aditivo/segmentos.
                 for s in servicos:
                     item = s.get("item", "")
                     if item:
@@ -628,7 +2032,7 @@ class DocumentProcessor:
                             all_servicos.append(s)
                         else:
                             # Item duplicado - manter sem prefixo aqui
-                            # O prefixo AD- será adicionado por _prefix_aditivo_items
+                            # O prefixo de reinício será aplicado por _prefix_aditivo_items
                             item_counts[item] = count + 1
                             all_servicos.append(s)
                     else:
@@ -694,6 +2098,85 @@ class DocumentProcessor:
         if "ocr_noise" in debug:
             summary["ocr_noise"] = debug.get("ocr_noise")
         return summary
+
+    def _calc_qty_ratio(self, servicos: list) -> float:
+        """Calcula a proporção de serviços com quantidade válida."""
+        if not servicos:
+            return 0.0
+        qty_count = sum(1 for s in servicos if parse_quantity(s.get("quantidade")) not in (None, 0))
+        return qty_count / len(servicos)
+
+    def _analyze_document_type(self, file_path: str) -> dict:
+        """
+        Analisa o tipo de documento para otimizar o fluxo de extração.
+
+        Returns:
+            dict com:
+                - is_scanned: bool - documento é escaneado
+                - has_image_tables: bool - tem tabelas dentro de imagens
+                - total_pages: int
+                - avg_chars_per_page: float
+                - large_images_count: int
+        """
+        result = {
+            "is_scanned": False,
+            "has_image_tables": False,
+            "total_pages": 0,
+            "avg_chars_per_page": 0.0,
+            "large_images_count": 0
+        }
+
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                total_pages = len(pdf.pages)
+                total_chars = 0
+                total_large_images = 0
+                pages_with_tables_in_images = 0
+
+                for page in pdf.pages:
+                    text = page.extract_text() or ""
+                    chars = len(text.strip())
+                    total_chars += chars
+
+                    # Contar imagens grandes (potenciais tabelas escaneadas)
+                    large_images = sum(
+                        1 for img in page.images
+                        if img.get("width", 0) > 400 and img.get("height", 0) > 400
+                    )
+                    total_large_images += large_images
+
+                    # Página com pouco texto mas com imagem grande = tabela em imagem
+                    if chars < APC.SCANNED_MIN_CHARS_PER_PAGE and large_images > 0:
+                        pages_with_tables_in_images += 1
+
+                avg_chars = total_chars / total_pages if total_pages > 0 else 0
+                image_ratio = total_large_images / total_pages if total_pages > 0 else 0
+
+                result["total_pages"] = total_pages
+                result["avg_chars_per_page"] = avg_chars
+                result["large_images_count"] = total_large_images
+
+                # Documento escaneado: pouco texto OU muitas imagens grandes
+                result["is_scanned"] = (
+                    avg_chars < APC.SCANNED_MIN_CHARS_PER_PAGE
+                    or (avg_chars < 500 and image_ratio >= APC.SCANNED_IMAGE_PAGE_RATIO)
+                )
+
+                # Tem tabelas em imagens: páginas específicas com pouco texto + imagem
+                result["has_image_tables"] = pages_with_tables_in_images > 0
+
+                logger.info(
+                    f"Análise do documento: {total_pages} páginas, "
+                    f"média {avg_chars:.0f} chars/página, "
+                    f"{total_large_images} imagens grandes, "
+                    f"escaneado={result['is_scanned']}, "
+                    f"tabelas_em_imagens={result['has_image_tables']}"
+                )
+
+        except Exception as e:
+            logger.warning(f"Erro ao analisar documento: {e}")
+
+        return result
 
     def _median(self, values: list) -> float:
         if not values:
@@ -941,59 +2424,16 @@ class DocumentProcessor:
         return "vision"
 
     def _crop_region(self, image_bytes: bytes, left: float, top: float, right: float, bottom: float) -> bytes:
-        try:
-            img = Image.open(io.BytesIO(image_bytes))
-            width, height = img.size
-            crop = img.crop((int(width * left), int(height * top), int(width * right), int(height * bottom)))
-            buffer = io.BytesIO()
-            crop.save(buffer, format="PNG")
-            return buffer.getvalue()
-        except (IOError, ValueError, OSError) as e:
-            logger.debug(f"Erro ao recortar imagem: {e}")
-            return image_bytes
+        """Delega recorte de imagem ao PDFExtractionService."""
+        return pdf_extraction_service.crop_region(image_bytes, left, top, right, bottom)
 
     def _resize_image_bytes(self, image_bytes: bytes, scale: float = 0.5) -> bytes:
-        try:
-            img = Image.open(io.BytesIO(image_bytes))
-            width, height = img.size
-            resized = img.resize((max(1, int(width * scale)), max(1, int(height * scale))))
-            buffer = io.BytesIO()
-            resized.save(buffer, format="PNG")
-            return buffer.getvalue()
-        except (IOError, ValueError, OSError) as e:
-            logger.debug(f"Erro ao redimensionar imagem: {e}")
-            return image_bytes
+        """Delega redimensionamento de imagem ao PDFExtractionService."""
+        return pdf_extraction_service.resize_image(image_bytes, scale)
 
     def _detect_table_pages(self, images: List[bytes]) -> List[int]:
-        keywords = {"RELATORIO", "SERVICOS", "EXECUTADOS", "ITEM", "DISCRIMINACAO", "UNID", "QUANTIDADE"}
-        table_pages = []
-        for index, image_bytes in enumerate(images):
-            header = self._crop_region(image_bytes, 0.05, 0.0, 0.95, 0.35)
-            header = self._resize_image_bytes(header, scale=0.5)
-            try:
-                text = ocr_service.extract_text_from_bytes(header)
-            except OCRError as e:
-                logger.debug(f"Erro OCR na detecao de pagina de tabela: {e}")
-                text = ""
-            normalized = normalize_description(text)
-            hits = sum(1 for k in keywords if k in normalized)
-            if hits >= 2:
-                table_pages.append(index)
-                continue
-            if re.search(r"\b\d{3}\s*\d{2}\s*\d{2}\b", normalized):
-                table_pages.append(index)
-
-        # Se encontramos páginas de tabela mas não a última, incluir páginas consecutivas
-        # pois tabelas frequentemente continuam em páginas seguintes sem cabeçalho
-        if table_pages and len(images) > 1:
-            max_detected = max(table_pages)
-            # Se há páginas após a última detectada, incluí-las
-            for i in range(max_detected + 1, len(images)):
-                if i not in table_pages:
-                    table_pages.append(i)
-            table_pages.sort()
-
-        return table_pages
+        """Delega detecção de páginas com tabelas ao PDFExtractionService."""
+        return pdf_extraction_service.detect_table_pages(images)
 
     def _extract_servicos_pagewise(self, images: List[bytes], progress_callback=None, cancel_check=None) -> List[dict]:
         servicos: List[Dict[str, Any]] = []
@@ -1024,20 +2464,25 @@ class DocumentProcessor:
     def _extract_item_code(self, desc: str) -> str:
         """
         Extrai código do item da descrição (ex: "001.03.01" de "001.03.01 MOBILIZAÇÃO").
-        Também reconhece formatos com prefixo AD- (ex: "AD-1.1", "AD-1.1-A").
+        Também reconhece formatos com prefixo AD- (legacy) e reinícios Sx-.
         """
         if not desc:
             return ""
 
         text = desc.strip()
 
-        # Primeiro, tentar extrair formato com prefixo AD- (ex: AD-1.1, AD-1.1-A)
+        # Primeiro, tentar extrair formato com prefixo Sx- (ex: S2-1.1)
+        restart_match = re.match(r'^(S\d+-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
+        if restart_match:
+            return restart_match.group(1).upper()
+
+        # Tentar extrair formato com prefixo AD- (legacy: AD-1.1, AD-1.1-A)
         ad_match = re.match(r'^(AD-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
         if ad_match:
             return ad_match.group(1).upper()
 
         # Formato numérico padrão (ex: 1.1, 10.4, 10.4-A)
-        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}(?:-[A-Z])?)\b', text)
+        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}(?:-[A-Z])?)\b', text)
         if not match:
             match = re.match(r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\b', text)
 
@@ -1059,7 +2504,7 @@ class DocumentProcessor:
             return "", desc.strip()
 
         cleaned = re.sub(
-            r"^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,3}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*[-.]?\s*",
+            r"^(S\d+-)?(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*[-.]?\s*",
             "",
             desc
         ).strip()
@@ -1336,9 +2781,12 @@ class DocumentProcessor:
         cancel_check=None
     ) -> tuple[list, float, dict, dict]:
         """
-        Tenta extrair serviços de tabelas usando múltiplos métodos.
+        Extrai serviços de tabelas usando fluxo em cascata otimizado.
 
-        Tenta: Document AI, pdfplumber, OCR layout (nessa ordem de prioridade).
+        Fluxo:
+        1. pdfplumber (gratuito) - se qty_ratio >= 70%: SUCESSO
+        2. Document AI (~R$0.008/pág) - se qty_ratio >= 60%: SUCESSO
+        3. OCR Layout removido do fluxo principal (muito lento, baixa qualidade)
 
         Args:
             file_path: Caminho para o arquivo
@@ -1354,151 +2802,151 @@ class DocumentProcessor:
         table_debug: dict = {}
         table_attempts: dict = {}
 
-        table_threshold = APC.TABLE_CONFIDENCE_THRESHOLD
-        table_min_items = APC.TABLE_MIN_ITEMS
+        # Thresholds de qualidade por etapa (baseado apenas em qty_ratio)
+        # Nota: não usamos TABLE_MIN_ITEMS pois atestados podem ter apenas 1 item
+        stage1_threshold = APC.STAGE1_QTY_THRESHOLD  # 70% para pdfplumber
+        stage2_threshold = APC.STAGE2_QTY_THRESHOLD  # 60% para Document AI
+
         document_ai_enabled = APC.DOCUMENT_AI_ENABLED
-        document_ai_fallback_only = APC.DOCUMENT_AI_FALLBACK_ONLY
         document_ai_ready = document_ai_enabled and document_ai_service.is_configured
 
         if file_ext == ".pdf":
-            # Tentar Document AI primeiro (se não for fallback-only)
-            if document_ai_ready and not document_ai_fallback_only:
-                doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
-                doc_debug["source"] = "document_ai"
-                table_attempts["document_ai"] = {
-                    "count": len(doc_servicos),
-                    "confidence": doc_conf,
-                    "debug": self._summarize_table_debug(doc_debug)
-                }
-                servicos_table, table_confidence, table_debug = self._choose_best_table(
-                    servicos_table, table_confidence, table_debug,
-                    doc_servicos, doc_conf, doc_debug
-                )
+            # Analisar tipo de documento
+            doc_analysis = self._analyze_document_type(file_path)
+            table_debug["doc_analysis"] = doc_analysis
 
-            # Tentar pdfplumber
+            # ============================================================
+            # ETAPA 1: pdfplumber (GRATUITO)
+            # ============================================================
+            logger.info("Cascata Etapa 1: Tentando pdfplumber...")
             pdf_servicos, pdf_conf, pdf_debug = self._extract_servicos_from_tables(file_path)
             pdf_debug["source"] = "pdfplumber"
+            pdf_qty_ratio = self._calc_qty_ratio(pdf_servicos)
             table_attempts["pdfplumber"] = {
                 "count": len(pdf_servicos),
                 "confidence": pdf_conf,
+                "qty_ratio": pdf_qty_ratio,
                 "debug": self._summarize_table_debug(pdf_debug)
             }
-            servicos_table, table_confidence, table_debug = self._choose_best_table(
-                servicos_table, table_confidence, table_debug,
-                pdf_servicos, pdf_conf, pdf_debug
+
+            # Verificar se pdfplumber atende o threshold (apenas qty_ratio)
+            if pdf_servicos and pdf_qty_ratio >= stage1_threshold:
+                logger.info(
+                    f"Cascata: pdfplumber SUCESSO - {len(pdf_servicos)} serviços, "
+                    f"qty_ratio={pdf_qty_ratio:.0%} >= {stage1_threshold:.0%}"
+                )
+                servicos_table = pdf_servicos
+                table_confidence = pdf_conf
+                table_debug = pdf_debug
+                table_debug["cascade_stage"] = 1
+                table_debug["cascade_reason"] = "pdfplumber_success"
+                return servicos_table, table_confidence, table_debug, table_attempts
+
+            logger.info(
+                f"Cascata: pdfplumber insuficiente - {len(pdf_servicos)} serviços, "
+                f"qty_ratio={pdf_qty_ratio:.0%} < {stage1_threshold:.0%}"
             )
 
-            # Tentar OCR layout se necessário
-            needs_ocr_layout = (
-                not servicos_table
-                or table_confidence < table_threshold
-                or len(servicos_table) < table_min_items
-            )
-            if needs_ocr_layout:
-                ocr_servicos, ocr_conf, ocr_debug = self._extract_servicos_from_ocr_layout(
-                    file_path,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check
-                )
-                ocr_debug["source"] = "ocr_layout"
-                table_attempts["ocr_layout"] = {
-                    "count": len(ocr_servicos),
-                    "confidence": ocr_conf,
-                    "debug": self._summarize_table_debug(ocr_debug)
-                }
-                servicos_table, table_confidence, table_debug = self._choose_best_table(
-                    servicos_table, table_confidence, table_debug,
-                    ocr_servicos, ocr_conf, ocr_debug
-                )
+            # ============================================================
+            # ETAPA 2: Document AI (BAIXO CUSTO ~R$0.008/página)
+            # ============================================================
+            if document_ai_ready:
+                logger.info("Cascata Etapa 2: Tentando Document AI...")
+                try:
+                    doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
+                    doc_debug["source"] = "document_ai"
+                    doc_qty_ratio = self._calc_qty_ratio(doc_servicos)
+                    table_attempts["document_ai"] = {
+                        "count": len(doc_servicos),
+                        "confidence": doc_conf,
+                        "qty_ratio": doc_qty_ratio,
+                        "debug": self._summarize_table_debug(doc_debug)
+                    }
 
-            # Verificar ruído do OCR
-            ocr_noisy = False
-            if table_debug.get("source") == "ocr_layout" and servicos_table:
-                ocr_noisy, ocr_noise_debug = is_ocr_noisy(servicos_table)
-                table_debug["ocr_noise"] = ocr_noise_debug
+                    # Verificar se Document AI atende o threshold (apenas qty_ratio)
+                    if doc_servicos and doc_qty_ratio >= stage2_threshold:
+                        logger.info(
+                            f"Cascata: Document AI SUCESSO - {len(doc_servicos)} serviços, "
+                            f"qty_ratio={doc_qty_ratio:.0%} >= {stage2_threshold:.0%}"
+                        )
+                        servicos_table = doc_servicos
+                        table_confidence = doc_conf
+                        table_debug = doc_debug
+                        table_debug["cascade_stage"] = 2
+                        table_debug["cascade_reason"] = "document_ai_success"
+                        return servicos_table, table_confidence, table_debug, table_attempts
 
-            # Document AI como fallback
-            needs_document_ai = (
-                document_ai_ready
-                and document_ai_fallback_only
-                and (
-                    not servicos_table
-                    or table_confidence < table_threshold
-                    or len(servicos_table) < table_min_items
-                    or ocr_noisy
-                )
-            )
-            if needs_document_ai:
-                doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
-                doc_debug["source"] = "document_ai"
-                table_attempts["document_ai"] = {
-                    "count": len(doc_servicos),
-                    "confidence": doc_conf,
-                    "debug": self._summarize_table_debug(doc_debug)
-                }
-                servicos_table, table_confidence, table_debug = self._choose_best_table(
-                    servicos_table, table_confidence, table_debug,
-                    doc_servicos, doc_conf, doc_debug
-                )
+                    logger.info(
+                        f"Cascata: Document AI insuficiente - {len(doc_servicos)} serviços, "
+                        f"qty_ratio={doc_qty_ratio:.0%} < {stage2_threshold:.0%}"
+                    )
+
+                    # Se Document AI tem melhor qualidade que pdfplumber, usar ele
+                    if doc_qty_ratio > pdf_qty_ratio:
+                        servicos_table = doc_servicos
+                        table_confidence = doc_conf
+                        table_debug = doc_debug
+                        table_debug["cascade_stage"] = 2
+                        table_debug["cascade_reason"] = "document_ai_better"
+
+                except Exception as e:
+                    logger.warning(f"Cascata: Document AI falhou - {e}")
+                    table_attempts["document_ai"] = {"error": str(e)}
+            else:
+                logger.info("Cascata: Document AI não disponível")
+
+            # ============================================================
+            # FALLBACK: Usar melhor resultado disponível
+            # ============================================================
+            if not servicos_table and pdf_servicos:
+                servicos_table = pdf_servicos
+                table_confidence = pdf_conf
+                table_debug = pdf_debug
+                table_debug["cascade_stage"] = 1
+                table_debug["cascade_reason"] = "pdfplumber_fallback"
+                logger.info(f"Cascata: Usando pdfplumber como fallback ({len(pdf_servicos)} serviços)")
 
         elif file_ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
-            # Imagem: tentar Document AI e OCR layout
-            if document_ai_ready and not document_ai_fallback_only:
-                doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
-                doc_debug["source"] = "document_ai"
-                table_attempts["document_ai"] = {
-                    "count": len(doc_servicos),
-                    "confidence": doc_conf,
-                    "debug": self._summarize_table_debug(doc_debug)
-                }
-                servicos_table, table_confidence, table_debug = self._choose_best_table(
-                    servicos_table, table_confidence, table_debug,
-                    doc_servicos, doc_conf, doc_debug
-                )
+            # ============================================================
+            # IMAGEM: Ir direto para Document AI
+            # ============================================================
+            logger.info("Imagem detectada: Usando Document AI diretamente")
 
-            ocr_servicos, ocr_conf, ocr_debug = self._extract_servicos_from_ocr_layout(
-                file_path,
-                progress_callback=progress_callback,
-                cancel_check=cancel_check
-            )
-            ocr_debug["source"] = "ocr_layout"
-            table_attempts["ocr_layout"] = {
-                "count": len(ocr_servicos),
-                "confidence": ocr_conf,
-                "debug": self._summarize_table_debug(ocr_debug)
-            }
-            servicos_table, table_confidence, table_debug = self._choose_best_table(
-                servicos_table, table_confidence, table_debug,
-                ocr_servicos, ocr_conf, ocr_debug
-            )
+            if document_ai_ready:
+                try:
+                    doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
+                    doc_debug["source"] = "document_ai"
+                    doc_qty_ratio = self._calc_qty_ratio(doc_servicos)
+                    table_attempts["document_ai"] = {
+                        "count": len(doc_servicos),
+                        "confidence": doc_conf,
+                        "qty_ratio": doc_qty_ratio,
+                        "debug": self._summarize_table_debug(doc_debug)
+                    }
 
-            ocr_noisy = False
-            if table_debug.get("source") == "ocr_layout" and servicos_table:
-                ocr_noisy, ocr_noise_debug = is_ocr_noisy(servicos_table)
-                table_debug["ocr_noise"] = ocr_noise_debug
+                    if doc_servicos and doc_qty_ratio >= stage2_threshold:
+                        servicos_table = doc_servicos
+                        table_confidence = doc_conf
+                        table_debug = doc_debug
+                        table_debug["cascade_stage"] = 2
+                        table_debug["cascade_reason"] = "document_ai_image"
+                        logger.info(
+                            f"Imagem: Document AI SUCESSO - {len(doc_servicos)} serviços, "
+                            f"qty_ratio={doc_qty_ratio:.0%}"
+                        )
 
-            needs_document_ai = (
-                document_ai_ready
-                and document_ai_fallback_only
-                and (
-                    not servicos_table
-                    or table_confidence < table_threshold
-                    or len(servicos_table) < table_min_items
-                    or ocr_noisy
-                )
-            )
-            if needs_document_ai:
-                doc_servicos, doc_conf, doc_debug = self._extract_servicos_from_document_ai(file_path)
-                doc_debug["source"] = "document_ai"
-                table_attempts["document_ai"] = {
-                    "count": len(doc_servicos),
-                    "confidence": doc_conf,
-                    "debug": self._summarize_table_debug(doc_debug)
-                }
-                servicos_table, table_confidence, table_debug = self._choose_best_table(
-                    servicos_table, table_confidence, table_debug,
-                    doc_servicos, doc_conf, doc_debug
-                )
+                except Exception as e:
+                    logger.warning(f"Imagem: Document AI falhou - {e}")
+                    table_attempts["document_ai"] = {"error": str(e)}
+            else:
+                logger.warning("Imagem: Document AI não disponível")
+
+        # Adicionar resumo do fluxo
+        table_debug["cascade_summary"] = {
+            "final_source": table_debug.get("source", "none"),
+            "final_stage": table_debug.get("cascade_stage", 0),
+            "attempts": list(table_attempts.keys())
+        }
 
         return servicos_table, table_confidence, table_debug, table_attempts
 
@@ -1543,12 +2991,14 @@ class DocumentProcessor:
         use_ai_for_services = not llm_fallback_only or not table_used
 
         # Método 1: OCR + análise de texto
-        self._notify_progress(progress_callback, 0, 0, "ia", "Analisando texto com IA")
-        self._check_cancel(cancel_check)
+        pdf_extraction_service._notify_progress(progress_callback, 0, 0, "ia", "Analisando texto com IA")
+        pdf_extraction_service._check_cancel(cancel_check)
         dados_ocr = ai_provider.extract_atestado_info(texto)
 
         # Método 2: Vision (GPT-4o ou Gemini)
-        if use_vision:
+        # OTIMIZAÇÃO: Só chamar Vision se precisamos da IA para serviços
+        # Quando tabela funciona (use_ai_for_services=False), pular Vision para economizar
+        if use_vision and use_ai_for_services:
             try:
                 if file_ext == ".pdf":
                     images = self._pdf_to_images(
@@ -1570,6 +3020,8 @@ class DocumentProcessor:
             except (OpenAIError, ValueError, KeyError) as e:
                 logger.warning(f"Erro no Vision: {e}")
                 dados_vision = None
+        elif use_vision and not use_ai_for_services:
+            logger.info("Vision pulado: tabela extraiu serviços com sucesso (economia de custo)")
 
         servicos_vision = filter_summary_rows(dados_vision.get("servicos", []) if dados_vision else [])
         servicos_ocr = filter_summary_rows(dados_ocr.get("servicos", []) if dados_ocr else [])
@@ -1635,35 +3087,34 @@ class DocumentProcessor:
             dados["servicos"] = merge_servicos_prefer_primary(primary_servicos, secondary_servicos)
 
         else:
-            primary_source = "ocr" if dados_ocr else "vision"
-            dados = dados_ocr or {
-                "descricao_servico": None,
-                "quantidade": None,
-                "unidade": None,
-                "contratante": None,
-                "data_emissao": None,
-                "servicos": []
-            }
-            if dados.get("servicos"):
-                dados["servicos"] = prefix_aditivo_items(dados["servicos"], texto)
-
-        # Se tabela foi usada com alta confiança, comparar com IA
-        if table_used and not use_ai_for_services:
-            servicos_table_filtered = [
-                s for s in servicos_table
-                if s.get("quantidade") is not None
-            ]
-            servicos_table_filtered = prefix_aditivo_items(servicos_table_filtered, texto)
-
-            ai_servicos = dados.get("servicos") or []
-            ai_servicos_count = len(ai_servicos) if isinstance(ai_servicos, list) else 0
-            table_servicos_count = len(servicos_table_filtered)
-
-            if table_servicos_count >= ai_servicos_count:
-                dados["servicos"] = servicos_table_filtered
-                primary_source = "table_services"
+            if dados_vision:
+                primary_source = "vision"
+                dados = dados_vision
+            elif dados_ocr:
+                primary_source = "ocr"
+                dados = dados_ocr
             else:
-                primary_source = primary_source + "_ai_preferred"
+                primary_source = "none"
+                dados = {
+                    "descricao_servico": None,
+                    "quantidade": None,
+                    "unidade": None,
+                    "contratante": None,
+                    "data_emissao": None,
+                    "servicos": []
+                }
+            servicos_list = dados.get("servicos")
+            if servicos_list:
+                dados["servicos"] = prefix_aditivo_items(servicos_list, texto)
+
+        # Se tabela foi usada com alta confiança e LLM é apenas fallback, usar tabela
+        if table_used and not use_ai_for_services:
+            servicos_table_filtered = prefix_aditivo_items(list(servicos_table), texto)
+
+            # Sempre usar tabela quando LLM_FALLBACK_ONLY=True e tabela disponível
+            # A tabela estruturada é mais confiável que a IA para extração de itens
+            dados["servicos"] = servicos_table_filtered
+            primary_source = "table_services"
 
         debug_info = {
             "vision": {"count": len(servicos_vision), "score": vision_score, "reprocessed": vision_reprocessed},
@@ -1681,7 +3132,10 @@ class DocumentProcessor:
         servicos: list,
         use_ai: bool,
         table_used: bool,
-        servicos_table: list
+        servicos_table: list,
+        texto: str,
+        strict_item_gate: bool = False,
+        skip_no_code_dedupe: bool = False
     ) -> list:
         """
         Aplica pós-processamento nos serviços extraídos.
@@ -1693,11 +3147,17 @@ class DocumentProcessor:
             use_ai: Se IA foi usada
             table_used: Se tabela foi usada com alta confiança
             servicos_table: Serviços da tabela (para enriquecimento)
+            texto: Texto extraido do documento
+            strict_item_gate: Se True, remove itens nao encontrados no texto/tabela
+            skip_no_code_dedupe: Se True, evita dedupe agressiva para documentos sem itens numerados
 
         Returns:
             Lista de serviços processados
         """
         servicos = filter_summary_rows(servicos)
+
+        # Fix A3: Extrair itens ocultos de descrições (antes de normalização)
+        servicos = self._extract_hidden_items_from_servicos(servicos)
 
         # Enriquecer com dados da tabela se IA foi usada
         if use_ai and not table_used:
@@ -1722,12 +3182,38 @@ class DocumentProcessor:
                 servico["quantidade"] = qty
             unit = servico.get("unidade")
             if isinstance(unit, str):
-                servico["unidade"] = unit.strip()
+                unit = unit.strip()
+                if unit:
+                    unit = normalize_unit(unit)
+                servico["unidade"] = unit
+            desc = servico.get("descricao") or ""
+            cleaned_desc = self._strip_trailing_unit_qty(desc, unit, qty)
+            if cleaned_desc and cleaned_desc != desc:
+                servico["descricao"] = cleaned_desc
+            # Fix B2: Remover prefixo UN/QTD da descrição
+            desc = servico.get("descricao") or ""
+            cleaned_prefix = self._strip_unit_qty_prefix(desc)
+            if cleaned_prefix and cleaned_prefix != desc:
+                servico["descricao"] = cleaned_prefix
+
+        servicos = self._normalize_restart_prefixes_by_planilha(servicos)
+        servicos = self._dedupe_restart_prefix_duplicates(servicos)
+        servicos = self._dedupe_same_code_within_planilha(servicos)
+
+        if strict_item_gate:
+            servicos = self._filter_items_not_in_text_or_table(servicos, texto, servicos_table)
 
         # Aplicar filtros
         servicos = filter_classification_paths(servicos)
-        servicos = remove_duplicate_services(servicos)
+        if skip_no_code_dedupe:
+            com_item = [s for s in servicos if s.get("item")]
+            sem_item = [s for s in servicos if not s.get("item")]
+            sem_item = self._dedupe_no_code_by_desc_unit(sem_item)
+            servicos = com_item + sem_item
+        else:
+            servicos = remove_duplicate_services(servicos)
         servicos = self._remove_duplicate_pairs(servicos)
+        servicos = self._filter_section_headers(servicos)
         servicos = self._filter_items_without_quantity(servicos)
         servicos = self._filter_items_without_code(servicos)
 
@@ -1816,8 +3302,10 @@ class DocumentProcessor:
             desc = (servico.get("descricao") or "").strip()
             item_code = servico.get("item")
 
-            # Só processar se descrição muito curta e tem código válido
-            if len(desc) >= 10 or not item_code:
+            # Só processar se descrição curta ou claramente um cabeçalho
+            if not item_code:
+                continue
+            if len(desc) >= 10 and not self._is_section_header_desc(desc):
                 continue
 
             line_idx = line_map.get(str(item_code))
@@ -1828,13 +3316,15 @@ class DocumentProcessor:
             prev_line = lines[line_idx - 1].strip()
 
             # A linha anterior deve ser texto (não um código de item)
-            if re.match(r'^\d+\.\d+', prev_line):
+            if re.match(r'^(S\d+-)?\d+\.\d+', prev_line):
                 continue
 
             # Ignorar linhas muito curtas ou que são apenas números
             if len(prev_line) < 15:
                 continue
             if re.match(r'^[\d\s,\.]+$', prev_line):
+                continue
+            if self._is_section_header_desc(prev_line):
                 continue
 
             # Ignorar linhas de cabeçalho/rodapé comuns
@@ -1881,24 +3371,73 @@ class DocumentProcessor:
         file_ext = Path(file_path).suffix.lower()
 
         # 1. Extrair texto do documento
-        texto = self._extract_texto_from_file(
-            file_path, file_ext, progress_callback, cancel_check
-        )
-
-        # 2. Extrair serviços de tabelas (múltiplos métodos)
-        servicos_table, table_confidence, table_debug, table_attempts = \
-            self._extract_servicos_from_all_tables(
+        doc_analysis = None
+        images = None
+        if file_ext == ".pdf":
+            doc_analysis = table_extraction_service.analyze_document_type(file_path)
+            if isinstance(doc_analysis, dict) and doc_analysis.get("is_scanned"):
+                images = self._pdf_to_images(
+                    file_path,
+                    dpi=300,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check,
+                    stage="ocr"
+                )
+                texto = self._ocr_image_list(images, progress_callback, cancel_check)
+            else:
+                texto = self._extract_texto_from_file(
+                    file_path, file_ext, progress_callback, cancel_check
+                )
+        else:
+            texto = self._extract_texto_from_file(
                 file_path, file_ext, progress_callback, cancel_check
             )
 
-        # Determinar se tabela será usada
-        table_threshold = APC.TABLE_CONFIDENCE_THRESHOLD
-        table_min_items = APC.TABLE_MIN_ITEMS
-        table_used = (
+        # 2. Extrair serviços de tabelas (múltiplos métodos)
+        servicos_table, table_confidence, table_debug, table_attempts = \
+            table_extraction_service.extract_cascade(
+                file_path,
+                file_ext,
+                progress_callback,
+                cancel_check,
+                doc_analysis=doc_analysis
+            )
+
+        # Stage 1.5: backfill de quantidades via texto para PDFs digitais
+        text_backfill = {}
+        if (
             servicos_table
-            and table_confidence >= table_threshold
-            and len(servicos_table) >= table_min_items
-        )
+            and texto
+            and isinstance(doc_analysis, dict)
+            and not doc_analysis.get("is_scanned")
+            and not doc_analysis.get("has_image_tables")
+        ):
+            cleared = self._clear_item_code_quantities(servicos_table)
+            filled = self._backfill_quantities_from_text(servicos_table, texto)
+            if cleared or filled:
+                text_backfill = {"cleared": cleared, "filled": filled}
+        if text_backfill and isinstance(table_debug, dict):
+            table_debug["text_backfill"] = text_backfill
+
+        # Determinar se tabela será usada (validação final)
+        # Usar threshold mais permissivo na validação final (Stage 3)
+        # Nota: não usamos TABLE_MIN_ITEMS pois atestados podem ter apenas 1 item
+        min_qty_ratio = APC.STAGE3_QTY_THRESHOLD
+
+        # Calcular qty_ratio
+        qty_ratio = table_extraction_service.calc_qty_ratio(servicos_table)
+
+        # Tabela é usada se passou pela cascata com qualidade aceitável
+        cascade_stage = table_debug.get("cascade_stage", 0) if isinstance(table_debug, dict) else 0
+
+        # Critério simplificado: apenas qty_ratio
+        table_used = bool(servicos_table and qty_ratio >= min_qty_ratio)
+
+        if servicos_table and not table_used:
+            logger.info(
+                f"Tabela descartada na validação final: {len(servicos_table)} itens, "
+                f"qty_ratio={qty_ratio:.2%} < {min_qty_ratio:.0%}, cascade_stage={cascade_stage}"
+            )
 
         if isinstance(table_debug, dict):
             table_debug.setdefault("attempts", table_attempts)
@@ -1907,10 +3446,16 @@ class DocumentProcessor:
         use_ai = ai_provider.is_configured
 
         if use_ai:
-            dados, primary_source, ai_debug_info = self._extract_dados_with_ai(
-                file_path, file_ext, texto, use_vision,
-                servicos_table, table_used,
-                progress_callback, cancel_check
+            dados, primary_source, ai_debug_info = document_analysis_service.extract_dados_with_ai(
+                file_path,
+                file_ext,
+                texto,
+                use_vision,
+                servicos_table,
+                table_used,
+                progress_callback,
+                cancel_check,
+                images=images
             )
 
             dados["_debug"] = {
@@ -1918,7 +3463,9 @@ class DocumentProcessor:
                 "table": {
                     "count": len(servicos_table),
                     "confidence": table_confidence,
+                    "qty_ratio": qty_ratio,
                     "used": table_used,
+                    "cascade_stage": cascade_stage,
                     "debug": table_debug
                 },
                 "primary_source": primary_source,
@@ -1926,11 +3473,7 @@ class DocumentProcessor:
             }
         else:
             # IA não configurada - usar apenas tabela
-            servicos_table_filtered = [
-                s for s in servicos_table
-                if s.get("quantidade") is not None
-            ] if table_used else []
-            servicos_table_filtered = prefix_aditivo_items(servicos_table_filtered, texto)
+            servicos_table_filtered = prefix_aditivo_items(list(servicos_table), texto) if table_used else []
 
             dados = {
                 "descricao_servico": None,
@@ -1944,7 +3487,9 @@ class DocumentProcessor:
                 "table": {
                     "count": len(servicos_table),
                     "confidence": table_confidence,
+                    "qty_ratio": qty_ratio,
                     "used": table_used,
+                    "cascade_stage": cascade_stage,
                     "debug": table_debug
                 },
                 "primary_source": "table" if table_used else "none",
@@ -1957,13 +3502,203 @@ class DocumentProcessor:
 
         # Recuperar descrições ausentes do texto OCR
         servicos_raw = dados.get("servicos") or []
+        text_items: List[Dict[str, Any]] = []
+        itemless_mode = False
+        text_section_enabled = True
+        text_section_reason = None
+        if table_used and isinstance(table_debug, dict):
+            source = (table_debug.get("source") or "").lower()
+            stats = table_debug.get("stats") or {}
+            duplicate_ratio = stats.get("duplicate_ratio", 0.0)
+            if (
+                source == "pdfplumber"
+                and table_confidence >= APC.TEXT_SECTION_TABLE_CONFIDENCE_MIN
+                and qty_ratio >= APC.TEXT_SECTION_QTY_RATIO_MIN
+                and duplicate_ratio <= APC.TEXT_SECTION_DUP_RATIO_MAX
+            ):
+                text_section_enabled = False
+                text_section_reason = (
+                    "strong_table "
+                    f"source={source} qty_ratio={qty_ratio:.2f} "
+                    f"confidence={table_confidence:.2f} duplicate_ratio={duplicate_ratio:.2f}"
+                )
+                logger.info(f"[TEXTO] text_section desativado: {text_section_reason}")
+        if texto and isinstance(doc_analysis, dict) and not doc_analysis.get("is_scanned") and table_used:
+            page_segments = self._split_text_by_pages(texto)
+            page_planilha_map, page_planilha_audit = self._build_page_planilha_map(page_segments)
+            if page_planilha_map:
+                remapped = self._apply_page_planilha_map(servicos_raw, page_planilha_map)
+                if remapped:
+                    logger.info(f"[TEXTO] Planilha reatribuida por pagina: {remapped} itens")
+                if isinstance(dados.get("_debug"), dict):
+                    dados["_debug"]["page_planilha"] = {
+                        "map": page_planilha_map,
+                        "audit": page_planilha_audit
+                    }
+            text_items = []
+            section_items = []
+            if page_planilha_map:
+                for page_num, page_text in page_segments:
+                    planilha_id = page_planilha_map.get(page_num, 0)
+                    if not planilha_id:
+                        continue
+                    page_text_items = self._extract_items_from_text_lines(page_text)
+                    page_section_items = (
+                        self._extract_items_from_text_section(page_text) if text_section_enabled else []
+                    )
+                    for item in page_text_items + page_section_items:
+                        prefix, core = self._split_restart_prefix(item.get("item"))
+                        if prefix:
+                            item["item"] = core
+                            item.pop("_item_prefix", None)
+                        item["_page"] = page_num
+                        item["_planilha_id"] = planilha_id
+                    text_items.extend(page_text_items)
+                    section_items.extend(page_section_items)
+            else:
+                text_items = self._extract_items_from_text_lines(texto)
+                section_items = self._extract_items_from_text_section(texto) if text_section_enabled else []
+            text_codes = self._extract_item_codes_from_text_lines(texto)
+            updated = self._refine_item_codes_from_text(servicos_raw, text_items, text_codes)
+            if updated:
+                logger.info(f"[TEXTO] Codigos refinados do texto: {updated}")
+            text_candidates = []
+            if section_items:
+                text_candidates.extend(section_items)
+            if text_items:
+                text_candidates.extend(text_items)
+            prefix_map, unique_prefix_by_code = self._build_restart_prefix_maps(servicos_raw)
+            if text_candidates and (prefix_map or unique_prefix_by_code):
+                for item in text_candidates:
+                    prefix, core = self._split_restart_prefix(item.get("item"))
+                    if prefix:
+                        continue
+                    code = self._normalize_item_code(core)
+                    if not code:
+                        continue
+                    unit = normalize_unit(item.get("unidade") or "")
+                    qty = parse_quantity(item.get("quantidade"))
+                    mapped = prefix_map.get((code, unit, qty)) or unique_prefix_by_code.get(code)
+                    if mapped:
+                        item["item"] = f"{mapped}-{code}"
+            text_map = self._build_text_item_map(text_candidates)
+            enriched = self._apply_text_descriptions(servicos_raw, text_map)
+            if enriched:
+                logger.info(f"[TEXTO] Descricoes enriquecidas pelo texto: {enriched}")
+            existing_index: Dict[tuple, dict] = {}
+            existing_keys = set()
+            for servico in servicos_raw:
+                key = self._item_key(servico)
+                if key:
+                    existing_keys.add(key)
+                    existing_index[key] = servico
+            if text_candidates:
+                added = 0
+                replaced = 0
+                for item in text_candidates:
+                    key = self._item_key(item)
+                    if not key:
+                        continue
+                    existing = existing_index.get(key)
+                    if existing:
+                        if self._should_replace_desc(existing.get("descricao") or "", item.get("descricao") or ""):
+                            existing["descricao"] = (item.get("descricao") or "").strip()
+                            existing["_desc_from_text"] = True
+                            replaced += 1
+                        continue
+                    servicos_raw.append(item)
+                    existing_keys.add(key)
+                    existing_index[key] = item
+                    added += 1
+                if added:
+                    logger.info(f"[TEXTO] Itens adicionados do texto: {added}")
+                if replaced:
+                    logger.info(f"[TEXTO] Itens atualizados pelo texto: {replaced}")
+            structured_ratio = None
+            with_code = [s for s in servicos_raw if s.get("item")]
+            if with_code:
+                structured = [
+                    parse_item_tuple(str(s.get("item")))
+                    for s in with_code
+                ]
+                structured = [t for t in structured if t and len(t) >= 2]
+                structured_ratio = len(structured) / len(with_code)
+            if structured_ratio is not None and structured_ratio < 0.4:
+                itemless_mode = True
+                no_code_items = self._extract_items_without_codes_from_text(texto)
+                if no_code_items:
+                    if len(no_code_items) >= len(servicos_raw):
+                        servicos_raw = list(no_code_items)
+                        logger.info(f"[TEXTO] Itens sem codigo substituindo tabela: {len(servicos_raw)}")
+                    else:
+                        existing_keys = set()
+                        for existing in servicos_raw:
+                            desc_key = normalize_description(existing.get("descricao") or "")[:80]
+                            unit_key = normalize_unit(existing.get("unidade") or "")
+                            qty_key = parse_quantity(existing.get("quantidade"))
+                            existing_keys.add((desc_key, unit_key, qty_key))
+                        added_no_code = 0
+                        for item in no_code_items:
+                            desc_key = normalize_description(item.get("descricao") or "")[:80]
+                            unit_key = normalize_unit(item.get("unidade") or "")
+                            qty_key = parse_quantity(item.get("quantidade"))
+                            key = (desc_key, unit_key, qty_key)
+                            if key in existing_keys:
+                                continue
+                            existing_keys.add(key)
+                            if key:
+                                servicos_raw.append(item)
+                                added_no_code += 1
+                        if added_no_code:
+                            logger.info(f"[TEXTO] Itens sem codigo adicionados do texto: {added_no_code}")
+        if isinstance(dados.get("_debug"), dict):
+            dados["_debug"]["text_section"] = {
+                "enabled": text_section_enabled,
+                "reason": text_section_reason,
+                "max_desc_len": APC.TEXT_SECTION_MAX_DESC_LEN,
+                "table_confidence_min": APC.TEXT_SECTION_TABLE_CONFIDENCE_MIN,
+                "qty_ratio_min": APC.TEXT_SECTION_QTY_RATIO_MIN,
+                "dup_ratio_max": APC.TEXT_SECTION_DUP_RATIO_MAX
+            }
+
+        cleared = self._clear_item_code_quantities(servicos_raw)
+        if texto:
+            needs_qty = any(parse_quantity(s.get("quantidade")) in (None, 0) for s in servicos_raw)
+            if cleared or needs_qty:
+                self._backfill_quantities_from_text(servicos_raw, texto)
         servicos_raw = self._recover_descriptions_from_text(servicos_raw, texto)
+        text_item_count = self._count_item_codes_in_text(texto)
+        strict_item_gate = bool(texto) and isinstance(doc_analysis, dict) and not doc_analysis.get("is_scanned") and text_item_count >= 5
+        if strict_item_gate and table_used and servicos_raw:
+            with_code = [s for s in servicos_raw if s.get("item")]
+            if with_code:
+                structured = [
+                    parse_item_tuple(str(s.get("item")))
+                    for s in with_code
+                ]
+                structured = [t for t in structured if t and len(t) >= 2]
+                structured_ratio = len(structured) / len(with_code)
+                if structured_ratio < 0.4:
+                    logger.info(
+                        f"[FILTRO] strict_item_gate desativado: baixa proporcao de codigos estruturados ({structured_ratio:.0%})"
+                    )
+                    strict_item_gate = False
+        if strict_item_gate and isinstance(table_debug, dict):
+            table_source = (table_debug.get("source") or "").lower()
+            if table_source and table_source != "pdfplumber":
+                logger.info(
+                    f"[FILTRO] strict_item_gate desativado: tabela veio de {table_source}"
+                )
+                strict_item_gate = False
 
         servicos = self._postprocess_servicos(
             servicos_raw,
             use_ai,
             table_used,
-            servicos_table
+            servicos_table,
+            texto,
+            strict_item_gate,
+            skip_no_code_dedupe=itemless_mode
         )
 
         dados["servicos"] = servicos
@@ -2057,7 +3792,7 @@ class DocumentProcessor:
         Returns:
             Resultado da análise com status de atendimento
         """
-        return ai_provider.match_atestados(exigencias, atestados)
+        return matching_service.match_exigencias(exigencias, atestados)
 
     def get_status(self) -> Dict[str, Any]:
         """

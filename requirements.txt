@@ -1,39 +1,39 @@
 # FastAPI e servidor
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+fastapi==0.128.0
+uvicorn[standard]==0.40.0
+python-multipart==0.0.21
 
 # Banco de dados
 sqlalchemy==2.0.45
-aiosqlite==0.19.0
+aiosqlite==0.22.1
 
 # Autenticação
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 
 # Extração de PDF
-pdfplumber==0.10.3
+pdfplumber==0.11.9
 PyMuPDF==1.26.7
 
 # OCR
-easyocr==1.7.1
+easyocr==1.7.2
 
 # OpenAI
-openai==1.109.1
+openai==2.15.0
 
 # Google Gemini
-google-genai==0.5.0
-google-cloud-documentai==2.30.0
-Pillow==11.3.0
+google-genai==1.59.0
+google-cloud-documentai==3.8.0
+Pillow==12.1.0
 
 # Utilitários
-python-dotenv==1.0.0
+python-dotenv==1.2.1
 pydantic[email]==2.12.5
 pydantic-settings==2.12.0
 
 # Azure Document Intelligence (OCR Cloud)
-azure-ai-documentintelligence==1.0.0
-azure-core==1.30.0
+azure-ai-documentintelligence==1.0.2
+azure-core==1.38.0
 
 # Processamento de imagem (pré-processamento para OCR)
 # scipy==1.11.4  # Opcional - descomente se necessário (requer build tools)

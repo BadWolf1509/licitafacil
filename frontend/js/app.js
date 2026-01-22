@@ -177,10 +177,13 @@ function formatarData(dataISO) {
  * Formata um número para exibição
  */
 function formatarNumero(numero, decimais = 2) {
+    if (numero === null || numero === undefined) return '-';
+    const parsed = Number(numero);
+    if (!Number.isFinite(parsed)) return '-';
     return new Intl.NumberFormat('pt-BR', {
         minimumFractionDigits: decimais,
         maximumFractionDigits: decimais
-    }).format(numero);
+    }).format(parsed);
 }
 
 // Fechar modal ao clicar fora

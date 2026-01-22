@@ -21,6 +21,7 @@ class PDFExtractor:
 
         Args:
             file_path: Caminho para o arquivo PDF
+            include_page: Se True, inclui numero da pagina por tabela
 
         Returns:
             Texto extraído do PDF
@@ -38,7 +39,11 @@ class PDFExtractor:
 
         return "\n\n".join(text_parts)
 
-    def extract_tables(self, file_path: str) -> List[List[List[str]]]:
+    def extract_tables(
+        self,
+        file_path: str,
+        include_page: bool = False
+    ) -> List[Any]:
         """
         Extrai todas as tabelas de um PDF.
 
@@ -48,11 +53,11 @@ class PDFExtractor:
         Returns:
             Lista de tabelas, onde cada tabela é uma lista de linhas
         """
-        all_tables = []
+        all_tables: List[Any] = []
 
         try:
             with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
+                for page_index, page in enumerate(pdf.pages, start=1):
                     tables = page.extract_tables()
                     if tables:
                         for table in tables:
@@ -68,7 +73,13 @@ class PDFExtractor:
                                     cleaned_table.append(cleaned_row)
 
                             if cleaned_table:
-                                all_tables.append(cleaned_table)
+                                if include_page:
+                                    all_tables.append({
+                                        "rows": cleaned_table,
+                                        "page": page_index
+                                    })
+                                else:
+                                    all_tables.append(cleaned_table)
         except Exception as e:
             raise PDFError("extrair tabelas", str(e))
 

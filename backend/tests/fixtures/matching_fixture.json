@@ -1,0 +1,40 @@
+{
+  "exigencias": [
+    {
+      "descricao": "Fornecimento e instalacao de cabo de cobre flexivel isolado",
+      "quantidade_minima": 100.0,
+      "unidade": "M"
+    },
+    {
+      "descricao": "Forro em placas de gesso",
+      "quantidade_minima": 50.0,
+      "unidade": "M2"
+    }
+  ],
+  "atestados": [
+    {
+      "id": 1,
+      "descricao_servico": "Atestado eletrica",
+      "servicos_json": [
+        {
+          "item": "1.1",
+          "descricao": "CABO DE COBRE FLEXIVEL ISOLADO, 2,5 MM2, ANTI-CHAMA 450/750 V, FORNECIMENTO E INSTALACAO",
+          "quantidade": 120.0,
+          "unidade": "M"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "descricao_servico": "Atestado arquitetura",
+      "servicos_json": [
+        {
+          "item": "2.1",
+          "descricao": "FORRO EM PLACAS DE GESSO PARA AMBIENTES COMERCIAIS",
+          "quantidade": 60.0,
+          "unidade": "M2"
+        }
+      ]
+    }
+  ]
+}

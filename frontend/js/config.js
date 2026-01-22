@@ -16,9 +16,9 @@ const CONFIG = {
 // Funções auxiliares para requisições à API
 const api = {
     /**
-     * Faz uma requisição à API
+     * Faz uma requisicao a API
      * @param {string} endpoint - Endpoint da API (ex: '/auth/login')
-     * @param {object} options - Opções do fetch
+     * @param {object} options - Opcoes do fetch
      * @returns {Promise<object>} - Resposta da API
      */
     async request(endpoint, options = {}) {
@@ -40,10 +40,24 @@ const api = {
                 headers
             });
 
-            const data = await response.json();
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = null;
+            }
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Erro na requisição');
+                if (response.status === 401) {
+                    localStorage.removeItem(CONFIG.TOKEN_KEY);
+                    localStorage.removeItem(CONFIG.USER_KEY);
+                    if (!window.location.pathname.endsWith('index.html')) {
+                        window.location.href = 'index.html';
+                    }
+                    throw new Error('Sessao expirada. Faca login novamente.');
+                }
+                const message = (data && data.detail) ? data.detail : `Erro na requisicao (${response.status})`;
+                throw new Error(message);
             }
 
             return data;
@@ -53,7 +67,7 @@ const api = {
         }
     },
 
-    // Métodos convenientes
+    // Metodos convenientes
     get(endpoint) {
         return this.request(endpoint, { method: 'GET' });
     },
@@ -86,7 +100,7 @@ const api = {
     /**
      * Upload de arquivo
      * @param {string} endpoint - Endpoint da API
-     * @param {FormData} formData - Dados do formulário com arquivo
+     * @param {FormData} formData - Dados do formulario com arquivo
      * @returns {Promise<object>} - Resposta da API
      */
     async upload(endpoint, formData) {
@@ -105,10 +119,24 @@ const api = {
                 body: formData
             });
 
-            const data = await response.json();
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = null;
+            }
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Erro no upload');
+                if (response.status === 401) {
+                    localStorage.removeItem(CONFIG.TOKEN_KEY);
+                    localStorage.removeItem(CONFIG.USER_KEY);
+                    if (!window.location.pathname.endsWith('index.html')) {
+                        window.location.href = 'index.html';
+                    }
+                    throw new Error('Sessao expirada. Faca login novamente.');
+                }
+                const message = (data && data.detail) ? data.detail : `Erro no upload (${response.status})`;
+                throw new Error(message);
             }
 
             return data;

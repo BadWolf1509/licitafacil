@@ -67,6 +67,31 @@
             border-bottom: none;
         }
 
+        .atestado-itens {
+            margin-top: var(--spacing-sm);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+        }
+
+        .atestado-itens summary {
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .atestado-item-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .atestado-item-detail:last-child {
+            border-bottom: none;
+        }
+
         .progress-bar {
             height: 8px;
             background: var(--bg-secondary);
@@ -312,14 +337,17 @@
                 container.innerHTML = analise.resultado_json.map(r => {
                     const statusIcon = r.status === 'atende' ? '✅' : r.status === 'parcial' ? '⚠️' : '❌';
                     const statusClass = r.status === 'atende' ? 'success' : r.status === 'parcial' ? 'warning' : 'error';
+                    const exigenciaDescricao = r.exigencia?.descricao || 'Exigencia sem descricao';
+                    const exigenciaQuantidade = r.exigencia?.quantidade_minima;
+                    const exigenciaUnidade = r.exigencia?.unidade || '-';
 
                     return `
                         <div class="card resultado-card">
                             <div class="resultado-header">
                                 <div>
-                                    <h3>${r.exigencia.descricao}</h3>
+                                    <h3>${exigenciaDescricao}</h3>
                                     <p class="text-muted">
-                                        Mínimo exigido: ${formatarNumero(r.exigencia.quantidade_minima)} ${r.exigencia.unidade}
+                                        Mínimo exigido: ${formatarNumero(exigenciaQuantidade)} ${exigenciaUnidade}
                                     </p>
                                 </div>
                                 <div class="resultado-status status-${statusClass}">
@@ -336,12 +364,23 @@
                                     ${r.atestados_recomendados.map(at => `
                                         <div class="atestado-item">
                                             <span>${at.descricao_servico}</span>
-                                            <span>${formatarNumero(at.quantidade)} ${at.unidade} (${at.percentual_cobertura.toFixed(1)}%)</span>
+                                            <span>${formatarNumero(at.quantidade)} ${at.unidade || '-'} (${at.percentual_cobertura.toFixed(1)}%)</span>
                                         </div>
+                                        ${(at.itens && at.itens.length) ? `
+                                            <details class="atestado-itens">
+                                                <summary>Itens usados (${at.itens.length})</summary>
+                                                ${at.itens.map(item => `
+                                                    <div class="atestado-item-detail">
+                                                        <span>${item.item ? item.item + ' - ' : ''}${item.descricao || '-'}</span>
+                                                        <span>${formatarNumero(item.quantidade)} ${item.unidade || '-'}</span>
+                                                    </div>
+                                                `).join('')}
+                                            </details>
+                                        ` : ''}
                                     `).join('')}
                                     <div class="atestado-item" style="font-weight: bold;">
                                         <span>Total</span>
-                                        <span>${formatarNumero(r.soma_quantidades)} ${r.exigencia.unidade}</span>
+                                        <span>${formatarNumero(r.soma_quantidades)} ${exigenciaUnidade}</span>
                                     </div>
                                 </div>
                             ` : '<p class="text-muted mt-2">Nenhum atestado compatível encontrado.</p>'}

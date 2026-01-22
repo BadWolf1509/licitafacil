@@ -11,6 +11,7 @@ import re
 from functools import lru_cache
 from typing import Optional, Any
 
+from config import TableExtractionConfig as TEC
 from .text_normalizer import normalize_header, normalize_unit, normalize_description, UNIT_TOKENS
 
 
@@ -31,13 +32,30 @@ def parse_item_tuple(value: str) -> Optional[tuple]:
     if not text:
         return None
 
+    prefix_strip = re.match(r'^(AD|[A-Z]{1,3}\d+)-', text, re.IGNORECASE)
+    if prefix_strip:
+        text = text[prefix_strip.end():].strip()
+
+    # Prefer prefixo no inicio para evitar capturar numeros no resto do texto
+    # (ex: "2.3.4 25MPA" ou "3.4.1 ... 3,00").
+    prefix_match = re.match(r'^(\d{1,3}(?:\.\d{1,3}){1,4})(?!/\d)', text)
+    if prefix_match:
+        text = prefix_match.group(1)
+    else:
+        # Tentar encontrar código de item após prefixo numérico (ex: "9149 6.14" -> "6.14")
+        # Isso captura códigos SINAPI ou similares seguidos do código de item real
+        after_prefix = re.search(r'(?:^|\s)(\d{1,3}\.\d{1,3}(?:\.\d{1,3})?)(?:\s|$)', text)
+        if after_prefix:
+            text = after_prefix.group(1)
+
     cleaned = re.sub(r"[^0-9. ]", "", text)
     cleaned = cleaned.strip().strip(".")
     if not cleaned:
         return None
 
     parts = [p for p in re.split(r"[ .]+", cleaned) if p]
-    if not parts or len(parts) > 4:
+    # Item codes must have at least 2 parts (e.g., "1.1", not "200")
+    if len(parts) < 2 or len(parts) > 5:
         return None
     if any(len(p) > 3 for p in parts):
         return None
@@ -59,6 +77,38 @@ def item_tuple_to_str(value: tuple) -> str:
         String formatada (ex: "1.2.3")
     """
     return ".".join(str(v) for v in value)
+
+
+# Palavras de contexto que indicam que o número seguinte NÃO é um código de item
+CONTEXT_WORDS_PATTERN = re.compile(
+    r'(?:linha|tipo|modelo|ref|referencia|referência|similar|serie|série)\s*$',
+    re.IGNORECASE
+)
+
+
+def is_valid_item_context(text: str, position: int) -> bool:
+    """
+    Verifica se um código de item na posição indicada está em contexto válido.
+
+    Retorna False se o código é precedido por palavras de contexto como
+    "linha", "tipo", "modelo", etc., indicando que é parte da descrição,
+    não um código de item real.
+
+    Args:
+        text: Texto completo onde o código aparece
+        position: Posição do código no texto
+
+    Returns:
+        True se contexto válido (código real), False se inválido (parte de descrição)
+    """
+    if position <= 0:
+        return True  # No início da linha é sempre válido
+
+    prefix = text[:position].strip()
+    if CONTEXT_WORDS_PATTERN.search(prefix):
+        return False  # Precedido por palavra de contexto
+
+    return True
 
 
 def parse_quantity(value: Any) -> Optional[float]:
@@ -366,10 +416,10 @@ def validate_column_mapping(mapping: dict, col_stats: list) -> dict:
             return 0.0
         return float(col_stats[idx].get("avg_len", 0.0))
 
-    min_unit_ratio = 0.2
-    min_qty_ratio = 0.35
-    min_desc_len = 10.0
-    max_desc_numeric = 0.6
+    min_unit_ratio = TEC.MIN_UNIT_RATIO
+    min_qty_ratio = TEC.MIN_QTY_RATIO
+    min_desc_len = TEC.MIN_DESC_LEN
+    max_desc_numeric = TEC.MAX_DESC_NUMERIC
 
     item_col = mapping.get("item")
     desc_col = mapping.get("descricao")

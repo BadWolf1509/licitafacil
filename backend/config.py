@@ -163,6 +163,17 @@ class Messages:
 # === Processamento ===
 OCR_PARALLEL_ENABLED = env_bool("OCR_PARALLEL_ENABLED", True)
 OCR_MAX_WORKERS = env_int("OCR_MAX_WORKERS", 4)
+OCR_PREPROCESS_ENABLED = env_bool("OCR_PREPROCESS", True)
+OCR_TESSERACT_FALLBACK = env_bool("OCR_TESSERACT_FALLBACK", True)
+
+
+# === Fila de Processamento ===
+QUEUE_MAX_CONCURRENT = env_int("QUEUE_MAX_CONCURRENT", 3)
+QUEUE_POLL_INTERVAL = env_float("QUEUE_POLL_INTERVAL", 1.0)
+
+
+# === Autenticação ===
+ACCESS_TOKEN_EXPIRE_MINUTES = env_int("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
 
 
 # === Paginação ===
@@ -186,6 +197,13 @@ class PipelineConfig:
     MIN_CONFIDENCE_CLOUD_OCR = env_float("MIN_CONFIDENCE_CLOUD_OCR", 0.85)
 
 
+
+# === Configuracoes de Matching ===
+class MatchingConfig:
+    """Configuracoes do matching deterministico."""
+    SIMILARITY_THRESHOLD = env_float("MATCH_SIMILARITY_THRESHOLD", 0.35)
+    MIN_COMMON_WORDS = env_int("MATCH_MIN_COMMON_WORDS", 2)
+    MIN_COMMON_WORDS_SHORT = env_int("MATCH_MIN_COMMON_WORDS_SHORT", 1)
 # === Configurações de Modelos de IA ===
 class AIModelConfig:
     """Configurações dos modelos de IA."""
@@ -199,6 +217,7 @@ class AIModelConfig:
     GEMINI_PRO_MODEL = os.getenv("GEMINI_PRO_MODEL", "gemini-2.0-flash")
     GEMINI_MAX_TOKENS = env_int("GEMINI_MAX_TOKENS", 16000)
     GEMINI_TEMPERATURE = env_float("GEMINI_TEMPERATURE", 0)
+    GEMINI_ALLOW_LEGACY = env_bool("GEMINI_ALLOW_LEGACY", False)
 
 
 # === Configurações de Extração de Tabelas ===
@@ -238,6 +257,12 @@ class AtestadoProcessingConfig:
     # OCR e Layout
     OCR_LAYOUT_CONFIDENCE = env_float("ATTESTADO_OCR_LAYOUT_CONFIDENCE", 0.3)
     OCR_LAYOUT_DPI = env_int("ATTESTADO_OCR_LAYOUT_DPI", 300)
+    OCR_LAYOUT_RETRY_DPI = env_int("ATTESTADO_OCR_LAYOUT_RETRY_DPI", 450)
+    OCR_LAYOUT_RETRY_DPI_HARD = env_int("ATTESTADO_OCR_LAYOUT_RETRY_DPI_HARD", 0)
+    OCR_LAYOUT_RETRY_CONFIDENCE = env_float("ATTESTADO_OCR_LAYOUT_RETRY_CONFIDENCE", 0.2)
+    OCR_LAYOUT_RETRY_MIN_WORDS = env_int("ATTESTADO_OCR_LAYOUT_RETRY_MIN_WORDS", 120)
+    OCR_LAYOUT_RETRY_MIN_ITEMS = env_int("ATTESTADO_OCR_LAYOUT_RETRY_MIN_ITEMS", 5)
+    OCR_LAYOUT_RETRY_MIN_QTY_RATIO = env_float("ATTESTADO_OCR_LAYOUT_RETRY_MIN_QTY_RATIO", 0.35)
     OCR_LAYOUT_PAGE_MIN_ITEMS = env_int("ATTESTADO_OCR_LAYOUT_PAGE_MIN_ITEMS", 3)
     OCR_PAGE_MIN_DOMINANT_LEN = env_int("ATTESTADO_OCR_PAGE_MIN_DOMINANT_LEN", 2)
     OCR_PAGE_MIN_ITEM_RATIO = env_float("ATTESTADO_OCR_PAGE_MIN_ITEM_RATIO", 0.6)
@@ -258,15 +283,71 @@ class AtestadoProcessingConfig:
     # Tabelas
     TABLE_CONFIDENCE_THRESHOLD = env_float("ATTESTADO_TABLE_CONFIDENCE_THRESHOLD", 0.7)
     TABLE_MIN_ITEMS = env_int("ATTESTADO_TABLE_MIN_ITEMS", 10)
-    # Document AI
+    # Document AI (Google Cloud)
+    # IMPORTANTE: O tipo de processador é configurado no Google Cloud Console
+    # Tipos disponíveis e custos (Jan/2025):
+    #   - Form Parser: US$ 30/1000 páginas (US$ 0.03/pág) - detecta tabelas estruturadas
+    #   - OCR Processor: US$ 1.50/1000 páginas (US$ 0.0015/pág) - apenas texto OCR
+    # Recomendação: Usar Form Parser apenas se pdfplumber falhar frequentemente
+    # Variáveis de ambiente:
+    #   - DOCUMENT_AI_PROJECT_ID, DOCUMENT_AI_LOCATION, DOCUMENT_AI_PROCESSOR_ID
     DOCUMENT_AI_ENABLED = env_bool("DOCUMENT_AI_ENABLED", False)
     DOCUMENT_AI_FALLBACK_ONLY = env_bool("DOCUMENT_AI_FALLBACK_ONLY", True)
+    DOCUMENT_AI_MIN_ITEMS = env_int("ATTESTADO_DOCUMENT_AI_MIN_ITEMS", 20)
+    # Fluxo em Cascata - Thresholds de qty_ratio por etapa
+    # Etapa 1 (pdfplumber): gratuito, exige alta qualidade
+    STAGE1_QTY_THRESHOLD = env_float("ATTESTADO_STAGE1_QTY_THRESHOLD", 0.70)
+    # Etapa 2 (Document AI): baixo custo, aceita qualidade moderada
+    STAGE2_QTY_THRESHOLD = env_float("ATTESTADO_STAGE2_QTY_THRESHOLD", 0.60)
+    # Etapa 3 (Vision AI): alto custo, aceita qualidade baixa
+    STAGE3_QTY_THRESHOLD = env_float("ATTESTADO_STAGE3_QTY_THRESHOLD", 0.40)
+    # Detecção de documento escaneado
+    SCANNED_MIN_CHARS_PER_PAGE = env_int("ATTESTADO_SCANNED_MIN_CHARS", 200)
+    SCANNED_IMAGE_PAGE_RATIO = env_float("ATTESTADO_SCANNED_IMG_RATIO", 0.5)
     # LLM e Vision
     LLM_FALLBACK_ONLY = env_bool("ATTESTADO_LLM_FALLBACK_ONLY", True)
     PAGEWISE_VISION_ENABLED = env_bool("ATTESTADO_PAGEWISE_VISION", True)
     VISION_QUALITY_THRESHOLD = env_float("ATTESTADO_VISION_QUALITY_THRESHOLD", 0.6)
     PAGEWISE_MIN_PAGES = env_int("ATTESTADO_PAGEWISE_MIN_PAGES", 3)
     PAGEWISE_MIN_ITEMS = env_int("ATTESTADO_PAGEWISE_MIN_ITEMS", 40)
+    # Mínimo de itens para confiança
+    MIN_ITEMS_FOR_CONFIDENCE = env_int("ATTESTADO_MIN_ITEMS_FOR_CONFIDENCE", 25)
+    # Restart de numeracao (prefixo Sx-)
+    RESTART_MIN_CODES = env_int("ATTESTADO_RESTART_MIN_CODES", 8)
+    RESTART_MIN_OVERLAP = env_int("ATTESTADO_RESTART_MIN_OVERLAP", 3)
+    RESTART_MIN_OVERLAP_RATIO = env_float("ATTESTADO_RESTART_MIN_OVERLAP_RATIO", 0.25)
+    # Texto (fallback/descricoes)
+    TEXT_SECTION_MAX_DESC_LEN = env_int("ATTESTADO_TEXT_SECTION_MAX_DESC_LEN", 240)
+    TEXT_SECTION_TABLE_CONFIDENCE_MIN = env_float("ATTESTADO_TEXT_SECTION_TABLE_CONFIDENCE_MIN", 0.85)
+    TEXT_SECTION_QTY_RATIO_MIN = env_float("ATTESTADO_TEXT_SECTION_QTY_RATIO_MIN", 0.8)
+    TEXT_SECTION_DUP_RATIO_MAX = env_float("ATTESTADO_TEXT_SECTION_DUP_RATIO_MAX", 0.35)
+
+
+
+# === Configurações de Detecção de Ruído OCR ===
+class OCRNoiseConfig:
+    """Configurações para detecção de ruído em extração OCR."""
+    MIN_UNIT_RATIO = env_float("ATTESTADO_OCR_NOISE_MIN_UNIT_RATIO", 0.5)
+    MIN_QTY_RATIO = env_float("ATTESTADO_OCR_NOISE_MIN_QTY_RATIO", 0.35)
+    MIN_AVG_DESC_LEN = env_float("ATTESTADO_OCR_NOISE_MIN_AVG_DESC_LEN", 14.0)
+    MAX_SHORT_DESC_RATIO = env_float("ATTESTADO_OCR_NOISE_MAX_SHORT_DESC_RATIO", 0.45)
+    MIN_ALPHA_RATIO = env_float("ATTESTADO_OCR_NOISE_MIN_ALPHA_RATIO", 0.45)
+    MIN_FAILURES = env_int("ATTESTADO_OCR_NOISE_MIN_FAILS", 2)
+    SHORT_DESC_LEN = env_int("ATTESTADO_OCR_NOISE_SHORT_DESC_LEN", 12)
+
+
+# === Configurações de Score de Qualidade ===
+class QualityScoreConfig:
+    """Configurações para cálculo de score de qualidade."""
+    MIN_UNIT_RATIO = env_float("QUALITY_SCORE_MIN_UNIT_RATIO", 0.8)
+    MIN_QTY_RATIO = env_float("QUALITY_SCORE_MIN_QTY_RATIO", 0.8)
+    MIN_ITEM_RATIO = env_float("QUALITY_SCORE_MIN_ITEM_RATIO", 0.4)
+    MAX_DUPLICATE_RATIO = env_float("QUALITY_SCORE_MAX_DUPLICATE_RATIO", 0.35)
+    PENALTY_UNIT = env_float("QUALITY_SCORE_PENALTY_UNIT", 0.2)
+    PENALTY_QTY = env_float("QUALITY_SCORE_PENALTY_QTY", 0.2)
+    PENALTY_ITEM = env_float("QUALITY_SCORE_PENALTY_ITEM", 0.2)
+    PENALTY_DUPLICATE = env_float("QUALITY_SCORE_PENALTY_DUPLICATE", 0.1)
+    PENALTY_FEW_ITEMS = env_float("QUALITY_SCORE_PENALTY_FEW_ITEMS", 0.2)
 
 
 # === API Versioning ===

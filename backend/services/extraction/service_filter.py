@@ -7,6 +7,7 @@ inválidos, e comparar serviços por similaridade.
 Otimizado para performance usando índices invertidos em vez de O(n²).
 """
 
+import re
 from typing import Optional, Set, Tuple, Dict, List
 from collections import Counter, defaultdict
 
@@ -17,6 +18,71 @@ from .text_normalizer import (
 )
 from .table_processor import parse_item_tuple, item_tuple_to_str, parse_quantity
 from config import DeduplicationConfig
+
+
+# Unidades de medida válidas para construção civil/engenharia
+VALID_UNITS = {
+    # Métricas lineares
+    'M', 'M2', 'M3', 'ML', 'KM',
+    # Unidades
+    'UN', 'UND', 'UNID', 'UNIDADE', 'PC', 'PÇ', 'PECA', 'PEÇA',
+    # Peso/Volume
+    'KG', 'T', 'TON', 'L', 'LT', 'LITRO',
+    # Conjuntos
+    'CJ', 'CONJ', 'CONJUNTO', 'PAR', 'PARES', 'JG', 'JOGO',
+    # Globais
+    'VB', 'VERBA', 'GL', 'GLOBAL', 'SV', 'SERV',
+    # Hora/Dia
+    'H', 'HR', 'HORA', 'DIA', 'D', 'MES', 'MÊS',
+    # Outros comuns
+    'SC', 'SACO', 'PT', 'PONTO', 'FX', 'FAIXA', 'CX', 'CAIXA',
+}
+
+_COMPARISON_PATTERN = re.compile(r"(>=|<=|>|<)\s*\d")
+
+
+def _is_technical_comparison(desc_upper: str) -> bool:
+    if not desc_upper:
+        return False
+    if "FCK" in desc_upper or "MPA" in desc_upper:
+        return True
+    return bool(_COMPARISON_PATTERN.search(desc_upper))
+
+
+def is_valid_unit(unit: str) -> bool:
+    """
+    Verifica se uma unidade de medida é válida.
+
+    Uma unidade válida é uma das unidades conhecidas de construção civil
+    ou segue padrões comuns (M?, M², M3, etc).
+
+    Args:
+        unit: Unidade a verificar
+
+    Returns:
+        True se a unidade é válida
+    """
+    if not unit:
+        return False
+
+    normalized = normalize_unit(unit)
+    if not normalized:
+        return False
+
+    # Verificar se está na lista de unidades válidas
+    if normalized in VALID_UNITS:
+        return True
+
+    # Verificar padrões comuns (M?, M², etc podem ter variações)
+    if len(normalized) <= 3:
+        # Unidades curtas são geralmente válidas
+        return True
+
+    # Unidades muito longas (>5 chars) são provavelmente palavras do texto
+    if len(normalized) > 5:
+        return False
+
+    return False
 
 
 def _build_keyword_index(servicos: list) -> Dict[str, List[int]]:
@@ -52,14 +118,14 @@ def _has_valid_item_and_quantity(servico: dict) -> bool:
     Returns:
         True se tem item válido e quantidade
     """
-    import re
     item = servico.get("item")
     quantidade = servico.get("quantidade")
 
     # Verificar se tem código de item válido (ex: "1.1", "6.3.4")
     if not item:
         return False
-    if not re.match(r'^\d+(\.\d+)+$', str(item)):
+    item_tuple = parse_item_tuple(str(item))
+    if not item_tuple or len(item_tuple) < 2:
         return False
 
     # Verificar se tem quantidade válida
@@ -103,11 +169,11 @@ def filter_classification_paths(servicos: list) -> list:
                 filtered.append(servico)
             continue
 
-        # Ignorar itens que contêm ">" (caminho de classificação)
-        if ">" in descricao:
-            continue
-
+        # Ignore classification paths but allow technical comparisons (e.g., FCK >= 25MPA).
         desc_upper = descricao.upper().strip()
+
+        if ">" in descricao and not (has_valid_item_qty or _is_technical_comparison(desc_upper)):
+            continue
 
         # Prefixos que SEMPRE são classificação (não serviços reais)
         invalid_prefixes = [
@@ -309,9 +375,11 @@ def filter_servicos_by_item_length(servicos: list) -> Tuple[list, dict]:
             filtered.append(servico)
             continue
         qty = parse_quantity(servico.get("quantidade"))
-        unit = normalize_unit(servico.get("unidade") or "")
+        unit_raw = servico.get("unidade") or ""
         desc = (servico.get("descricao") or "").strip()
-        if qty not in (None, 0) and unit and len(desc) >= min_desc_len:
+        # Só manter item com comprimento diferente se tiver unidade VÁLIDA
+        # Isso evita manter itens onde "CENTRO" ou "JOAOPESSOA" são interpretados como unidade
+        if qty not in (None, 0) and is_valid_unit(unit_raw) and len(desc) >= min_desc_len:
             filtered.append(servico)
             info["kept_mismatch"] += 1
 
@@ -416,6 +484,9 @@ def repair_missing_prefix(servicos: list, dominant_prefix: Optional[int]) -> Tup
 
     for servico in servicos:
         item_val = servico.get("item")
+        item_str = str(item_val or "").strip()
+        if re.match(r'^(AD|[A-Z]{1,3}\d+)-', item_str, re.IGNORECASE):
+            continue
         item_tuple = parse_item_tuple(str(item_val)) if item_val else None
         if not item_tuple or len(item_tuple) != 2:
             continue
@@ -444,7 +515,9 @@ def is_summary_row(desc: str) -> bool:
     normalized = normalize_description(desc)
     if not normalized:
         return False
-    if normalized.startswith("TOTAL") or "TOTAL DA" in normalized or "TOTAL DO" in normalized:
+    if normalized.startswith("TOTAL"):
+        return True
+    if re.match(r'^(VALOR\s+)?TOTAL\s+(DA|DO)\b', normalized):
         return True
     if normalized.startswith("SUBTOTAL"):
         return True

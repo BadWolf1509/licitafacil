@@ -27,7 +27,7 @@ class GeminiProvider(BaseAIProvider):
     def __init__(self, api_key: Optional[str] = None):
         self._model_name = AIModelConfig.GEMINI_MODEL
         self._pro_model = AIModelConfig.GEMINI_PRO_MODEL
-        self._types = None
+        self._types: Any = None
         self._use_new_sdk = False
         super().__init__(api_key)
 
@@ -38,6 +38,8 @@ class GeminiProvider(BaseAIProvider):
             self._client = None
             return
 
+        allow_legacy = AIModelConfig.GEMINI_ALLOW_LEGACY
+
         # Tentar nova SDK primeiro
         try:
             from google import genai
@@ -46,7 +48,10 @@ class GeminiProvider(BaseAIProvider):
             self._types = types
             self._use_new_sdk = True
         except ImportError:
-            # Fallback para SDK legada
+            if not allow_legacy:
+                self._client = None
+                return
+            # Fallback para SDK legada (opcional)
             try:
                 import google.generativeai as genai_old
                 genai_old.configure(api_key=api_key)
@@ -89,6 +94,8 @@ class GeminiProvider(BaseAIProvider):
             start_time = time.time()
 
             if self._use_new_sdk:
+                assert self._types is not None
+                assert self._client is not None
                 config = self._types.GenerateContentConfig(
                     system_instruction=system_prompt,
                     temperature=temp,
@@ -102,6 +109,7 @@ class GeminiProvider(BaseAIProvider):
                 )
                 content = response.text
             else:
+                assert self._client is not None
                 model = self._client.GenerativeModel(
                     model_name=self._model_name,
                     system_instruction=system_prompt
@@ -154,6 +162,8 @@ class GeminiProvider(BaseAIProvider):
             start_time = time.time()
 
             if self._use_new_sdk:
+                assert self._types is not None
+                assert self._client is not None
                 parts: List[Any] = []
                 if user_text:
                     parts.append(user_text)
@@ -177,6 +187,7 @@ class GeminiProvider(BaseAIProvider):
                 )
                 content = response.text
             else:
+                assert self._client is not None
                 from PIL import Image
                 import io
 
@@ -228,6 +239,11 @@ class GeminiProvider(BaseAIProvider):
         """Extrai informações de atestado a partir de texto."""
         from services.gemini_analyzer import gemini_analyzer
         return gemini_analyzer.extract_atestado_info(texto)
+
+    def extract_atestado_metadata(self, texto: str) -> Dict[str, Any]:
+        """Extrai apenas metadados de atestado a partir de texto."""
+        from services.gemini_analyzer import gemini_analyzer
+        return gemini_analyzer.extract_atestado_metadata(texto)
 
     def extract_edital_requirements(self, texto: str) -> List[Dict[str, Any]]:
         """Extrai requisitos de edital."""

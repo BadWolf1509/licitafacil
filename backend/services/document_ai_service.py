@@ -103,7 +103,7 @@ class DocumentAIService:
                     tables.append({"page": page_index + 1, "rows": rows})
         return tables
 
-    def extract_tables(self, file_path: str) -> Dict[str, Any]:
+    def extract_tables(self, file_path: str, use_native_pdf_parsing: bool = False) -> Dict[str, Any]:
         if not self.is_configured:
             return {"tables": [], "pages": 0, "error": "not_configured"}
         client = self._get_client()
@@ -112,7 +112,19 @@ class DocumentAIService:
         with open(file_path, "rb") as handle:
             content = handle.read()
         raw_document = documentai.RawDocument(content=content, mime_type=mime_type)
-        request = documentai.ProcessRequest(name=name, raw_document=raw_document)
+        process_options = None
+        if use_native_pdf_parsing and mime_type == "application/pdf":
+            process_options = documentai.ProcessOptions(
+                ocr_config=documentai.OcrConfig(enable_native_pdf_parsing=True)
+            )
+        if process_options:
+            request = documentai.ProcessRequest(
+                name=name,
+                raw_document=raw_document,
+                process_options=process_options
+            )
+        else:
+            request = documentai.ProcessRequest(name=name, raw_document=raw_document)
         result = client.process_document(request=request)
         document = result.document
         tables = self._extract_tables_from_document(document)

@@ -13,6 +13,7 @@ from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
+from utils.http_helpers import get_user_resource_or_404
 from logging_config import get_logger
 
 logger = get_logger('routers.analise')
@@ -49,16 +50,9 @@ def obter_analise(
     db: Session = Depends(get_db)
 ) -> AnaliseResponse:
     """Obtém uma análise específica."""
-    analise = db.query(Analise).filter(
-        Analise.id == analise_id,
-        Analise.user_id == current_user.id
-    ).first()
-
-    if not analise:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ANALISE_NOT_FOUND
-        )
+    analise = get_user_resource_or_404(
+        db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
+    )
     return analise
 
 
@@ -98,7 +92,8 @@ async def criar_analise(
                 "id": at.id,
                 "descricao_servico": at.descricao_servico,
                 "quantidade": float(at.quantidade) if at.quantidade else 0,
-                "unidade": at.unidade or ""
+                "unidade": at.unidade or "",
+                "servicos_json": at.servicos_json
             }
             for at in atestados
         ]
@@ -143,16 +138,9 @@ async def processar_analise(
     Reprocessa uma análise existente: extrai exigências do edital e faz matching com atestados.
     Útil quando novos atestados são adicionados ou para reprocessar com IA atualizada.
     """
-    analise = db.query(Analise).filter(
-        Analise.id == analise_id,
-        Analise.user_id == current_user.id
-    ).first()
-
-    if not analise:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ANALISE_NOT_FOUND
-        )
+    analise = get_user_resource_or_404(
+        db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
+    )
 
     if not analise.arquivo_path or not os.path.exists(analise.arquivo_path):
         raise HTTPException(
@@ -182,7 +170,8 @@ async def processar_analise(
                 "id": at.id,
                 "descricao_servico": at.descricao_servico,
                 "quantidade": float(at.quantidade) if at.quantidade else 0,
-                "unidade": at.unidade or ""
+                "unidade": at.unidade or "",
+                "servicos_json": at.servicos_json
             }
             for at in atestados
         ]
@@ -217,16 +206,9 @@ def excluir_analise(
     db: Session = Depends(get_db)
 ) -> Mensagem:
     """Exclui uma análise."""
-    analise = db.query(Analise).filter(
-        Analise.id == analise_id,
-        Analise.user_id == current_user.id
-    ).first()
-
-    if not analise:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ANALISE_NOT_FOUND
-        )
+    analise = get_user_resource_or_404(
+        db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
+    )
 
     # Remover arquivo se existir
     if analise.arquivo_path:

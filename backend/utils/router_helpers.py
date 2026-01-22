@@ -71,14 +71,3 @@ def save_upload_file(file: UploadFile, destination: str) -> None:
         shutil.copyfileobj(file.file, buffer)
 
 
-def cleanup_on_error(filepath: str, error: Exception, context: str) -> None:
-    """
-    Limpa arquivo e loga erro quando processamento falha.
-
-    Args:
-        filepath: Caminho do arquivo a remover
-        error: Exceção que causou o erro
-        context: Contexto para log (ex: "upload de atestado")
-    """
-    logger.error(f"Erro em {context}: {error}")
-    safe_delete_file(filepath)

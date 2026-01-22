@@ -1,10 +1,14 @@
 """
 Avaliação de qualidade dos serviços extraídos.
 """
-import os
 from typing import Dict, List, Tuple
 from collections import Counter
 
+from config import (
+    OCRNoiseConfig as ONC,
+    QualityScoreConfig as QSC,
+    AtestadoProcessingConfig as APC,
+)
 from .text_normalizer import normalize_description
 from .table_processor import parse_quantity
 
@@ -67,10 +71,7 @@ def compute_description_quality(servicos: List[dict]) -> Dict:
     if total == 0:
         return {"avg_len": 0.0, "short_ratio": 0.0, "alpha_ratio": 0.0}
 
-    try:
-        short_len = int(os.getenv("ATTESTADO_OCR_NOISE_SHORT_DESC_LEN", "12"))
-    except ValueError:
-        short_len = 12
+    short_len = ONC.SHORT_DESC_LEN
 
     lengths: List[int] = []
     short_count = 0
@@ -120,31 +121,13 @@ def is_ocr_noisy(servicos: List[dict]) -> Tuple[bool, Dict]:
     unit_ratio = stats.get("with_unit", 0) / total
     qty_ratio = stats.get("with_qty", 0) / total
 
-    # Carregar thresholds de variáveis de ambiente
-    try:
-        min_unit_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_UNIT_RATIO", "0.5"))
-    except ValueError:
-        min_unit_ratio = 0.5
-    try:
-        min_qty_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_QTY_RATIO", "0.35"))
-    except ValueError:
-        min_qty_ratio = 0.35
-    try:
-        min_avg_len = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_AVG_DESC_LEN", "14"))
-    except ValueError:
-        min_avg_len = 14.0
-    try:
-        max_short_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MAX_SHORT_DESC_RATIO", "0.45"))
-    except ValueError:
-        max_short_ratio = 0.45
-    try:
-        min_alpha_ratio = float(os.getenv("ATTESTADO_OCR_NOISE_MIN_ALPHA_RATIO", "0.45"))
-    except ValueError:
-        min_alpha_ratio = 0.45
-    try:
-        min_failures = int(os.getenv("ATTESTADO_OCR_NOISE_MIN_FAILS", "2"))
-    except ValueError:
-        min_failures = 2
+    # Carregar thresholds de configuração centralizada
+    min_unit_ratio = ONC.MIN_UNIT_RATIO
+    min_qty_ratio = ONC.MIN_QTY_RATIO
+    min_avg_len = ONC.MIN_AVG_DESC_LEN
+    max_short_ratio = ONC.MAX_SHORT_DESC_RATIO
+    min_alpha_ratio = ONC.MIN_ALPHA_RATIO
+    min_failures = ONC.MIN_FAILURES
 
     failures = 0
     reasons: Dict[str, float] = {}
@@ -205,17 +188,16 @@ def compute_quality_score(stats: Dict) -> float:
     with_qty_ratio = stats.get("with_qty", 0) / total
     with_item_ratio = stats.get("with_item", 0) / total
 
-    if with_unit_ratio < 0.8:
-        score -= 0.2
-    if with_qty_ratio < 0.8:
-        score -= 0.2
-    if with_item_ratio < 0.4:
-        score -= 0.2
-    if stats.get("duplicate_ratio", 0) > 0.35:
-        score -= 0.1
+    if with_unit_ratio < QSC.MIN_UNIT_RATIO:
+        score -= QSC.PENALTY_UNIT
+    if with_qty_ratio < QSC.MIN_QTY_RATIO:
+        score -= QSC.PENALTY_QTY
+    if with_item_ratio < QSC.MIN_ITEM_RATIO:
+        score -= QSC.PENALTY_ITEM
+    if stats.get("duplicate_ratio", 0) > QSC.MAX_DUPLICATE_RATIO:
+        score -= QSC.PENALTY_DUPLICATE
 
-    min_items = int(os.getenv("ATTESTADO_MIN_ITEMS_FOR_CONFIDENCE", "25"))
-    if total < min_items:
-        score -= 0.2
+    if total < APC.MIN_ITEMS_FOR_CONFIDENCE:
+        score -= QSC.PENALTY_FEW_ITEMS
 
     return max(0.0, min(1.0, round(score, 2)))

@@ -8,7 +8,7 @@ permitindo fácil extensão e substituição.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 import time
 
 
@@ -79,7 +79,7 @@ class BaseAIProvider(ABC):
             api_key: Chave de API do provedor (opcional, pode vir do ambiente)
         """
         self._api_key = api_key
-        self._client = None
+        self._client: Any = None
         self._initialize()
 
     @abstractmethod

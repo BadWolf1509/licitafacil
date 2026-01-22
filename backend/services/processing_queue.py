@@ -7,13 +7,13 @@ e models compartilhados.
 """
 
 import asyncio
-import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Callable
 from collections import deque
 import threading
 
 from logging_config import get_logger
+from config import QUEUE_MAX_CONCURRENT, QUEUE_POLL_INTERVAL
 from .models import JobStatus, ProcessingJob
 from .job_repository import JobRepository
 from .job_executor import JobExecutor
@@ -42,9 +42,9 @@ class ProcessingQueue:
         self._callbacks_by_type: Dict[str, Callable] = {}
         self._cancel_requested: set = set()
 
-        # Configurações
-        self._max_concurrent = int(os.getenv("QUEUE_MAX_CONCURRENT", "3"))
-        self._poll_interval = float(os.getenv("QUEUE_POLL_INTERVAL", "1.0"))
+        # Configurações (importadas de config.py)
+        self._max_concurrent = QUEUE_MAX_CONCURRENT
+        self._poll_interval = QUEUE_POLL_INTERVAL
 
         # Repositório para persistência
         self._repository = JobRepository(db_path)

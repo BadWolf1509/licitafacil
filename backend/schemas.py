@@ -110,9 +110,12 @@ class AtestadoResponse(AtestadoBase):
 
 class ExigenciaEdital(BaseModel):
     """Representa uma exigência extraída do edital."""
-    descricao: str
-    quantidade_minima: Decimal
-    unidade: str
+    descricao: Optional[str] = None
+    quantidade_minima: Optional[Decimal] = None
+    unidade: Optional[str] = None
+    percentual_exigido: Optional[float] = None
+    permitir_soma: Optional[bool] = None
+    exige_unico: Optional[bool] = None
 
 
 class AtestadoMatch(BaseModel):
@@ -122,6 +125,7 @@ class AtestadoMatch(BaseModel):
     quantidade: Decimal
     unidade: str
     percentual_cobertura: float
+    itens: Optional[List[ServicoAtestado]] = None
 
 
 class ResultadoExigencia(BaseModel):

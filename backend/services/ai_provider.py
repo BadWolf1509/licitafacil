@@ -181,6 +181,61 @@ class AIProviderManager:
 
         return available[0]
 
+    def _get_analyzer(self, provider_name: str):
+        """Retorna o analisador para o provedor especificado."""
+        if provider_name == "gemini":
+            return self._get_gemini()
+        return self._get_openai()
+
+    def _execute_with_fallback(
+        self,
+        method_name: str,
+        args: tuple,
+        provider: Optional[str] = None
+    ) -> Any:
+        """
+        Executa método no provedor selecionado com fallback automático.
+
+        Args:
+            method_name: Nome do método a chamar no analisador
+            args: Argumentos para passar ao método
+            provider: Provedor específico a usar (opcional)
+
+        Returns:
+            Resultado do método chamado
+
+        Raises:
+            Exception: Se todos os provedores falharem
+        """
+        selected = self._select_provider(provider)
+
+        try:
+            analyzer = self._get_analyzer(selected)
+            method = getattr(analyzer, method_name)
+            result = method(*args)
+
+            self._stats[selected]["calls"] += 1
+            return result
+
+        except Exception as e:
+            self._stats[selected]["errors"] += 1
+
+            # Tentar fallback se houver outro provedor
+            available = self.available_providers
+            fallback = [p for p in available if p != selected]
+
+            if fallback:
+                fallback_provider = fallback[0]
+                logger.warning(
+                    f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}"
+                )
+
+                fallback_analyzer = self._get_analyzer(fallback_provider)
+                fallback_method = getattr(fallback_analyzer, method_name)
+                return fallback_method(*args)
+
+            raise
+
     def extract_atestado_from_images(
         self,
         images: List[bytes],
@@ -196,34 +251,11 @@ class AIProviderManager:
         Returns:
             Dicionário com dados extraídos
         """
-        selected = self._select_provider(provider)
-
-        try:
-            if selected == "gemini":
-                result = self._get_gemini().extract_atestado_from_images(images)
-            else:
-                result = self._get_openai().extract_atestado_from_images(images)
-
-            self._stats[selected]["calls"] += 1
-            return result
-
-        except Exception as e:
-            self._stats[selected]["errors"] += 1
-
-            # Tentar fallback se houver outro provedor
-            available = self.available_providers
-            fallback = [p for p in available if p != selected]
-
-            if fallback:
-                fallback_provider = fallback[0]
-                logger.warning(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
-
-                if fallback_provider == "gemini":
-                    return self._get_gemini().extract_atestado_from_images(images)
-                else:
-                    return self._get_openai().extract_atestado_from_images(images)
-
-            raise
+        return self._execute_with_fallback(
+            "extract_atestado_from_images",
+            (images,),
+            provider
+        )
 
     def extract_atestado_info(
         self,
@@ -240,34 +272,32 @@ class AIProviderManager:
         Returns:
             Dicionário com dados extraídos
         """
-        selected = self._select_provider(provider)
+        return self._execute_with_fallback(
+            "extract_atestado_info",
+            (texto,),
+            provider
+        )
 
-        try:
-            if selected == "gemini":
-                result = self._get_gemini().extract_atestado_info(texto)
-            else:
-                result = self._get_openai().extract_atestado_info(texto)
+    def extract_atestado_metadata(
+        self,
+        texto: str,
+        provider: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Extrai apenas metadados do atestado a partir de texto.
 
-            self._stats[selected]["calls"] += 1
-            return result
+        Args:
+            texto: Texto extraído do documento
+            provider: Provedor específico a usar (opcional)
 
-        except Exception as e:
-            self._stats[selected]["errors"] += 1
-
-            # Tentar fallback
-            available = self.available_providers
-            fallback = [p for p in available if p != selected]
-
-            if fallback:
-                fallback_provider = fallback[0]
-                logger.warning(f"Erro com {selected}, tentando fallback para {fallback_provider}: {e}")
-
-                if fallback_provider == "gemini":
-                    return self._get_gemini().extract_atestado_info(texto)
-                else:
-                    return self._get_openai().extract_atestado_info(texto)
-
-            raise
+        Returns:
+            Dicionário com metadados extraídos
+        """
+        return self._execute_with_fallback(
+            "extract_atestado_metadata",
+            (texto,),
+            provider
+        )
 
     def match_atestados(
         self,
@@ -346,7 +376,7 @@ class AIProviderManager:
 
                     # Se tiver pelo menos 2 palavras em comum
                     if len(common) >= 2:
-                        s_qtd = float(s.get("quantidade", 0))
+                        s_qtd = float(s.get("quantidade") or 0)
                         total_qtd += s_qtd
                         matches.append({
                             "atestado_id": atestado.get("id"),

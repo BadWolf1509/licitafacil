@@ -16,6 +16,7 @@ from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
+from utils.http_helpers import get_user_resource_or_404
 
 from logging_config import get_logger
 logger = get_logger('routers.atestados')
@@ -48,16 +49,9 @@ def obter_atestado(
     db: Session = Depends(get_db)
 ) -> AtestadoResponse:
     """Obtém um atestado específico."""
-    atestado = db.query(Atestado).filter(
-        Atestado.id == atestado_id,
-        Atestado.user_id == current_user.id
-    ).first()
-
-    if not atestado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ATESTADO_NOT_FOUND
-        )
+    atestado = get_user_resource_or_404(
+        db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
+    )
     return atestado
 
 
@@ -132,16 +126,9 @@ async def reprocessar_atestado(
     db: Session = Depends(get_db)
 ) -> JobResponse:
     """Reprocessa um atestado existente usando o arquivo salvo."""
-    atestado = db.query(Atestado).filter(
-        Atestado.id == atestado_id,
-        Atestado.user_id == current_user.id
-    ).first()
-
-    if not atestado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ATESTADO_NOT_FOUND
-        )
+    atestado = get_user_resource_or_404(
+        db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
+    )
 
     if not atestado.arquivo_path or not os.path.exists(atestado.arquivo_path):
         raise HTTPException(
@@ -182,16 +169,9 @@ def atualizar_atestado(
     db: Session = Depends(get_db)
 ) -> AtestadoResponse:
     """Atualiza um atestado existente."""
-    atestado = db.query(Atestado).filter(
-        Atestado.id == atestado_id,
-        Atestado.user_id == current_user.id
-    ).first()
-
-    if not atestado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ATESTADO_NOT_FOUND
-        )
+    atestado = get_user_resource_or_404(
+        db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
+    )
 
     # Atualizar campos fornecidos
     if dados.descricao_servico is not None:
@@ -218,16 +198,9 @@ def atualizar_servicos(
     db: Session = Depends(get_db)
 ) -> AtestadoResponse:
     """Atualiza apenas os serviços de um atestado (usado para excluir itens individuais)."""
-    atestado = db.query(Atestado).filter(
-        Atestado.id == atestado_id,
-        Atestado.user_id == current_user.id
-    ).first()
-
-    if not atestado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ATESTADO_NOT_FOUND
-        )
+    atestado = get_user_resource_or_404(
+        db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
+    )
 
     # Converter ServicoAtestado para dict e ordenar por item
     servicos_dict = [s.model_dump() for s in dados.servicos_json]
@@ -245,16 +218,9 @@ def excluir_atestado(
     db: Session = Depends(get_db)
 ) -> Mensagem:
     """Exclui um atestado."""
-    atestado = db.query(Atestado).filter(
-        Atestado.id == atestado_id,
-        Atestado.user_id == current_user.id
-    ).first()
-
-    if not atestado:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=Messages.ATESTADO_NOT_FOUND
-        )
+    atestado = get_user_resource_or_404(
+        db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
+    )
 
     # Remover arquivo se existir
     if atestado.arquivo_path:

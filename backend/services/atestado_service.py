@@ -45,9 +45,9 @@ def sort_key_item(servico: dict) -> tuple:
     """
     Gera uma chave de ordenação para um serviço baseado no número do item.
 
-    Trata itens como "1.1", "2.10", "3.1.2" e aditivos "AD-1.1" corretamente.
+    Trata itens como "1.1", "2.10", "3.1.2" e reinícios "S2-1.1" corretamente.
     Também trata sufixos de duplicata (-A, -B, etc.) para ordenação correta.
-    Itens de aditivo (AD-) vêm depois dos itens originais.
+    Itens com prefixo Sx vêm depois dos itens originais.
 
     Args:
         servico: Dicionário do serviço com campo 'item'
@@ -60,12 +60,19 @@ def sort_key_item(servico: dict) -> tuple:
         return (float('inf'), 0, 0)  # Itens sem número vão para o final
 
     try:
-        # Verificar se é item de aditivo (AD-1.1, AD1-1.1, AD2-2.3, etc.)
-        aditivo_num = 0
-        aditivo_match = re.match(r'^AD(\d*)-(.+)$', item)
-        if aditivo_match:
-            aditivo_num = int(aditivo_match.group(1)) if aditivo_match.group(1) else 1
-            item = aditivo_match.group(2)  # Pegar apenas a parte do item
+        # Verificar prefixo de reinício (S2-1.1, S3-2.4, etc.)
+        segment_num = 0
+        segment_match = re.match(r'^S(\d+)-(.+)$', item, re.IGNORECASE)
+        if segment_match:
+            segment_num = int(segment_match.group(1))
+            item = segment_match.group(2)
+        else:
+            # Legacy: aditivo (AD-1.1, AD1-1.1, AD2-2.3, etc.)
+            aditivo_match = re.match(r'^AD(\d*)-(.+)$', item, re.IGNORECASE)
+            if aditivo_match:
+                aditivo_num = int(aditivo_match.group(1)) if aditivo_match.group(1) else 1
+                segment_num = 100 + aditivo_num
+                item = aditivo_match.group(2)  # Pegar apenas a parte do item
 
         # Extrair sufixo de duplicata (-A, -B, etc.) do final
         suffix_num = 0
@@ -84,11 +91,11 @@ def sort_key_item(servico: dict) -> tuple:
             else:
                 parts.append(0)
 
-        # Retorna tupla: (numero_aditivo, partes_do_item..., sufixo_duplicata)
-        # Assim: originais (aditivo=0) < aditivos (aditivo=1, 2, ...)
+        # Retorna tupla: (segmento, partes_do_item..., sufixo_duplicata)
+        # Assim: originais (segmento=0) < S2 < S3 < ... < AD (segmento>=101)
         # E: sem sufixo (0) < -A (1) < -B (2) ...
         if parts:
-            return (aditivo_num,) + tuple(parts) + (suffix_num,)
+            return (segment_num,) + tuple(parts) + (suffix_num,)
         return (float('inf'), 0, 0)
     except (ValueError, AttributeError):
         return (float('inf'), 0, 0)
