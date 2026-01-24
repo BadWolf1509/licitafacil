@@ -5,6 +5,20 @@ Contém utilitários para normalização de texto, processamento de tabelas
 e filtros de serviços extraídos.
 """
 
+from .constants import (
+    KNOWN_CATEGORIES,
+    KNOWN_CATEGORIES_NORMALIZED,
+    SECTION_HEADERS,
+    NARRATIVE_TOKENS,
+    VALID_UNITS,
+    IGNORE_UNITS,
+    FOOTER_TOKENS,
+    INSTITUTIONAL_TOKENS,
+    STOP_PREFIXES,
+)
+
+from .patterns import Patterns
+
 from .text_normalizer import (
     normalize_description,
     normalize_unit,
@@ -12,6 +26,7 @@ from .text_normalizer import (
     normalize_desc_for_match,
     extract_keywords,
     description_similarity,
+    is_garbage_text,
     UNIT_TOKENS,
 )
 
@@ -53,7 +68,27 @@ from .quality_assessor import (
     compute_quality_score,
 )
 
+from .item_utils import (
+    normalize_item_code,
+    strip_restart_prefix,
+    split_restart_prefix,
+    item_code_in_text,
+    max_restart_prefix_index,
+)
+
 __all__ = [
+    # constants
+    'KNOWN_CATEGORIES',
+    'KNOWN_CATEGORIES_NORMALIZED',
+    'SECTION_HEADERS',
+    'NARRATIVE_TOKENS',
+    'VALID_UNITS',
+    'IGNORE_UNITS',
+    'FOOTER_TOKENS',
+    'INSTITUTIONAL_TOKENS',
+    'STOP_PREFIXES',
+    # patterns
+    'Patterns',
     # text_normalizer
     'normalize_description',
     'normalize_unit',
@@ -61,6 +96,7 @@ __all__ = [
     'normalize_desc_for_match',
     'extract_keywords',
     'description_similarity',
+    'is_garbage_text',
     'UNIT_TOKENS',
     # table_processor
     'parse_item_tuple',
@@ -94,4 +130,10 @@ __all__ = [
     'compute_description_quality',
     'is_ocr_noisy',
     'compute_quality_score',
+    # item_utils
+    'normalize_item_code',
+    'strip_restart_prefix',
+    'split_restart_prefix',
+    'item_code_in_text',
+    'max_restart_prefix_index',
 ]

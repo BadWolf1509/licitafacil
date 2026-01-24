@@ -154,6 +154,18 @@ def normalize_unit(unit: str) -> str:
         if match:
             normalized = match.group(1)
 
+    # 8b. Corrigir unidades com números concatenados (erro comum de OCR do Document AI)
+    # Padrões: "UN353375" → "UN", "UN333" → "UN", "UN3" → "UN"
+    # O OCR às vezes junta a unidade com códigos SINAPI ou outros números adjacentes
+    unit_with_garbage = re.match(r'^(UN|UND|VB|KG|L|CJ|PC|PT|HA|T|TON|KM|MES|GB)(\d{1,})$', normalized, re.IGNORECASE)
+    if unit_with_garbage:
+        base_unit = unit_with_garbage.group(1).upper()
+        garbage_digits = unit_with_garbage.group(2)
+        # Se tem mais de 2 dígitos, certamente é lixo (não é M2, M3)
+        # Se tem 1-2 dígitos mas a unidade não aceita sufixo numérico, também é lixo
+        if len(garbage_digits) >= 1 and base_unit not in ('M', 'KM'):
+            normalized = base_unit
+
     # 9. Mapear unidades corrompidas conhecidas para unidades corretas
     unit_corrections = {
         'M23': 'M2',      # M2 + ruído "3"
@@ -270,5 +282,27 @@ def description_similarity(left: str, right: str) -> float:
         return 0.0
     intersection = len(left_kw & right_kw)
     return intersection / max(len(left_kw), len(right_kw))
+
+
+def is_garbage_text(text: str, threshold: float = 0.4) -> bool:
+    """
+    Verifica se um texto parece ser lixo de OCR.
+
+    Args:
+        text: Texto a verificar
+        threshold: Proporção máxima de caracteres não-alfanuméricos (default: 0.4)
+
+    Returns:
+        True se o texto parece ser lixo
+    """
+    if not text or len(text) < 10:
+        return True
+
+    # Contar caracteres alfanuméricos
+    alnum_count = sum(1 for c in text if c.isalnum() or c.isspace())
+    total_count = len(text)
+
+    ratio = alnum_count / total_count if total_count > 0 else 0
+    return ratio < (1 - threshold)
 
 

@@ -115,6 +115,11 @@ def parse_quantity(value: Any) -> Optional[float]:
     """
     Converte string para quantidade numérica.
 
+    Trata artefatos comuns de OCR do Document AI:
+    - "8 100" → 8 (segundo número é código SINAPI vazado)
+    - "7 1" → 1 (primeiro número é lixo de célula adjacente)
+    - "8888 4,00" → 4.00 (primeiro número é lixo OCR)
+
     Args:
         value: Valor a converter
 
@@ -129,6 +134,41 @@ def parse_quantity(value: Any) -> Optional[float]:
     text = str(value).strip()
     if not text:
         return None
+
+    # Detectar formato "X Y" com espaço (erro comum de OCR)
+    # Padrões: "8 100", "7 1", "8888 4,00"
+    space_split = re.match(r'^(\d+)\s+(\d+(?:[,.]?\d*)?)$', text)
+    if space_split:
+        first_num = space_split.group(1)
+        second_num = space_split.group(2)
+
+        # Converter para comparação
+        first_val = float(first_num)
+        second_clean = second_num.replace(",", ".")
+        try:
+            second_val = float(second_clean)
+        except ValueError:
+            second_val = float("inf")
+
+        # Heurística: código SINAPI tem 5-6 dígitos sem decimal
+        # Quantidade tipicamente < 10000 e pode ter decimal
+        first_is_sinapi = len(first_num) >= 5 and "," not in first_num and "." not in first_num
+        second_is_sinapi = len(second_num.replace(",", "").replace(".", "")) >= 5 and "," not in second_num and "." not in second_num
+
+        # Se segundo parece SINAPI (>=5 dígitos), usar primeiro
+        if second_is_sinapi and not first_is_sinapi:
+            text = first_num
+        # Se primeiro parece SINAPI, usar segundo
+        elif first_is_sinapi and not second_is_sinapi:
+            text = second_num
+        # Se segundo tem decimal (formato de quantidade), usar segundo
+        elif "," in second_num or ("." in second_num and len(second_num.split(".")[-1]) <= 2):
+            text = second_num
+        # Se ambos inteiros, usar o menor (provavelmente quantidade)
+        elif first_val <= second_val:
+            text = first_num
+        else:
+            text = second_num
 
     # Remove separadores de milhar e troca vírgula por ponto
     text = text.replace(".", "").replace(",", ".")

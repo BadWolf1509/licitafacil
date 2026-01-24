@@ -392,6 +392,9 @@ def filter_servicos_by_item_prefix(servicos: list) -> Tuple[list, dict]:
     """
     Filtra serviços por prefixo dominante de item.
 
+    Aceita prefixos contíguos (seções consecutivas como 2, 3, 4...) para não
+    perder itens quando uma tabela contém múltiplas seções da planilha.
+
     Args:
         servicos: Lista de serviços
 
@@ -417,21 +420,58 @@ def filter_servicos_by_item_prefix(servicos: list) -> Tuple[list, dict]:
 
     min_ratio = DeduplicationConfig.ITEM_PREFIX_RATIO
 
+    # Construir conjunto de prefixos contíguos (seções consecutivas)
+    # Ex: se temos prefixos [2, 3, 5], aceitamos 2 e 3 (contíguos), mas 5 é isolado
+    unique_prefixes = sorted(counts.keys())
+    contiguous_prefixes = set()
+    if unique_prefixes:
+        # Encontrar grupos contíguos que incluem o prefixo dominante
+        for i, prefix in enumerate(unique_prefixes):
+            if prefix == dominant_prefix:
+                # Adicionar o dominante e seus vizinhos contíguos
+                contiguous_prefixes.add(prefix)
+                # Expandir para trás
+                j = i - 1
+                while j >= 0 and unique_prefixes[j] == unique_prefixes[j + 1] - 1:
+                    contiguous_prefixes.add(unique_prefixes[j])
+                    j -= 1
+                # Expandir para frente
+                j = i + 1
+                while j < len(unique_prefixes) and unique_prefixes[j] == unique_prefixes[j - 1] + 1:
+                    contiguous_prefixes.add(unique_prefixes[j])
+                    j += 1
+                break
+
+    # Calcular ratio dos prefixos contíguos
+    contiguous_count = sum(counts.get(p, 0) for p in contiguous_prefixes)
+    contiguous_ratio = contiguous_count / max(1, len(prefixes))
+
     info = {
         "dominant_prefix": dominant_prefix,
         "ratio": round(ratio, 3),
+        "contiguous_prefixes": sorted(contiguous_prefixes),
+        "contiguous_ratio": round(contiguous_ratio, 3),
         "applied": False,
         "filtered_out": 0
     }
 
+    # Só filtrar se o ratio dominante for muito alto (>= min_ratio)
+    # E se os prefixos contíguos não cobrirem bem os dados
     if ratio < min_ratio:
         return servicos, info
 
+    # Se os prefixos contíguos cobrem >= 95% dos itens, não filtrar (manter todos)
+    if contiguous_ratio >= 0.95:
+        info["applied"] = False
+        info["reason"] = "contiguous_prefixes_cover_most"
+        return servicos, info
+
+    # Filtrar, mas aceitar todos os prefixos contíguos (não só o dominante)
     filtered = []
     for servico in servicos:
         item_val = servico.get("item")
         item_tuple = parse_item_tuple(str(item_val)) if item_val else None
-        if not item_tuple or item_tuple[0] == dominant_prefix:
+        if not item_tuple or item_tuple[0] in contiguous_prefixes:
             filtered.append(servico)
 
     info["applied"] = True
