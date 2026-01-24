@@ -1,0 +1,82 @@
+/* Estilos especificos da pagina de analises */
+
+.resultado-card {
+    margin-bottom: var(--spacing-md);
+}
+
+.resultado-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.resultado-status {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-weight: 600;
+}
+
+.status-icon {
+    font-size: 1.5rem;
+}
+
+.atestado-lista {
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+}
+
+.atestado-item {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.atestado-item:last-child {
+    border-bottom: none;
+}
+
+.atestado-itens {
+    margin-top: var(--spacing-sm);
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+}
+
+.atestado-itens summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.atestado-item-detail {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+}
+
+.atestado-item-detail:last-child {
+    border-bottom: none;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: var(--spacing-sm);
+}
+
+.progress-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-fill.atende { background: var(--success); }
+.progress-fill.parcial { background: var(--warning); }
+.progress-fill.nao-atende { background: var(--error); }

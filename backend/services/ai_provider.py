@@ -65,8 +65,6 @@ class AIProviderManager:
 
     def __init__(self):
         self._provider = os.getenv("AI_PROVIDER", "auto").lower()
-        self._openai_analyzer = None
-        self._gemini_analyzer = None
         self._openai_provider = None
         self._gemini_provider = None
         self._stats = {
@@ -75,18 +73,12 @@ class AIProviderManager:
         }
 
     def _get_openai(self):
-        """Lazy load do analisador OpenAI (legado)."""
-        if self._openai_analyzer is None:
-            from .ai_analyzer import ai_analyzer
-            self._openai_analyzer = ai_analyzer
-        return self._openai_analyzer
+        """Retorna provider OpenAI."""
+        return self.get_openai_provider()
 
     def _get_gemini(self):
-        """Lazy load do analisador Gemini (legado)."""
-        if self._gemini_analyzer is None:
-            from .gemini_analyzer import gemini_analyzer
-            self._gemini_analyzer = gemini_analyzer
-        return self._gemini_analyzer
+        """Retorna provider Gemini."""
+        return self.get_gemini_provider()
 
     def get_openai_provider(self):
         """
@@ -182,10 +174,10 @@ class AIProviderManager:
         return available[0]
 
     def _get_analyzer(self, provider_name: str):
-        """Retorna o analisador para o provedor especificado."""
+        """Retorna o provider para o provedor especificado."""
         if provider_name == "gemini":
-            return self._get_gemini()
-        return self._get_openai()
+            return self.get_gemini_provider()
+        return self.get_openai_provider()
 
     def _execute_with_fallback(
         self,
@@ -306,98 +298,18 @@ class AIProviderManager:
         provider: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Faz matching entre exigências e atestados.
+        Faz matching entre exigencias e atestados.
 
         Args:
-            exigencias: Lista de exigências do edital
-            atestados: Lista de atestados disponíveis
-            provider: Provedor específico a usar (opcional)
+            exigencias: Lista de exigencias do edital
+            atestados: Lista de atestados disponiveis
+            provider: Provedor especifico a usar (opcional) - nao usado
 
         Returns:
             Lista de resultados do matching
         """
-        selected = self._select_provider(provider)
-
-        # OpenAI tem método específico, Gemini usa o genérico
-        if selected == "openai":
-            return self._get_openai().match_atestados(exigencias, atestados)
-        else:
-            # Para Gemini, usar o método do OpenAI (mais maduro)
-            # ou implementar matching local
-            openai = self._get_openai()
-            if openai.is_configured:
-                return openai.match_atestados(exigencias, atestados)
-            else:
-                # Matching local simplificado
-                return self._local_match(exigencias, atestados)
-
-    def _local_match(
-        self,
-        exigencias: List[Dict],
-        atestados: List[Dict]
-    ) -> List[Dict[str, Any]]:
-        """
-        Matching local sem IA (fallback).
-        Usa similaridade de texto simples.
-        """
-        import unicodedata
-
-        def normalize(text: str) -> str:
-            """Normaliza texto para comparação."""
-            text = unicodedata.normalize('NFKD', text)
-            text = text.encode('ASCII', 'ignore').decode('ASCII')
-            return text.upper()
-
-        results = []
-
-        for exig in exigencias:
-            exig_desc = normalize(exig.get("descricao", ""))
-            exig_qtd = float(exig.get("quantidade_minima", 0))
-            exig_un = exig.get("unidade", "").upper()
-
-            matches = []
-            total_qtd = 0.0
-
-            for atestado in atestados:
-                servicos = atestado.get("servicos_json", [])
-
-                for s in servicos:
-                    s_desc = normalize(s.get("descricao", ""))
-                    s_un = s.get("unidade", "").upper()
-
-                    # Verificar se unidade é compatível
-                    if s_un != exig_un:
-                        continue
-
-                    # Verificar palavras em comum
-                    exig_words = set(exig_desc.split())
-                    s_words = set(s_desc.split())
-                    common = exig_words & s_words
-
-                    # Se tiver pelo menos 2 palavras em comum
-                    if len(common) >= 2:
-                        s_qtd = float(s.get("quantidade") or 0)
-                        total_qtd += s_qtd
-                        matches.append({
-                            "atestado_id": atestado.get("id"),
-                            "servico": s.get("descricao"),
-                            "quantidade": s_qtd,
-                            "unidade": s_un
-                        })
-
-            percentual = (total_qtd / exig_qtd * 100) if exig_qtd > 0 else 0
-
-            results.append({
-                "exigencia": exig.get("descricao"),
-                "quantidade_exigida": exig_qtd,
-                "quantidade_comprovada": total_qtd,
-                "unidade": exig_un,
-                "atende": percentual >= 100,
-                "percentual_atendido": round(percentual, 2),
-                "atestados_utilizados": matches
-            })
-
-        return results
+        from .matching_service import matching_service
+        return matching_service.match_exigencias(exigencias, atestados)
 
     def get_stats(self) -> Dict[str, Any]:
         """Retorna estatísticas de uso dos provedores."""
@@ -409,19 +321,19 @@ class AIProviderManager:
 
     def get_status(self) -> Dict[str, Any]:
         """Retorna status detalhado dos provedores."""
-        openai = self._get_openai()
-        gemini = self._get_gemini()
+        openai = self.get_openai_provider()
+        gemini = self.get_gemini_provider()
 
         return {
             "provider_configurado": self._provider,
             "openai": {
                 "configurado": openai.is_configured,
-                "modelo_texto": getattr(openai, '_model', 'N/A'),
+                "modelo_texto": getattr(openai, '_text_model', 'N/A'),
                 "modelo_vision": getattr(openai, '_vision_model', 'N/A')
             },
             "gemini": {
                 "configurado": gemini.is_configured,
-                "modelo": getattr(gemini, '_model', 'N/A')
+                "modelo": getattr(gemini, '_model_name', 'N/A')
             },
             "recomendacao": self._get_recommendation()
         }

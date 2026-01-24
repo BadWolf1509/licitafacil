@@ -20,8 +20,7 @@ import fitz  # PyMuPDF
 from PIL import Image
 
 from .ocr_service import ocr_service
-from .extraction import normalize_description
-from .text_utils import is_garbage_text
+from .extraction import normalize_description, is_garbage_text
 from exceptions import PDFError, OCRError
 from config import OCR_PARALLEL_ENABLED, OCR_MAX_WORKERS
 

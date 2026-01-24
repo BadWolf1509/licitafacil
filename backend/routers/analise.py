@@ -8,7 +8,8 @@ from database import get_db
 from models import Usuario, Atestado, Analise
 from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse
 from auth import get_current_approved_user
-from services import document_processor
+from dependencies import ServiceContainer, get_services
+from services.atestado_service import atestados_to_dict
 from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_or_raise
@@ -23,10 +24,11 @@ router = APIRouter(prefix="/analises", tags=["Análises"])
 
 @router.get("/status/servicos")
 def status_servicos(
-    current_user: Usuario = Depends(get_current_approved_user)
+    current_user: Usuario = Depends(get_current_approved_user),
+    services: ServiceContainer = Depends(get_services)
 ) -> Dict[str, Any]:
     """Retorna o status dos serviços de processamento de documentos."""
-    return document_processor.get_status()
+    return services.document_processor.get_status()
 
 
 @router.get("/", response_model=PaginatedAnaliseResponse)
@@ -61,7 +63,8 @@ async def criar_analise(
     nome_licitacao: str = Form(...),
     file: UploadFile = File(...),
     current_user: Usuario = Depends(get_current_approved_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    services: ServiceContainer = Depends(get_services)
 ) -> AnaliseResponse:
     """
     Cria uma nova análise de licitação.
@@ -78,7 +81,7 @@ async def criar_analise(
 
     try:
         # Processar edital (extrair texto e exigências)
-        resultado_edital = document_processor.process_edital(filepath)
+        resultado_edital = services.document_processor.process_edital(filepath)
         exigencias = resultado_edital.get("exigencias", [])
 
         # Buscar atestados do usuário
@@ -87,21 +90,12 @@ async def criar_analise(
         ).all()
 
         # Converter atestados para formato de análise
-        atestados_dict = [
-            {
-                "id": at.id,
-                "descricao_servico": at.descricao_servico,
-                "quantidade": float(at.quantidade) if at.quantidade else 0,
-                "unidade": at.unidade or "",
-                "servicos_json": at.servicos_json
-            }
-            for at in atestados
-        ]
+        atestados_dict = atestados_to_dict(atestados)
 
         # Fazer matching se houver exigências e atestados
         resultado_matching = []
         if exigencias and atestados_dict:
-            resultado_matching = document_processor.analyze_qualification(
+            resultado_matching = services.document_processor.analyze_qualification(
                 exigencias, atestados_dict
             )
 
@@ -132,7 +126,8 @@ async def criar_analise(
 async def processar_analise(
     analise_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    services: ServiceContainer = Depends(get_services)
 ) -> AnaliseResponse:
     """
     Reprocessa uma análise existente: extrai exigências do edital e faz matching com atestados.
@@ -161,25 +156,16 @@ async def processar_analise(
 
     try:
         # Reprocessar edital
-        resultado_edital = document_processor.process_edital(analise.arquivo_path)
+        resultado_edital = services.document_processor.process_edital(analise.arquivo_path)
         exigencias = resultado_edital.get("exigencias", [])
 
         # Converter atestados para formato de análise
-        atestados_dict = [
-            {
-                "id": at.id,
-                "descricao_servico": at.descricao_servico,
-                "quantidade": float(at.quantidade) if at.quantidade else 0,
-                "unidade": at.unidade or "",
-                "servicos_json": at.servicos_json
-            }
-            for at in atestados
-        ]
+        atestados_dict = atestados_to_dict(atestados)
 
         # Fazer matching
         resultado_matching = []
         if exigencias and atestados_dict:
-            resultado_matching = document_processor.analyze_qualification(
+            resultado_matching = services.document_processor.analyze_qualification(
                 exigencias, atestados_dict
             )
 

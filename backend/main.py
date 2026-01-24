@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError as SAIntegrityError, OperationalError
 
 from database import engine, Base
-from routers import auth, admin, atestados, analise, ai_status, pipeline_status
+from routers import auth, admin, atestados, analise, ai_status
 from services.processing_queue import processing_queue
 from middleware.rate_limit import RateLimitMiddleware
 from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION
@@ -193,7 +193,6 @@ app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(atestados.router, prefix=API_PREFIX)
 app.include_router(analise.router, prefix=API_PREFIX)
 app.include_router(ai_status.router, prefix=API_PREFIX)
-app.include_router(pipeline_status.router, prefix=API_PREFIX)
 
 
 # Servir arquivos estáticos do frontend (CSS, JS)

@@ -11,9 +11,14 @@ from datetime import datetime
 from typing import Optional, Callable, Dict, Any
 
 from .models import JobStatus, ProcessingJob
-
 from logging_config import get_logger
+
 logger = get_logger('services.job_executor')
+
+
+def _now_iso() -> str:
+    """Retorna timestamp ISO com timezone local para parsing correto no frontend."""
+    return datetime.now().astimezone().isoformat()
 
 
 class JobExecutor:
@@ -75,7 +80,7 @@ class JobExecutor:
 
         # Marcar como em processamento
         job.status = JobStatus.PROCESSING
-        job.started_at = datetime.now().isoformat()
+        job.started_at = _now_iso()
         job.attempts += 1
         job.progress_current = 0
         job.progress_total = 0
@@ -90,7 +95,7 @@ class JobExecutor:
             self._update_progress(job.id, 0, 0, "save", "Salvando resultado")
 
             job.status = JobStatus.COMPLETED
-            job.completed_at = datetime.now().isoformat()
+            job.completed_at = _now_iso()
             job.result = result
 
         except Exception as e:
@@ -108,7 +113,7 @@ class JobExecutor:
             else:
                 # Falha definitiva
                 job.status = JobStatus.FAILED
-                job.completed_at = datetime.now().isoformat()
+                job.completed_at = _now_iso()
                 job.error = f"Falhou após {job.attempts} tentativas: {error_msg}"
 
         self._save_job(job)
@@ -220,7 +225,7 @@ class JobExecutor:
         Returns:
             Job atualizado
         """
-        now = datetime.now().isoformat()
+        now = _now_iso()
         job.status = JobStatus.CANCELLED
         job.completed_at = now
         job.canceled_at = now

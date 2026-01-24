@@ -21,6 +21,11 @@ from .job_executor import JobExecutor
 logger = get_logger('services.processing_queue')
 
 
+def _now_iso() -> str:
+    """Retorna timestamp ISO com timezone local para parsing correto no frontend."""
+    return datetime.now().astimezone().isoformat()
+
+
 class ProcessingQueue:
     """
     Fila de processamento assíncrono para documentos.
@@ -176,7 +181,7 @@ class ProcessingQueue:
         if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
             return job
 
-        now = datetime.now().isoformat()
+        now = _now_iso()
         job.status = JobStatus.CANCELLED
         job.completed_at = now
         job.canceled_at = now

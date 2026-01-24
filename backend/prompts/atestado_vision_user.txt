@@ -1,0 +1,30 @@
+Analise as imagens e extraia ABSOLUTAMENTE TODOS os serviços listados.
+
+INSTRUÇÕES CRÍTICAS:
+1. Percorra TODAS as páginas e TODAS as séries de códigos (1.1, 1.2, 2.1, etc.)
+2. Para cada linha da tabela, extraia SEPARADAMENTE:
+   - "item": o número/código do item (ex: "1.1", "2.3", "3.1")
+   - "descricao": a descrição do serviço (sem o número)
+   - "quantidade": quantidade executada
+   - "unidade": unidade de medida
+3. NÃO confunda "Quantidade Executada" com "Custo Unitário" - use verificação matemática
+4. Verifique: Valor Total ≈ Custo Unitário × Quantidade
+5. Itens em séries diferentes são ITENS DISTINTOS
+6. NÃO omita nenhum item - extraia a lista COMPLETA
+7. Escreva a descrição completa da linha; não abrevie nem corte
+8. Se a descrição estiver quebrada em duas linhas, una as partes
+9. EXTRAIA ITENS DE MATERIAL (ex: "ACO CA-50, 10,0 MM, VERGALHAO") - são itens válidos!
+10. Se uma seção tem itens 3.1-3.5 E TAMBÉM 3.6-3.8, extraia TODOS (não pule os de material)
+11. MESMO QUE QUANTIDADES SEJAM IGUAIS, itens com NÚMEROS DIFERENTES são DISTINTOS!
+    Exemplo: 3.3 "Armação aço 5mm" (95,70 KG) e 3.6 "Aço vergalhão 5mm" (95,70 KG) = 2 ITENS!
+12. NÃO interprete itens de material como "parte" de itens de serviço - são linhas SEPARADAS
+
+REGRA CRÍTICA - COPIE A DESCRIÇÃO EXATA:
+13. Leia a descrição de CADA LINHA individualmente e copie EXATAMENTE o que está escrito
+14. NÃO generalize descrições! Se a linha diz "ACO CA-60, 5,0 MM, VERGALHAO", copie isso EXATAMENTE
+15. Itens diferentes têm descrições DIFERENTES - não copie a descrição de um item para outro
+16. Exemplo ERRADO: item 3.6 com descrição "ARMAÇÃO DE LAJE..." quando deveria ser "ACO CA-60, VERGALHAO"
+17. Exemplo CORRETO: item 3.6 = "ACO CA-60, 5,0 MM, VERGALHAO" (descrição exata da linha 3.6)
+
+CONTA FINAL: Conte as linhas numeradas na tabela. Cada número (3.1, 3.2, 3.3...) = 1 item.
+Se você vê 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8 na tabela = extraia 8 itens da seção 3.

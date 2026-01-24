@@ -116,6 +116,30 @@ def ordenar_servicos(servicos: List[dict]) -> List[dict]:
     return sorted(servicos, key=sort_key_item)
 
 
+def atestados_to_dict(atestados: list) -> List[dict]:
+    """
+    Converte lista de atestados ORM para dicionários de análise.
+
+    Usado para preparar atestados para matching com exigências de edital.
+
+    Args:
+        atestados: Lista de objetos Atestado (ORM)
+
+    Returns:
+        Lista de dicionários com campos necessários para análise
+    """
+    return [
+        {
+            "id": at.id,
+            "descricao_servico": at.descricao_servico,
+            "quantidade": float(at.quantidade) if at.quantidade else 0,
+            "unidade": at.unidade or "",
+            "servicos_json": at.servicos_json
+        }
+        for at in atestados
+    ]
+
+
 def salvar_atestado_processado(job) -> None:
     """
     Salva o resultado do processamento de um atestado no banco.

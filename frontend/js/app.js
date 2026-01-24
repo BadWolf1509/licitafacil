@@ -105,17 +105,33 @@ async function carregarDashboard() {
 }
 
 /**
+ * Abre um modal pelo ID
+ */
+function abrirModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.add('active');
+}
+
+/**
  * Abre o modal de cadastro de atestado
  */
 function abrirModalAtestado() {
-    document.getElementById('modalAtestado').classList.add('active');
+    abrirModal('modalAtestado');
 }
 
 /**
  * Fecha um modal
  */
 function fecharModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
+    const modal = document.getElementById(modalId);
+    if (modal) modal.classList.remove('active');
+}
+
+/**
+ * Fecha todos os modais ativos
+ */
+function fecharTodosModais() {
+    document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
 }
 
 /**
@@ -196,6 +212,6 @@ document.addEventListener('click', (e) => {
 // Fechar modal com ESC
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+        fecharTodosModais();
     }
 });

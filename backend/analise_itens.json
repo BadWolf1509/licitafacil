@@ -1,0 +1,2586 @@
+{
+  "itens_texto": {
+    "1.1": {
+      "linha": 159,
+      "texto_linha": "1.1 PLACA DE OBRA EM CHAPA DE ACO GALVANIZADO m² 6,4",
+      "desc_anterior": "1 PLACA DA OBRA",
+      "unit": "M²",
+      "qty": "6,4"
+    },
+    "2.1": {
+      "linha": 161,
+      "texto_linha": "2.1 DEMOLIÇÃO DE ALVENARIA DE BLOCO FURADO, DE FORMA MANUAL, SEM m³ 63,448",
+      "desc_anterior": "2 DEMOLIÇÕES E RETIRADAS",
+      "unit": "M³",
+      "qty": "63,448"
+    },
+    "2.2": {
+      "linha": 761,
+      "texto_linha": "2.2 D M E A M N O U L A I L Ç , Ã S O E D M E R R E E A V P E R S O T V IM E E IT N A T M O E C N E T R O Â . M A I F C _ O 1 , 2 D /2 E 0 1 F 7 O RMA M² 22,61",
+      "desc_anterior": "2 DEMOLIÇÕES E RETIRADAS",
+      "unit": "M²",
+      "qty": "22,61"
+    },
+    "2.3": {
+      "linha": 763,
+      "texto_linha": "2.3 REAPROVEITAMENTO. AF_12/2017 M² 35,11",
+      "desc_anterior": "DEMOLIÇÃO DE ARGAMASSAS, DE FORMA MANUAL, SEM",
+      "unit": "M²",
+      "qty": "35,11"
+    },
+    "2.4": {
+      "linha": 167,
+      "texto_linha": "2.4 REMOÇÃO DE TAPUME/ CHAPAS METÁLICAS E DE MADEIRA, DE FORMA MANUAL, m² 19,88",
+      "desc_anterior": "AF_12/2017",
+      "unit": "M²",
+      "qty": "19,88"
+    },
+    "2.5": {
+      "linha": 169,
+      "texto_linha": "2.5 REMOÇÃO DE FORROS DE DRYWALL, PVC E FIBROMINERAL, DE FORMA MANUAL, SEM m² 156,45",
+      "desc_anterior": "SEM REAPROVEITAMENTO. AF_12/2017",
+      "unit": "M²",
+      "qty": "156,45"
+    },
+    "2.6": {
+      "linha": 171,
+      "texto_linha": "2.6 REMOÇÃO DE LOUÇAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 UN 30",
+      "desc_anterior": "REAPROVEITAMENTO. AF_12/2017",
+      "unit": "UN",
+      "qty": "30"
+    },
+    "2.7": {
+      "linha": 172,
+      "texto_linha": "2.7 REMOÇÃO DE METAIS SANITÁRIOS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. UN 14",
+      "desc_anterior": "2.6 REMOÇÃO DE LOUÇAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 UN 30",
+      "unit": "UN",
+      "qty": "14"
+    },
+    "2.8": {
+      "linha": 174,
+      "texto_linha": "2.8 REMOÇÃO DE JANELAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 m² 49,35",
+      "desc_anterior": "AF_12/2017",
+      "unit": "M²",
+      "qty": "49,35"
+    },
+    "2.9": {
+      "linha": 175,
+      "texto_linha": "2.9 REMOÇÃO DE PORTAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 m² 48,72",
+      "desc_anterior": "2.8 REMOÇÃO DE JANELAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 m² 49,35",
+      "unit": "M²",
+      "qty": "48,72"
+    },
+    "2.10": {
+      "linha": 176,
+      "texto_linha": "2.10 REMOÇÃO DE TRAMA DE MADEIRA PARA COBERTURA, DE FORMA MANUAL, SEM m² 38,93",
+      "desc_anterior": "2.9 REMOÇÃO DE PORTAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017 m² 48,72",
+      "unit": "M²",
+      "qty": "38,93"
+    },
+    "2.11": {
+      "linha": 178,
+      "texto_linha": "2.11 REMOÇÃO DE TELHAS DE FIBROCIMENTO, METÁLICA E CERÂMICA, DE FORMA m² 38,93",
+      "desc_anterior": "REAPROVEITAMENTO. AF_12/2017",
+      "unit": "M²",
+      "qty": "38,93"
+    },
+    "2.12": {
+      "linha": 180,
+      "texto_linha": "2.12 REMOÇÃO DE INTERRUPTORES/TOMADAS ELÉTRICAS, DE FORMA MANUAL, SEM UN 95",
+      "desc_anterior": "MECANIZADA, COM USO DE GUINDASTE, SEM REAPROVEITAMENTO. AF_12/2017",
+      "unit": "UN",
+      "qty": "95"
+    },
+    "2.13": {
+      "linha": 182,
+      "texto_linha": "2.13 REMOÇÃO DE LUMINÁRIAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. UN 60",
+      "desc_anterior": "REAPROVEITAMENTO. AF_12/2017",
+      "unit": "UN",
+      "qty": "60"
+    },
+    "3.1": {
+      "linha": 185,
+      "texto_linha": "3.1 CINTA DE AMARRAÇÃO DE ALVENARIA MOLDADA IN LOCO EM CONCRETO. M 42,94",
+      "desc_anterior": "3 ESTRUTURA",
+      "unit": "M",
+      "qty": "42,94"
+    },
+    "3.2": {
+      "linha": 187,
+      "texto_linha": "3.2 VERGA PRÉ-MOLDADA PARA PORTAS COM ATÉ 1,5 M DE VÃO. AF_03/2016 M 90,74",
+      "desc_anterior": "AF_03/2016",
+      "unit": "M",
+      "qty": "90,74"
+    },
+    "3.3": {
+      "linha": 258,
+      "texto_linha": "3.3 VERGA PRÉ-MOLDADA PARA PORTAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016 M 10,55",
+      "desc_anterior": "Página 4/11",
+      "unit": "M",
+      "qty": "10,55"
+    },
+    "3.4": {
+      "linha": 259,
+      "texto_linha": "3.4 VERGA PRÉ-MOLDADA PARA JANELAS COM ATÉ 1,5 M DE VÃO. AF_03/2016 M 29,3",
+      "desc_anterior": "3.3 VERGA PRÉ-MOLDADA PARA PORTAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016 M 10,55",
+      "unit": "M",
+      "qty": "29,3"
+    },
+    "3.5": {
+      "linha": 260,
+      "texto_linha": "3.5 CONTRAVERGA PRÉ-MOLDADA PARA VÃOS DE ATÉ 1,5 M DE COMPRIMENTO. M 29,3",
+      "desc_anterior": "3.4 VERGA PRÉ-MOLDADA PARA JANELAS COM ATÉ 1,5 M DE VÃO. AF_03/2016 M 29,3",
+      "unit": "M",
+      "qty": "29,3"
+    },
+    "3.6": {
+      "linha": 262,
+      "texto_linha": "3.6 VERGA PRÉ-MOLDADA PARA JANELAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016 M 54,6",
+      "desc_anterior": "AF_03/2016",
+      "unit": "M",
+      "qty": "54,6"
+    },
+    "3.7": {
+      "linha": 263,
+      "texto_linha": "3.7 CONTRAVERGA PRÉ-MOLDADA PARA VÃOS DE MAIS DE 1,5 M DE COMPRIMENTO. M 54,6",
+      "desc_anterior": "3.6 VERGA PRÉ-MOLDADA PARA JANELAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016 M 54,6",
+      "unit": "M",
+      "qty": "54,6"
+    },
+    "4.1": {
+      "linha": 625,
+      "texto_linha": "4.1 CAMADA, INCLUSIVE APLICAÇÃO DE PRIMER ASFÁLTICO, E=3MM. M² 39,33",
+      "desc_anterior": "IMPERMEABILIZAÇÃO DE SUPERFÍCIE COM MANTA ASFÁLTICA, UMA",
+      "unit": "M²",
+      "qty": "39,33"
+    },
+    "5.1": {
+      "linha": 269,
+      "texto_linha": "5.1 ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS FURADOS NA HORIZONTAL DE m² 164,93",
+      "desc_anterior": "5 ALVENARIAS",
+      "unit": "M²",
+      "qty": "164,93"
+    },
+    "5.2": {
+      "linha": 273,
+      "texto_linha": "5.2 DIVISORIA SANITÁRIA, TIPO CABINE, EM GRANITO CINZA POLIDO, ESP = 3CM, m² 12,018",
+      "desc_anterior": "AF_06/2014",
+      "unit": "M²",
+      "qty": "12,018"
+    },
+    "6.1": {
+      "linha": 277,
+      "texto_linha": "6.1 TRAMA DE MADEIRA COMPOSTA POR RIPAS, CAIBROS E TERÇAS PARA TELHADOS DE m² 38,93",
+      "desc_anterior": "6 COBERTURA",
+      "unit": "M²",
+      "qty": "38,93"
+    },
+    "6.2": {
+      "linha": 280,
+      "texto_linha": "6.2 TELHAMENTO COM TELHA CERÂMICA CAPA-CANAL, TIPO COLONIAL, COM ATÉ 2 m² 38,93",
+      "desc_anterior": "TRANSPORTE VERTICAL. AF_07/2019",
+      "unit": "M²",
+      "qty": "38,93"
+    },
+    "6.3": {
+      "linha": 282,
+      "texto_linha": "6.3 FORRO EM PLACAS DE GESSO, PARA AMBIENTES RESIDENCIAIS. AF_05/2017_PS m² 526,35",
+      "desc_anterior": "ÁGUAS, INCLUSO TRANSPORTE VERTICAL. AF_07/2019",
+      "unit": "M²",
+      "qty": "526,35"
+    },
+    "7.1": {
+      "linha": 284,
+      "texto_linha": "7.1 PORTA DE MADEIRA COMPENSADA LISA PARA PINTURA, 120X210X3,5CM, 2 FOLHAS, UN 8",
+      "desc_anterior": "7 ESQUADRIAS",
+      "unit": "UN",
+      "qty": "8"
+    },
+    "7.2": {
+      "linha": 286,
+      "texto_linha": "7.2 Porta em madeira compensada (canela), lisa, semi-ôca, 1.40 x 2.10 m, duas folhas, un 1",
+      "desc_anterior": "INCLUSO ADUELA 2A, ALIZAR 2A E DOBRADIÇAS. AF_12/2019",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "7.3": {
+      "linha": 288,
+      "texto_linha": "7.3 KIT DE PORTA DE MADEIRA PARA PINTURA, SEMI-OCA (LEVE OU MÉDIA), PADRÃO UN 15",
+      "desc_anterior": "inclusive batentes e ferragens",
+      "unit": "UN",
+      "qty": "15"
+    },
+    "7.4": {
+      "linha": 875,
+      "texto_linha": "7.4 UN 1,00",
+      "desc_anterior": "PORTA PIVOTANTE DE VIDRO TEMPERADO, 90X210 CM, ESPESSURA 10",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "7.5": {
+      "linha": 878,
+      "texto_linha": "7.5 M² 10,40",
+      "desc_anterior": "INSTALAÇÃO DE VIDRO TEMPERADO, E = 10 MM, ENCAIXADO EM PERFIL",
+      "unit": "M²",
+      "qty": "10,40"
+    },
+    "7.6": {
+      "linha": 880,
+      "texto_linha": "7.6 PORTA COMPLETA, BLINDOR/CHUMBO (0,80X2,10)m (S/ACESSÓRIOS) UN 2,00",
+      "desc_anterior": "U. AF_01/2021_PS",
+      "unit": "UN",
+      "qty": "2,00"
+    },
+    "7.7": {
+      "linha": 881,
+      "texto_linha": "7.7 PORTA COMPLETA, BLINDOR/CHUMBO (1,20X2,10)m (S/ACESSÓRIOS) UN 1,00",
+      "desc_anterior": "7.6 PORTA COMPLETA, BLINDOR/CHUMBO (0,80X2,10)m (S/ACESSÓRIOS) UN 2,00",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "7.8": {
+      "linha": 883,
+      "texto_linha": "7.8 M² 4,80",
+      "desc_anterior": "PELICULA ADESIVA APLICADA EM VIDROS-TIPO INSULFILM JATEADA -",
+      "unit": "M²",
+      "qty": "4,80"
+    },
+    "7.9": {
+      "linha": 885,
+      "texto_linha": "7.9 Visor plumbífero com moldura, esp=80mm (nacional) M² 1,02",
+      "desc_anterior": "REFERÊNCIA SBC 150158",
+      "unit": "M²",
+      "qty": "1,02"
+    },
+    "7.10": {
+      "linha": 887,
+      "texto_linha": "7.10 UN 2,00",
+      "desc_anterior": "MOLA HIDRAULICA DE PISO PARA PORTA DE VIDRO TEMPERADO.",
+      "unit": "UN",
+      "qty": "2,00"
+    },
+    "8.1": {
+      "linha": 309,
+      "texto_linha": "8.1 VASO SANITARIO SIFONADO CONVENCIONAL PARA PCD SEM FURO FRONTAL COM UN 8",
+      "desc_anterior": "8 INSTALAÇÕES HIDROSSANITÁRIAS",
+      "unit": "UN",
+      "qty": "8"
+    },
+    "8.2": {
+      "linha": 379,
+      "texto_linha": "8.2 VASO SANITARIO SIFONADO CONVENCIONAL COM LOUÇA BRANCA, INCLUSO UN 3",
+      "desc_anterior": "Página 5/11",
+      "unit": "UN",
+      "qty": "3"
+    },
+    "8.3": {
+      "linha": 382,
+      "texto_linha": "8.3 LAVATÓRIO LOUÇA BRANCA SUSPENSO, 29,5 X 39CM OU EQUIVALENTE, PADRÃO UN 11",
+      "desc_anterior": "INSTALAÇÃO. AF_10/2016",
+      "unit": "UN",
+      "qty": "11"
+    },
+    "8.4": {
+      "linha": 384,
+      "texto_linha": "8.4 BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 1,50MX0,55M, INCLUSIVE CUBA UN 1",
+      "desc_anterior": "POPULAR - FORNECIMENTO E INSTALAÇÃO. AF_01/2020",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "8.5": {
+      "linha": 386,
+      "texto_linha": "8.5 BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 2,70MX1,85MX0,55M, UN 1",
+      "desc_anterior": "DE AÇO INOX - FORNECIMENTO E INSTALAÇÃO",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "8.6": {
+      "linha": 388,
+      "texto_linha": "8.6 BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 3,45MX0,60M, INCLUSIVE DUAS UN 1",
+      "desc_anterior": "INCLUSIVE CUBA DE AÇO INOX - FORNECIMENTO E INSTALAÇÃO",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "8.7": {
+      "linha": 390,
+      "texto_linha": "8.7 GRANITO BRANCO PARA BANCADA DE ATENDIMENTO m² 0,66",
+      "desc_anterior": "CUBA DE AÇO INOX - FORNECIMENTO E INSTALAÇÃO",
+      "unit": "M²",
+      "qty": "0,66"
+    },
+    "8.8": {
+      "linha": 391,
+      "texto_linha": "8.8 PONTO DE CONSUMO TERMINAL DE ÁGUA FRIA (SUBRAMAL) COM TUBULAÇÃO DE UN 47",
+      "desc_anterior": "8.7 GRANITO BRANCO PARA BANCADA DE ATENDIMENTO m² 0,66",
+      "unit": "UN",
+      "qty": "47"
+    },
+    "8.9": {
+      "linha": 394,
+      "texto_linha": "8.9 TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 40 MM, FORNECIDO E INSTALADO M 35,33",
+      "desc_anterior": "CHUMBAMENTO EM ALVENARIA. AF_12/2014",
+      "unit": "M",
+      "qty": "35,33"
+    },
+    "8.10": {
+      "linha": 396,
+      "texto_linha": "8.10 TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 50 MM, FORNECIDO E INSTALADO M 22,93",
+      "desc_anterior": "EM RAMAL DE DESCARGA OU RAMAL DE ESGOTO SANITÁRIO. AF_08/2022",
+      "unit": "M",
+      "qty": "22,93"
+    },
+    "8.11": {
+      "linha": 398,
+      "texto_linha": "8.11 TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 100 MM, FORNECIDO E INSTALADO M 25,31",
+      "desc_anterior": "EM RAMAL DE DESCARGA OU RAMAL DE ESGOTO SANITÁRIO. AF_08/2022",
+      "unit": "M",
+      "qty": "25,31"
+    },
+    "8.12": {
+      "linha": 400,
+      "texto_linha": "8.12 CAIXA ENTERRADA HIDRÁULICA RETANGULAR EM ALVENARIA COM TIJOLOS UN 5",
+      "desc_anterior": "EM RAMAL DE DESCARGA OU RAMAL DE ESGOTO SANITÁRIO. AF_08/2022",
+      "unit": "UN",
+      "qty": "5"
+    },
+    "8.13": {
+      "linha": 403,
+      "texto_linha": "8.13 TAMPA DE CONCRETO ARMADO 60X60X5CM PARA CAIXA UN 2",
+      "desc_anterior": "AF_12/2020",
+      "unit": "UN",
+      "qty": "2"
+    },
+    "8.14": {
+      "linha": 404,
+      "texto_linha": "8.14 RALO SECO, PVC, DN 100 X 40 MM, JUNTA SOLDÁVEL, FORNECIDO E INSTALADO EM UN 1",
+      "desc_anterior": "8.13 TAMPA DE CONCRETO ARMADO 60X60X5CM PARA CAIXA UN 2",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "8.15": {
+      "linha": 406,
+      "texto_linha": "8.15 CAIXA SIFONADA, PVC, DN 100 X 100 X 50 MM, FORNECIDA E INSTALADA EM RAMAIS UN 11",
+      "desc_anterior": "RAMAL DE DESCARGA OU EM RAMAL DE ESGOTO SANITÁRIO. AF_08/2022",
+      "unit": "UN",
+      "qty": "11"
+    },
+    "8.16": {
+      "linha": 408,
+      "texto_linha": "8.16 DUCHA HIGIENICA PLASTICA COM REGISTRO METALICO 1/2 \" UN 11",
+      "desc_anterior": "DE ENCAMINHAMENTO DE ÁGUA PLUVIAL. AF_06/2022",
+      "unit": "UN",
+      "qty": "11"
+    },
+    "8.17": {
+      "linha": 409,
+      "texto_linha": "8.17 BARRA DE APOIO RETA, EM ACO INOX POLIDO, COMPRIMENTO 80 CM, FIXADA NA UN 16",
+      "desc_anterior": "8.16 DUCHA HIGIENICA PLASTICA COM REGISTRO METALICO 1/2 \" UN 11",
+      "unit": "UN",
+      "qty": "16"
+    },
+    "8.18": {
+      "linha": 411,
+      "texto_linha": "8.18 TORNEIRA CROMADA DE MESA, 1/2” OU 3/4”, PARA LAVATÓRIO, PADRÃO POPULAR - UN 11",
+      "desc_anterior": "PAREDE - FORNECIMENTO E INSTALAÇÃO. AF_01/2020",
+      "unit": "UN",
+      "qty": "11"
+    },
+    "9.1": {
+      "linha": 414,
+      "texto_linha": "9.1 LUMINÁRIA TIPO PLAFON EM PLÁSTICO, DE SOBREPOR, COM 1 LÂMPADA UN 11",
+      "desc_anterior": "9 INSTALAÇÕES ELÉTRICAS",
+      "unit": "UN",
+      "qty": "11"
+    },
+    "9.2": {
+      "linha": 416,
+      "texto_linha": "9.2 LUMINÁRIA TIPO CALHA, DE SOBREPOR, COM 2 LÂMPADAS TUBULARES UN 75",
+      "desc_anterior": "FLUORESCENTE DE 15 W, SEM REATOR - FORNECIMENTO E INSTALAÇÃO. AF_02/2020",
+      "unit": "UN",
+      "qty": "75"
+    },
+    "9.3": {
+      "linha": 905,
+      "texto_linha": "9.3 ELÉTRICA, ELETRODUTO, CABO, RASGO, QUEBRA E CHUMBAMENTO. UN 7,00",
+      "desc_anterior": "PONTO DE TOMADA RESIDENCIAL INCLUINDO TOMADA 10A/250V, CAIXA",
+      "unit": "UN",
+      "qty": "7,00"
+    },
+    "9.4": {
+      "linha": 421,
+      "texto_linha": "9.4 PONTO DE ILUMINAÇÃO RESIDENCIAL INCLUINDO INTERRUPTOR SIMPLES, CAIXA UN 86",
+      "desc_anterior": "ELETRODUTO, CABO, RASGO, QUEBRA E CHUMBAMENTO. AF_01/2016",
+      "unit": "UN",
+      "qty": "86"
+    },
+    "10.1": {
+      "linha": 425,
+      "texto_linha": "10.1 CABO ELETRÔNICO CATEGORIA 6, INSTALADO EM EDIFICAÇÃO INSTITUCIONAL - M 134,7",
+      "desc_anterior": "10 REDE LÓGICA",
+      "unit": "M",
+      "qty": "134,7"
+    },
+    "10.2": {
+      "linha": 427,
+      "texto_linha": "10.2 PATCH PANEL 24 PORTAS, CATEGORIA 6 - FORNECIMENTO E INSTALAÇÃO. UN 1",
+      "desc_anterior": "FORNECIMENTO E INSTALAÇÃO. AF_11/2019",
+      "unit": "UN",
+      "qty": "1"
+    },
+    "10.3": {
+      "linha": 429,
+      "texto_linha": "10.3 TOMADA DE REDE RJ45 - FORNECIMENTO E INSTALAÇÃO. AF_11/2019 UN 9",
+      "desc_anterior": "AF_11/2019",
+      "unit": "UN",
+      "qty": "9"
+    },
+    "10.4": {
+      "linha": 430,
+      "texto_linha": "10.4 TOMADA PARA TELEFONE RJ11 - FORNECIMENTO E INSTALAÇÃO. AF_11/2019 UN 6",
+      "desc_anterior": "10.3 TOMADA DE REDE RJ45 - FORNECIMENTO E INSTALAÇÃO. AF_11/2019 UN 9",
+      "unit": "UN",
+      "qty": "6"
+    },
+    "11.1": {
+      "linha": 500,
+      "texto_linha": "11.1 EXTINTOR DE INCÊNDIO PORTÁTIL COM CARGA DE PQS DE 4 KG, CLASSE BC - UN 2",
+      "desc_anterior": "Página 6/11",
+      "unit": "UN",
+      "qty": "2"
+    },
+    "11.2": {
+      "linha": 502,
+      "texto_linha": "11.2 EXTINTOR DE INCÊNDIO PORTÁTIL COM CARGA DE ÁGUA PRESSURIZADA DE 10 L, UN 2",
+      "desc_anterior": "FORNECIMENTO E INSTALAÇÃO. AF_10/2020_PE",
+      "unit": "UN",
+      "qty": "2"
+    },
+    "11.3": {
+      "linha": 504,
+      "texto_linha": "11.3 LUMINÁRIA DE EMERGÊNCIA, COM 30 LÂMPADAS LED DE 2 W, SEM REATOR - UN 27",
+      "desc_anterior": "CLASSE A - FORNECIMENTO E INSTALAÇÃO. AF_10/2020_PE",
+      "unit": "UN",
+      "qty": "27"
+    },
+    "11.4": {
+      "linha": 506,
+      "texto_linha": "11.4 PLACA DE SINALIZACAO DE SEGURANCA CONTRA INCENDIO, FOTOLUMINESCENTE, UN 27",
+      "desc_anterior": "FORNECIMENTO E INSTALAÇÃO. AF_02/2020",
+      "unit": "UN",
+      "qty": "27"
+    },
+    "11.5": {
+      "linha": 509,
+      "texto_linha": "11.5 PLACA DE SINALIZACAO DE SEGURANCA CONTRA INCENDIO, FOTOLUMINESCENTE, UN 2",
+      "desc_anterior": "PICTOGRAMAS CONFORME NBR 16820)",
+      "unit": "UN",
+      "qty": "2"
+    },
+    "12.1": {
+      "linha": 993,
+      "texto_linha": "12.1 M³ 1,48",
+      "desc_anterior": "CONCRETO MAGRO PARA LASTRO, TRAÇO 1:4,5:4,5 (EM MASSA SECA DE",
+      "unit": "M³",
+      "qty": "1,48"
+    },
+    "12.2": {
+      "linha": 515,
+      "texto_linha": "12.2 CONTRAPISO EM ARGAMASSA TRAÇO 1:4 (CIMENTO E AREIA), PREPARO MANUAL, m² 107,9",
+      "desc_anterior": "AREIA MÉDIA/ BRITA 1) - PREPARO MANUAL. AF_05/2021",
+      "unit": "M²",
+      "qty": "107,9"
+    },
+    "12.3": {
+      "linha": 518,
+      "texto_linha": "12.3 PISO EM GRANILITE, MARMORITE OU GRANITINA ESPESSURA 8 MM, INCLUSO JUNTAS m² 107,9",
+      "desc_anterior": "ESPESSURA 2CM. AF_07/2021",
+      "unit": "M²",
+      "qty": "107,9"
+    },
+    "12.4": {
+      "linha": 520,
+      "texto_linha": "12.4 RODAPÉ PRÉ-MOLDADO DE GRANILITE H= 10cm M 96,31",
+      "desc_anterior": "DE DILATACAO PLASTICAS",
+      "unit": "M",
+      "qty": "96,31"
+    },
+    "12.5": {
+      "linha": 521,
+      "texto_linha": "12.5 EXECUÇÃO DE PASSEIO (CALÇADA) OU PISO DE CONCRETO COM CONCRETO m³ 2,49",
+      "desc_anterior": "12.4 RODAPÉ PRÉ-MOLDADO DE GRANILITE H= 10cm M 96,31",
+      "unit": "M³",
+      "qty": "2,49"
+    },
+    "13.1": {
+      "linha": 1019,
+      "texto_linha": "13.1 INTERNAS, COM COLHER DE PEDREIRO. ARGAMASSA TRAÇO 1:3 COM M² 331,11",
+      "desc_anterior": "CHAPISCO APLICADO EM ALVENARIAS E ESTRUTURAS DE CONCRETO",
+      "unit": "M²",
+      "qty": "331,11"
+    },
+    "13.2": {
+      "linha": 1023,
+      "texto_linha": "13.2 M² 331,11 MANUALMENTE EM FACES INTERNAS DE PAREDES, ESPESSURA DE 20MM,",
+      "desc_anterior": "1:2:8, PREPARO MECÂNICO COM BETONEIRA 400L, APLICADA",
+      "unit": "",
+      "qty": ""
+    },
+    "13.3": {
+      "linha": 531,
+      "texto_linha": "13.3 revestimento com argamassa baritada - densidade = 3,2 g/cm³ - esp=1,5cm m² 46,508",
+      "desc_anterior": "AF_06/2014",
+      "unit": "M²",
+      "qty": "46,508"
+    },
+    "13.4": {
+      "linha": 532,
+      "texto_linha": "13.4 Revestimento cerâmico para piso ou parede, 30 x 60 cm, porcelanato, linha white",
+      "desc_anterior": "13.3 revestimento com argamassa baritada - densidade = 3,2 g/cm³ - esp=1,5cm m² 46,508",
+      "unit": "",
+      "qty": ""
+    },
+    "14.1": {
+      "linha": 1027,
+      "texto_linha": "14.1 M² 81,36",
+      "desc_anterior": "EMASSAMENTO COM MASSA LÁTEX, APLICAÇÃO EM PAREDE, DUAS",
+      "unit": "M²",
+      "qty": "81,36"
+    },
+    "14.2": {
+      "linha": 538,
+      "texto_linha": "14.2 APLICAÇÃO DE FUNDO SELADOR ACRÍLICO EM TETO, UMA DEMÃO. AF_06/2014 m² 438,15",
+      "desc_anterior": "AF_06/2014",
+      "unit": "M²",
+      "qty": "438,15"
+    },
+    "14.3": {
+      "linha": 539,
+      "texto_linha": "14.3 APLICAÇÃO MANUAL DE PINTURA COM TINTA LÁTEX ACRÍLICA EM PAREDES, DUAS m² 1106,09",
+      "desc_anterior": "14.2 APLICAÇÃO DE FUNDO SELADOR ACRÍLICO EM TETO, UMA DEMÃO. AF_06/2014 m² 438,15",
+      "unit": "M²",
+      "qty": "1106,09"
+    },
+    "14.4": {
+      "linha": 541,
+      "texto_linha": "14.4 APLICAÇÃO MANUAL DE PINTURA COM TINTA LÁTEX ACRÍLICA EM TETO, DUAS m² 526,35",
+      "desc_anterior": "DEMÃOS. AF_06/2014",
+      "unit": "M²",
+      "qty": "526,35"
+    },
+    "14.5": {
+      "linha": 543,
+      "texto_linha": "14.5 PINTURA TINTA DE ACABAMENTO (PIGMENTADA) ESMALTE SINTÉTICO ACETINADO m² 56,76",
+      "desc_anterior": "DEMÃOS. AF_06/2014",
+      "unit": "M²",
+      "qty": "56,76"
+    },
+    "15.1": {
+      "linha": 546,
+      "texto_linha": "15.1 m³ 143,56 CARGA MANUAL DE ENTULHO EM CAMINHAO BASCULANTE 6 M3",
+      "desc_anterior": "15 LIMPEZA DE OBRA",
+      "unit": "",
+      "qty": ""
+    },
+    "15.2": {
+      "linha": 547,
+      "texto_linha": "15.2 TRANSPORTE DE ENTULHO COM CAMINHAO BASCULANTE 6 M3, RODOVIA m³ 143,56",
+      "desc_anterior": "15.1 m³ 143,56 CARGA MANUAL DE ENTULHO EM CAMINHAO BASCULANTE 6 M3",
+      "unit": "M³",
+      "qty": "143,56"
+    },
+    "8.20": {
+      "linha": 899,
+      "texto_linha": "8.20 Chuveiro elétrico de plástico (lorenzetti ou similar) UN 10,00",
+      "desc_anterior": "8 INSTALAÇÕES HIDROSSANITÁRIAS",
+      "unit": "UN",
+      "qty": "10,00"
+    },
+    "8.21": {
+      "linha": 901,
+      "texto_linha": "8.21 UN 1,00",
+      "desc_anterior": "TANQUE DE LOUÇA BRANCA SUSPENSO, 18L OU EQUIVALENTE -",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "8.23": {
+      "linha": 637,
+      "texto_linha": "8.23 UN 27,00",
+      "desc_anterior": "ENGATE FLEXÍVEL EM PLÁSTICO BRANCO, 1/2”X 40CM - FORNECIMENTO E",
+      "unit": "UN",
+      "qty": "27,00"
+    },
+    "8.24": {
+      "linha": 640,
+      "texto_linha": "8.24 UN 11,00",
+      "desc_anterior": "ASSENTO SANITÁRIO CONVENCIONAL - FORNECIMENTO E INSTALACAO.",
+      "unit": "UN",
+      "qty": "11,00"
+    },
+    "9.5": {
+      "linha": 908,
+      "texto_linha": "9.5 20A/250V, CAIXA ELÉTRICA, ELETRODUTO, CABO 4,00 MM² , RASGO, UN 10,00",
+      "desc_anterior": "PONTO DE TOMADA ALTO DE USO ESPECIFICO, INCLUINDO TOMADA",
+      "unit": "UN",
+      "qty": "10,00"
+    },
+    "9.6": {
+      "linha": 650,
+      "texto_linha": "9.6 20A/250V, CAIXA ELÉTRICA, ELETRODUTO, CABO 4,00 MM² , RASGO, UN 4,00",
+      "desc_anterior": "PONTO DE TOMADA BAIXO DE USO ESPECIFICO, INCLUINDO TOMADA",
+      "unit": "UN",
+      "qty": "4,00"
+    },
+    "9.7": {
+      "linha": 653,
+      "texto_linha": "9.7 UN 1,00",
+      "desc_anterior": "Quadro de distribuição de embutir, em resina termoplástica, para até 32",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "9.8": {
+      "linha": 655,
+      "texto_linha": "9.8 Disjuntor bipolar DR 63 A - Dispositivo residual diferencial, tipo AC, 30MA UN 1,00",
+      "desc_anterior": "disjuntores, SLIM, com barramento, padrão DIN, exclusive disjuntores",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "9.9": {
+      "linha": 657,
+      "texto_linha": "9.9 UN 1,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "desc_anterior": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 50A -",
+      "unit": "",
+      "qty": ""
+    },
+    "9.10": {
+      "linha": 659,
+      "texto_linha": "9.10 UN 5,00",
+      "desc_anterior": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 32A -",
+      "unit": "UN",
+      "qty": "5,00"
+    },
+    "9.11": {
+      "linha": 662,
+      "texto_linha": "9.11 UN 19,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "desc_anterior": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 25A -",
+      "unit": "",
+      "qty": ""
+    },
+    "9.12": {
+      "linha": 912,
+      "texto_linha": "9.12 UN 1,00",
+      "desc_anterior": "Quadro de distribuição de embutir, em resina termoplástica, para até 16",
+      "unit": "UN",
+      "qty": "1,00"
+    },
+    "9.13": {
+      "linha": 667,
+      "texto_linha": "9.13 UN 5,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "desc_anterior": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 16A -",
+      "unit": "",
+      "qty": ""
+    },
+    "12.7": {
+      "linha": 996,
+      "texto_linha": "12.7 MANUAL, APLICADO EM ÁREAS SECAS SOBRE LAJE, ADERIDO, M² 49,17",
+      "desc_anterior": "CONTRAPISO EM ARGAMASSA TRAÇO 1:4 (CIMENTO E AREIA), PREPARO",
+      "unit": "M²",
+      "qty": "49,17"
+    },
+    "2.14": {
+      "linha": 764,
+      "texto_linha": "2.14 Remoção de cobogó ou bloco de vidro - Rev 02 M² 30,00",
+      "desc_anterior": "2.3 REAPROVEITAMENTO. AF_12/2017 M² 35,11",
+      "unit": "M²",
+      "qty": "30,00"
+    },
+    "3.8": {
+      "linha": 767,
+      "texto_linha": "3.8 para Uso Geral, com formas planas em compensado resinado 12mm (05 M³ 1,38",
+      "desc_anterior": "Concreto Armado fck=21,0MPa, usinado, bombeado, adensado e lançado,",
+      "unit": "M³",
+      "qty": "1,38"
+    },
+    "5.4": {
+      "linha": 773,
+      "texto_linha": "5.4 (ESPESSURA 19 CM), ASSENTADO EM ARGAMASSA TRACO 1:4 (CIMENTO M² 11,43",
+      "desc_anterior": "ALVENARIA EM TIJOLO CERAMICO FURADO 9X19X19CM, 1 VEZ",
+      "unit": "M²",
+      "qty": "11,43"
+    },
+    "5.5": {
+      "linha": 775,
+      "texto_linha": "5.5 Cobogo cimento tipo \"veneziana\", dim: 40 x 40 x 9cm M² 33,00",
+      "desc_anterior": "E AREIA MEDIA NAO PENEIRADA), PREPARO MANUAL, JUNTA1 CM.",
+      "unit": "M²",
+      "qty": "33,00"
+    },
+    "6.5": {
+      "linha": 778,
+      "texto_linha": "6.5 TELHADO COM ATÉ DUAS ÁGUAS, INCLUSO IÇAMENTO. - REFERÊNCIA M² 34,26",
+      "desc_anterior": "TELHAMENTO COM TELHA ONDULADA DE PVC COLONIAL PLAN, PARA",
+      "unit": "M²",
+      "qty": "34,26"
+    },
+    "6.6": {
+      "linha": 781,
+      "texto_linha": "6.6 para Uso Geral, com formas planas em compensado resinado 12mm (05 M³ 0,3668",
+      "desc_anterior": "Concreto Armado fck=21,0MPa, usinado, bombeado, adensado e lançado,",
+      "unit": "M³",
+      "qty": "0,3668"
+    },
+    "6.7": {
+      "linha": 784,
+      "texto_linha": "6.7 ousimilar, exclusive condutores M 20,20",
+      "desc_anterior": "Calha Pluvial de beiral, Ø 125mm, PVC, semicircular, linha Aquapluv, Tigre",
+      "unit": "M",
+      "qty": "20,20"
+    },
+    "6.8": {
+      "linha": 786,
+      "texto_linha": "6.8 EM RAMAL DE ENCAMINHAMENTO. AF_06/2022 M 25,52",
+      "desc_anterior": "TUBO PVC, SÉRIE R, ÁGUA PLUVIAL, DN 50 MM, FORNECIDO E INSTALADO",
+      "unit": "M",
+      "qty": "25,52"
+    },
+    "6.9": {
+      "linha": 788,
+      "texto_linha": "6.9 EM RAMAL DE ENCAMINHAMENTO. AF_06/2022 M 0,20",
+      "desc_anterior": "TUBO PVC, SÉRIE R, ÁGUA PLUVIAL, DN 40 MM, FORNECIDO E INSTALADO",
+      "unit": "M",
+      "qty": "0,20"
+    },
+    "6.10": {
+      "linha": 790,
+      "texto_linha": "6.10 MM, JUNTA ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE UN 2,00",
+      "desc_anterior": "BUCHA DE REDUÇÃO LONGA, PVC, SERIE R, ÁGUA PLUVIAL, DN 50 X 40",
+      "unit": "UN",
+      "qty": "2,00"
+    },
+    "6.11": {
+      "linha": 793,
+      "texto_linha": "6.11 ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO. UN 4,00",
+      "desc_anterior": "JOELHO 45 GRAUS, PVC, SERIE R, ÁGUA PLUVIAL, DN 50 MM, JUNTA",
+      "unit": "UN",
+      "qty": "4,00"
+    },
+    "6.12": {
+      "linha": 796,
+      "texto_linha": "6.12 ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO. UN 4,00",
+      "desc_anterior": "JOELHO 90 GRAUS, PVC, SERIE R, ÁGUA PLUVIAL, DN 50 MM, JUNTA",
+      "unit": "UN",
+      "qty": "4,00"
+    },
+    "6.13": {
+      "linha": 799,
+      "texto_linha": "6.13 ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO. UN 12,00",
+      "desc_anterior": "LUVA SIMPLES, PVC, SERIE R, ÁGUA PLUVIAL, DN 50 MM, JUNTA",
+      "unit": "UN",
+      "qty": "12,00"
+    },
+    "6.15": {
+      "linha": 804,
+      "texto_linha": "6.15 INSTALADO EM RAMAIS DE ENCAMINHAMENTO DE ÁGUA PLUVIAL. UN 4,00",
+      "desc_anterior": "RALO SIFONADO, PVC, DN 100 X 40 MM, JUNTA SOLDÁVEL, FORNECIDO E",
+      "unit": "UN",
+      "qty": "4,00"
+    },
+    "7.11": {
+      "linha": 891,
+      "texto_linha": "7.11 M² 2,10 externas verticais em alumínio anodizado branco de 1.1/2\" x 1.1/2\" com",
+      "desc_anterior": "anodizado branco de 1\"x2\" horizontais a cada 5cm com 1,85m e barras",
+      "unit": "",
+      "qty": ""
+    },
+    "7.12": {
+      "linha": 894,
+      "texto_linha": "7.12 M 2,05 inclusive roldanas",
+      "desc_anterior": "Trilho para fixação (parte inferior) de porta de correr em perfil \"u\",",
+      "unit": "",
+      "qty": ""
+    },
+    "7.13": {
+      "linha": 896,
+      "texto_linha": "7.13 M 2,05",
+      "desc_anterior": "Trilho para fixação (parte superior) de porta de correr em perfil \"u\",",
+      "unit": "M",
+      "qty": "2,05"
+    },
+    "9.14": {
+      "linha": 917,
+      "texto_linha": "9.14 PARA CIRCUITOS TERMINAIS - FORNECIMENTO E INSTALAÇÃO. M 22,00",
+      "desc_anterior": "CABO DE COBRE FLEXÍVEL ISOLADO, 6 MM², ANTI-CHAMA 450/750 V,",
+      "unit": "M",
+      "qty": "22,00"
+    },
+    "10.5": {
+      "linha": 989,
+      "texto_linha": "10.5 RASGOS NAS PAREDES, INCLUSO TOMADA PARA ANTENA, ELETRODUTO, UN 7,00",
+      "desc_anterior": "PONTO DE TOMADA PARA TV COM ELETRODUTO FLEXÍVEL EMBUTIDO EM",
+      "unit": "UN",
+      "qty": "7,00"
+    },
+    "12.8": {
+      "linha": 998,
+      "texto_linha": "12.8 Polimento de piso de alta resistência (existente) M² 485,30",
+      "desc_anterior": "ACABAMENTO NÃO REFORÇADO, ESPESSURA 2CM. AF_07/2021",
+      "unit": "M²",
+      "qty": "485,30"
+    },
+    "12.9": {
+      "linha": 999,
+      "texto_linha": "12.9 Aterro com argila para jardim (paisagismo) M³ 3,38",
+      "desc_anterior": "12.8 Polimento de piso de alta resistência (existente) M² 485,30",
+      "unit": "M³",
+      "qty": "3,38"
+    },
+    "12.10": {
+      "linha": 1000,
+      "texto_linha": "12.10 Pó de pedra M³ 0,50",
+      "desc_anterior": "12.9 Aterro com argila para jardim (paisagismo) M³ 3,38",
+      "unit": "M³",
+      "qty": "0,50"
+    },
+    "12.11": {
+      "linha": 1002,
+      "texto_linha": "12.11 M² 18,05 ALTURA MINIMA DE 50MM (FORNECIMENTO E COLOCAÇÃO)",
+      "desc_anterior": "GRAMA SINTÉTICA ESPORTIVA PARA FUTEBOL EM POLIETILENO, COM",
+      "unit": "",
+      "qty": ""
+    },
+    "12.12": {
+      "linha": 1004,
+      "texto_linha": "12.12 RETANGULAR COR NATURAL DE 20 X 10 CM, ESPESSURA 6 CM. M² 28,45",
+      "desc_anterior": "EXECUÇÃO DE PASSEIO EM PISO INTERTRAVADO, COM BLOCO",
+      "unit": "M²",
+      "qty": "28,45"
+    },
+    "12.13": {
+      "linha": 1007,
+      "texto_linha": "12.13 M² 4,00",
+      "desc_anterior": "EXECUÇÃO DE PASSEIO EM PISO INTERTRAVADO, COM BLOCO",
+      "unit": "M²",
+      "qty": "4,00"
+    },
+    "12.14": {
+      "linha": 1011,
+      "texto_linha": "12.14 M 56,04",
+      "desc_anterior": "EM CONCRETO PRÉ-FABRICADO, DIMENSÕES 100X15X13X30 CM",
+      "unit": "M",
+      "qty": "56,04"
+    },
+    "12.15": {
+      "linha": 1015,
+      "texto_linha": "12.15 CONCRETO OU LAJE SOBRE SOLO, COM COMPACTADOR DE SOLOS A M² 55,55",
+      "desc_anterior": "COMPACTAÇÃO MECÂNICA DE SOLO PARA EXECUÇÃO DE RADIER, PISO DE",
+      "unit": "M²",
+      "qty": "55,55"
+    },
+    "14.9": {
+      "linha": 1033,
+      "texto_linha": "14.9 M² 394,07 EXTERNAS DE CASAS. AF_03/2024",
+      "desc_anterior": "APLICAÇÃO MANUAL DE FUNDO SELADOR ACRÍLICO EM PAREDES",
+      "unit": "",
+      "qty": ""
+    },
+    "14.10": {
+      "linha": 1035,
+      "texto_linha": "14.10 M² 312,71",
+      "desc_anterior": "APLICAÇÃO MANUAL DE MASSA ACRÍLICA EM PAREDES EXTERNAS DE",
+      "unit": "M²",
+      "qty": "312,71"
+    },
+    "14.11": {
+      "linha": 1104,
+      "texto_linha": "14.11 M² 394,07",
+      "desc_anterior": "PINTURA LÁTEX ACRÍLICA ECONÔMICA, APLICAÇÃO MANUAL EM",
+      "unit": "M²",
+      "qty": "394,07"
+    },
+    "14.12": {
+      "linha": 1107,
+      "texto_linha": "14.12 M² 134,60",
+      "desc_anterior": "PINTURA DE PISO COM TINTA ACRÍLICA, APLICAÇÃO MANUAL, 2 DEMÃOS,",
+      "unit": "M²",
+      "qty": "134,60"
+    },
+    "14.13": {
+      "linha": 1110,
+      "texto_linha": "14.13 M 56,04",
+      "desc_anterior": "PINTURA DE MEIO-FIO COM TINTA BRANCA A BASE DE CAL (CAIAÇÃO).",
+      "unit": "M",
+      "qty": "56,04"
+    },
+    "14.14": {
+      "linha": 1113,
+      "texto_linha": "14.14 M 60,60",
+      "desc_anterior": "PINTURA ESMALTE BASE SOLVENTE EM POSTES OU TUBULAÇÕES 2",
+      "unit": "M",
+      "qty": "60,60"
+    },
+    "16.1": {
+      "linha": 1116,
+      "texto_linha": "16.1 Fornecimento e montagem de tubo de aço galvanizado de 1\" M 60,60",
+      "desc_anterior": "16 DIVERSOS",
+      "unit": "M",
+      "qty": "60,60"
+    },
+    "16.2": {
+      "linha": 1117,
+      "texto_linha": "16.2 Planta - Palmeira Areca (alt=1,00m), fornecimento e plantio UN 2,00",
+      "desc_anterior": "16.1 Fornecimento e montagem de tubo de aço galvanizado de 1\" M 60,60",
+      "unit": "UN",
+      "qty": "2,00"
+    },
+    "16.3": {
+      "linha": 1118,
+      "texto_linha": "16.3 Planta - Palmeira Vecthia, h=3,00m, fornecimento e plantio UN 2,00",
+      "desc_anterior": "16.2 Planta - Palmeira Areca (alt=1,00m), fornecimento e plantio UN 2,00",
+      "unit": "UN",
+      "qty": "2,00"
+    },
+    "16.4": {
+      "linha": 1119,
+      "texto_linha": "16.4 PLANTIO DE ARBUSTO OU CERCA VIVA. AF_07/2024 UN 33,00",
+      "desc_anterior": "16.3 Planta - Palmeira Vecthia, h=3,00m, fornecimento e plantio UN 2,00",
+      "unit": "UN",
+      "qty": "33,00"
+    },
+    "16.5": {
+      "linha": 1121,
+      "texto_linha": "16.5 UN 3,00",
+      "desc_anterior": "Banco com encosto, compr=1,50m, largura=30cm, pé de ferro fundido e",
+      "unit": "UN",
+      "qty": "3,00"
+    }
+  },
+  "itens_extraidos": {
+    "1.1": {
+      "item_original": "1.1",
+      "descricao": "PLACA DE OBRA EM CHAPA DE ACO GALVANIZADO",
+      "quantidade": 6.4,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.1": {
+      "item_original": "2.1",
+      "descricao": "DEMOLIÇÃO DE ALVENARIA DE BLOCO FURADO, DE FORMA MANUAL, SEM",
+      "quantidade": 63.448,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "2.2": {
+      "item_original": "2.2",
+      "descricao": "DEMOLIÇÃO DE REVESTIMENTO CERÂMICO, DE FORMA MANUAL, SEM",
+      "quantidade": 402.23,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.3": {
+      "item_original": "2.3",
+      "descricao": "DEMOLIÇÃO DE ARGAMASSAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO.",
+      "quantidade": 137.6,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.4": {
+      "item_original": "2.4",
+      "descricao": "REMOÇÃO DE TAPUME/ CHAPAS METÁLICAS E DE MADEIRA, DE FORMA MANUAL,",
+      "quantidade": 19.88,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.5": {
+      "item_original": "2.5",
+      "descricao": "REMOÇÃO DE FORROS DE DRYWALL, PVC E FIBROMINERAL, DE FORMA MANUAL, SEM",
+      "quantidade": 156.45,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.6": {
+      "item_original": "2.6",
+      "descricao": "REMOÇÃO DE LOUÇAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017",
+      "quantidade": 30.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "2.7": {
+      "item_original": "2.7",
+      "descricao": "REMOÇÃO DE METAIS SANITÁRIOS, DE FORMA MANUAL, SEM REAPROVEITAMENTO.",
+      "quantidade": 14.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "2.8": {
+      "item_original": "2.8",
+      "descricao": "REMOÇÃO DE JANELAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017",
+      "quantidade": 49.35,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.9": {
+      "item_original": "2.9",
+      "descricao": "REMOÇÃO DE PORTAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO. AF_12/2017",
+      "quantidade": 48.72,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.10": {
+      "item_original": "2.10",
+      "descricao": "REMOÇÃO DE TRAMA DE MADEIRA PARA COBERTURA, DE FORMA MANUAL, SEM",
+      "quantidade": 38.93,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.11": {
+      "item_original": "2.11",
+      "descricao": "REMOÇÃO DE TELHAS DE FIBROCIMENTO, METÁLICA E CERÂMICA, DE FORMA",
+      "quantidade": 38.93,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "2.12": {
+      "item_original": "2.12",
+      "descricao": "REMOÇÃO DE INTERRUPTORES/TOMADAS ELÉTRICAS, DE FORMA MANUAL, SEM",
+      "quantidade": 95.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "2.13": {
+      "item_original": "2.13",
+      "descricao": "REMOÇÃO DE LUMINÁRIAS, DE FORMA MANUAL, SEM REAPROVEITAMENTO.",
+      "quantidade": 60.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "3.1": {
+      "item_original": "3.1",
+      "descricao": "CINTA DE AMARRAÇÃO DE ALVENARIA MOLDADA IN LOCO EM CONCRETO.",
+      "quantidade": 42.94,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.2": {
+      "item_original": "3.2",
+      "descricao": "VERGA PRÉ-MOLDADA PARA PORTAS COM ATÉ 1,5 M DE VÃO. AF_03/2016",
+      "quantidade": 90.74,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.3": {
+      "item_original": "3.3",
+      "descricao": "VERGA PRÉ-MOLDADA PARA PORTAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016",
+      "quantidade": 10.55,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.4": {
+      "item_original": "3.4",
+      "descricao": "VERGA PRÉ-MOLDADA PARA JANELAS COM ATÉ 1,5 M DE VÃO. AF_03/2016",
+      "quantidade": 29.3,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.5": {
+      "item_original": "3.5",
+      "descricao": "CONTRAVERGA PRÉ-MOLDADA PARA VÃOS DE ATÉ 1,5 M DE COMPRIMENTO.",
+      "quantidade": 29.3,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.6": {
+      "item_original": "3.6",
+      "descricao": "VERGA PRÉ-MOLDADA PARA JANELAS COM MAIS DE 1,5 M DE VÃO. AF_03/2016",
+      "quantidade": 54.6,
+      "unidade": "M",
+      "source": "?"
+    },
+    "3.7": {
+      "item_original": "3.7",
+      "descricao": "CONTRAVERGA PRÉ-MOLDADA PARA VÃOS DE MAIS DE 1,5 M DE COMPRIMENTO.",
+      "quantidade": 54.6,
+      "unidade": "M",
+      "source": "?"
+    },
+    "4.1": {
+      "item_original": "4.1",
+      "descricao": "CAMADA, INCLUSIVE APLICAÇÃO DE PRIMER ASFÁLTICO, E=3MM.",
+      "quantidade": 39.33,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "5.1": {
+      "item_original": "5.1",
+      "descricao": "ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS FURADOS NA HORIZONTAL DE",
+      "quantidade": 164.93,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "5.2": {
+      "item_original": "5.2",
+      "descricao": "DIVISORIA SANITÁRIA, TIPO CABINE, EM GRANITO CINZA POLIDO, ESP = 3CM,",
+      "quantidade": 12.018,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "6.1": {
+      "item_original": "6.1",
+      "descricao": "TRAMA DE MADEIRA COMPOSTA POR RIPAS, CAIBROS E TERÇAS PARA TELHADOS DE",
+      "quantidade": 38.93,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "6.2": {
+      "item_original": "6.2",
+      "descricao": "TELHAMENTO COM TELHA CERÂMICA CAPA-CANAL, TIPO COLONIAL, COM ATÉ 2",
+      "quantidade": 38.93,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "6.3": {
+      "item_original": "6.3",
+      "descricao": "FORRO EM PLACAS DE GESSO, PARA AMBIENTES RESIDENCIAIS. AF_05/2017_PS",
+      "quantidade": 526.35,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.1": {
+      "item_original": "7.1",
+      "descricao": "PORTA DE MADEIRA COMPENSADA LISA PARA PINTURA, 120X210X3,5CM, 2 FOLHAS,",
+      "quantidade": 8.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "7.2": {
+      "item_original": "7.2",
+      "descricao": "Porta em madeira compensada (canela), lisa, semi-ôca, 1.40 x 2.10 m, duas folhas,",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "7.3": {
+      "item_original": "7.3",
+      "descricao": "KIT DE PORTA DE MADEIRA PARA PINTURA, SEMI-OCA (LEVE OU MÉDIA), PADRÃO",
+      "quantidade": 15.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "7.4": {
+      "item_original": "7.4",
+      "descricao": "PORTA PIVOTANTE DE VIDRO TEMPERADO, 90X210 CM, ESPESSURA 10 MM,",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "7.5": {
+      "item_original": "7.5",
+      "descricao": "INSTALAÇÃO DE VIDRO TEMPERADO, E = 10 MM, ENCAIXADO EM PERFIL U.",
+      "quantidade": 5.4,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.6": {
+      "item_original": "7.6",
+      "descricao": "JANELA DE ALUMÍNIO DE CORRER COM 2 FOLHAS PARA VIDROS, COM VIDROS,",
+      "quantidade": 3.0,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.7": {
+      "item_original": "7.7",
+      "descricao": "JANELA DE ALUMÍNIO DE CORRER COM 3 FOLHAS (2 VENEZIANAS E 1 PARA VIDRO),",
+      "quantidade": 4.32,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.8": {
+      "item_original": "7.8",
+      "descricao": "JANELA DE ALUMÍNIO DE CORRER COM 4 FOLHAS PARA VIDROS, COM VIDROS,",
+      "quantidade": 43.2,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.9": {
+      "item_original": "7.9",
+      "descricao": "Visor plumbífero com moldura, esp=80mm (nacional)",
+      "quantidade": 1.02,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "7.10": {
+      "item_original": "7.10",
+      "descricao": "PORTA EM VIDRO, TEMPERADO 0,60X1,6M, ESPESSURA 8,0MM, INCLUSIVE",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.1": {
+      "item_original": "8.1",
+      "descricao": "VASO SANITARIO SIFONADO CONVENCIONAL PARA PCD SEM FURO FRONTAL COM",
+      "quantidade": 8.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.2": {
+      "item_original": "8.2",
+      "descricao": "VASO SANITARIO SIFONADO CONVENCIONAL COM LOUÇA BRANCA, INCLUSO",
+      "quantidade": 3.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.3": {
+      "item_original": "8.3",
+      "descricao": "LAVATÓRIO LOUÇA BRANCA SUSPENSO, 29,5 X 39CM OU EQUIVALENTE, PADRÃO",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.4": {
+      "item_original": "8.4",
+      "descricao": "BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 1,50MX0,55M, INCLUSIVE CUBA",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.5": {
+      "item_original": "8.5",
+      "descricao": "BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 2,70MX1,85MX0,55M,",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.6": {
+      "item_original": "8.6",
+      "descricao": "BANCADA DE GRANITO BRANCO POLIDO DIMENSÕES: 3,45MX0,60M, INCLUSIVE DUAS",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.7": {
+      "item_original": "8.7",
+      "descricao": "GRANITO BRANCO PARA BANCADA DE ATENDIMENTO",
+      "quantidade": 0.66,
+      "unidade": "M2",
+      "source": "text_line"
+    },
+    "8.8": {
+      "item_original": "8.8",
+      "descricao": "PONTO DE CONSUMO TERMINAL DE ÁGUA FRIA (SUBRAMAL) COM TUBULAÇÃO DE",
+      "quantidade": 47.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.9": {
+      "item_original": "8.9",
+      "descricao": "TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 40 MM, FORNECIDO E INSTALADO",
+      "quantidade": 35.33,
+      "unidade": "M",
+      "source": "?"
+    },
+    "8.10": {
+      "item_original": "8.10",
+      "descricao": "TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 50 MM, FORNECIDO E INSTALADO",
+      "quantidade": 22.93,
+      "unidade": "M",
+      "source": "?"
+    },
+    "8.11": {
+      "item_original": "8.11",
+      "descricao": "TUBO PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 100 MM, FORNECIDO E INSTALADO",
+      "quantidade": 25.31,
+      "unidade": "M",
+      "source": "?"
+    },
+    "8.12": {
+      "item_original": "8.12",
+      "descricao": "CAIXA ENTERRADA HIDRÁULICA RETANGULAR EM ALVENARIA COM TIJOLOS",
+      "quantidade": 5.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.13": {
+      "item_original": "8.13",
+      "descricao": "TAMPA DE CONCRETO ARMADO 60X60X5CM PARA CAIXA",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.14": {
+      "item_original": "8.14",
+      "descricao": "RALO SECO, PVC, DN 100 X 40 MM, JUNTA SOLDÁVEL, FORNECIDO E INSTALADO EM",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.15": {
+      "item_original": "8.15",
+      "descricao": "CAIXA SIFONADA, PVC, DN 100 X 100 X 50 MM, FORNECIDA E INSTALADA EM RAMAIS",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.16": {
+      "item_original": "8.16",
+      "descricao": "DUCHA HIGIENICA PLASTICA COM REGISTRO METALICO 1/2 \"",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.17": {
+      "item_original": "8.17",
+      "descricao": "BARRA DE APOIO RETA, EM ACO INOX POLIDO, COMPRIMENTO 80 CM, FIXADA NA",
+      "quantidade": 16.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "8.18": {
+      "item_original": "8.18",
+      "descricao": "TORNEIRA CROMADA DE MESA, 1/2” OU 3/4”, PARA LAVATÓRIO, PADRÃO POPULAR -",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "9.1": {
+      "item_original": "9.1",
+      "descricao": "LUMINÁRIA TIPO PLAFON EM PLÁSTICO, DE SOBREPOR, COM 1 LÂMPADA",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "9.2": {
+      "item_original": "9.2",
+      "descricao": "LUMINÁRIA TIPO CALHA, DE SOBREPOR, COM 2 LÂMPADAS TUBULARES",
+      "quantidade": 7.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "9.3": {
+      "item_original": "9.3",
+      "descricao": "PONTO DE TOMADA RESIDENCIAL INCLUINDO TOMADA 10A/250V, CAIXA ELÉTRICA,",
+      "quantidade": 118.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "9.4": {
+      "item_original": "9.4",
+      "descricao": "PONTO DE ILUMINAÇÃO RESIDENCIAL INCLUINDO INTERRUPTOR SIMPLES, CAIXA",
+      "quantidade": 86.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "10.1": {
+      "item_original": "10.1",
+      "descricao": "CABO ELETRÔNICO CATEGORIA 6, INSTALADO EM EDIFICAÇÃO INSTITUCIONAL -",
+      "quantidade": 134.7,
+      "unidade": "M",
+      "source": "?"
+    },
+    "10.2": {
+      "item_original": "10.2",
+      "descricao": "PATCH PANEL 24 PORTAS, CATEGORIA 6 - FORNECIMENTO E INSTALAÇÃO.",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "10.3": {
+      "item_original": "10.3",
+      "descricao": "TOMADA DE REDE RJ45 - FORNECIMENTO E INSTALAÇÃO. AF_11/2019",
+      "quantidade": 9.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "10.4": {
+      "item_original": "10.4",
+      "descricao": "TOMADA PARA TELEFONE RJ11 - FORNECIMENTO E INSTALAÇÃO. AF_11/2019",
+      "quantidade": 6.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "11.1": {
+      "item_original": "11.1",
+      "descricao": "EXTINTOR DE INCÊNDIO PORTÁTIL COM CARGA DE PQS DE 4 KG, CLASSE BC -",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "11.2": {
+      "item_original": "11.2",
+      "descricao": "EXTINTOR DE INCÊNDIO PORTÁTIL COM CARGA DE ÁGUA PRESSURIZADA DE 10 L,",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "11.3": {
+      "item_original": "11.3",
+      "descricao": "LUMINÁRIA DE EMERGÊNCIA, COM 30 LÂMPADAS LED DE 2 W, SEM REATOR -",
+      "quantidade": 27.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "11.4": {
+      "item_original": "11.4",
+      "descricao": "PLACA DE SINALIZACAO DE SEGURANCA CONTRA INCENDIO, FOTOLUMINESCENTE,",
+      "quantidade": 27.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "11.5": {
+      "item_original": "11.5",
+      "descricao": "PLACA DE SINALIZACAO DE SEGURANCA CONTRA INCENDIO, FOTOLUMINESCENTE,",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "12.1": {
+      "item_original": "12.1",
+      "descricao": "CONCRETO MAGRO PARA LASTRO, TRAÇO 1:4,5:4,5 (EM MASSA SECA DE CIMENTO/",
+      "quantidade": 5.3935,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "12.2": {
+      "item_original": "12.2",
+      "descricao": "CONTRAPISO EM ARGAMASSA TRAÇO 1:4 (CIMENTO E AREIA), PREPARO MANUAL,",
+      "quantidade": 107.9,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "12.3": {
+      "item_original": "12.3",
+      "descricao": "PISO EM GRANILITE, MARMORITE OU GRANITINA ESPESSURA 8 MM, INCLUSO JUNTAS",
+      "quantidade": 107.9,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "12.4": {
+      "item_original": "12.4",
+      "descricao": "RODAPÉ PRÉ-MOLDADO DE GRANILITE H= 10cm",
+      "quantidade": 96.31,
+      "unidade": "M",
+      "source": "?"
+    },
+    "12.5": {
+      "item_original": "12.5",
+      "descricao": "EXECUÇÃO DE PASSEIO (CALÇADA) OU PISO DE CONCRETO COM CONCRETO",
+      "quantidade": 2.49,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "13.1": {
+      "item_original": "13.1",
+      "descricao": "CHAPISCO APLICADO EM ALVENARIAS E ESTRUTURAS DE CONCRETO INTERNAS, COM",
+      "quantidade": 454.5,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "13.2": {
+      "item_original": "13.2",
+      "descricao": "MASSA ÚNICA, PARA RECEBIMENTO DE PINTURA, EM ARGAMASSA TRAÇO 1:2:8,",
+      "quantidade": 433.38,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "13.3": {
+      "item_original": "13.3",
+      "descricao": "revestimento com argamassa baritada - densidade = 3,2 g/cm³ - esp=1,5cm",
+      "quantidade": 46.508,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "13.4": {
+      "item_original": "13.4",
+      "descricao": "Revestimento cerâmico para piso ou parede, 30 x 60 cm, porcelanato, linha white",
+      "quantidade": 221.07,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "14.1": {
+      "item_original": "14.1",
+      "descricao": "APLICAÇÃO E LIXAMENTO DE MASSA LÁTEX EM PAREDES, DUAS DEMÃOS.",
+      "quantidade": 1106.09,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "14.2": {
+      "item_original": "14.2",
+      "descricao": "APLICAÇÃO DE FUNDO SELADOR ACRÍLICO EM TETO, UMA DEMÃO. AF_06/2014",
+      "quantidade": 438.15,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "14.3": {
+      "item_original": "14.3",
+      "descricao": "APLICAÇÃO MANUAL DE PINTURA COM TINTA LÁTEX ACRÍLICA EM PAREDES, DUAS",
+      "quantidade": 1106.09,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "14.4": {
+      "item_original": "14.4",
+      "descricao": "APLICAÇÃO MANUAL DE PINTURA COM TINTA LÁTEX ACRÍLICA EM TETO, DUAS",
+      "quantidade": 526.35,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "14.5": {
+      "item_original": "14.5",
+      "descricao": "PINTURA TINTA DE ACABAMENTO (PIGMENTADA) ESMALTE SINTÉTICO ACETINADO",
+      "quantidade": 56.76,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "15.1": {
+      "item_original": "15.1",
+      "descricao": "m³ 143,56 CARGA MANUAL DE ENTULHO EM CAMINHAO BASCULANTE 6 M3",
+      "quantidade": 143.56,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "15.2": {
+      "item_original": "15.2",
+      "descricao": "TRANSPORTE DE ENTULHO COM CAMINHAO BASCULANTE 6 M3, RODOVIA",
+      "quantidade": 143.56,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S1-2.2": {
+      "item_original": "S1-2.2",
+      "descricao": "SEM REAPROVEITAMENTO. AF_12/2017",
+      "quantidade": 81.56,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S1-4.1": {
+      "item_original": "S1-4.1",
+      "descricao": "CAMADA, INCLUSIVE APLICAÇÃO DE PRIMER ASFÁLTICO, E=3MM.",
+      "quantidade": 39.33,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S1-8.20": {
+      "item_original": "S1-8.20",
+      "descricao": "Chuveiro elétrico de plástico (lorenzetti ou similar)",
+      "quantidade": 8.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-8.21": {
+      "item_original": "S1-8.21",
+      "descricao": "ACABAMENTO E CANOPLA CROMADOS - FORNECIMENTO E INSTALAÇÃO.",
+      "quantidade": 9.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-8.22": {
+      "item_original": "S1-8.22",
+      "descricao": "SIFÃO DO TIPO FLEXÍVEL EM PVC 1 X 1.1/2 - FORNECIMENTO E INSTALAÇÃO. AF_01/202",
+      "quantidade": 16.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-8.23": {
+      "item_original": "S1-8.23",
+      "descricao": "ENGATE FLEXÍVEL EM PLÁSTICO BRANCO, 1/2\"X 40CM - FORNECIMENTO E INSTALAÇÃO. AF_01/2020",
+      "quantidade": 27.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-8.24": {
+      "item_original": "S1-8.24",
+      "descricao": "ASSENTO SANITÁRIO CONVENCIONAL - FORNECIMENTO E INSTALACAO. AF_01/2020",
+      "quantidade": 11.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.3": {
+      "item_original": "S1-9.3",
+      "descricao": "ELÉTRICA, ELETRODUTO, CABO, RASGO, QUEBRA E CHUMBAMENTO.",
+      "quantidade": 44.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.5": {
+      "item_original": "S1-9.5",
+      "descricao": "20A/250V, CAIXA ELÉTRICA, ELETRODUTO, CABO 4,00 MM² , RASGO,",
+      "quantidade": 19.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.6": {
+      "item_original": "S1-9.6",
+      "descricao": "20A/250V, CAIXA ELÉTRICA, ELETRODUTO, CABO 4,00 MM² , RASGO,",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.7": {
+      "item_original": "S1-9.7",
+      "descricao": "QUEBRA E CHUMBAMENTO - REFERÊNCIA SINAPI 93143/2022 Quadro de distribuição de embutir, em resina termoplástica, para até 32 disjuntores, SLIM, com barramento, padrão DIN, exclusive disjuntores",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.8": {
+      "item_original": "S1-9.8",
+      "descricao": "Disjuntor bipolar DR 63 A - Dispositivo residual diferencial, tipo AC, 30MA",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S1-9.9": {
+      "item_original": "S1-9.9",
+      "descricao": "UN 1,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "text_line_unit_first"
+    },
+    "S1-9.10": {
+      "item_original": "S1-9.10",
+      "descricao": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 32A - FORNECIMENTO E INSTALAÇÃO. AF_10/2020 DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 25A -",
+      "quantidade": 5.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.11": {
+      "item_original": "S1-9.11",
+      "descricao": "UN 19,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "quantidade": 19.0,
+      "unidade": "UN",
+      "source": "text_line_unit_first"
+    },
+    "S1-9.12": {
+      "item_original": "S1-9.12",
+      "descricao": "DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 20A - FORNECIMENTO E INSTALAÇÃO. AF_10/2020 DISJUNTOR MONOPOLAR TIPO DIN, CORRENTE NOMINAL DE 16A -",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S1-9.13": {
+      "item_original": "S1-9.13",
+      "descricao": "UN 5,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "quantidade": 5.0,
+      "unidade": "UN",
+      "source": "text_line_unit_first"
+    },
+    "S1-12.7": {
+      "item_original": "S1-12.7",
+      "descricao": "MANUAL, APLICADO EM ÁREAS SECAS SOBRE LAJE, ADERIDO,",
+      "quantidade": 39.33,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S1-13.1": {
+      "item_original": "S1-13.1",
+      "descricao": "INTERNAS, COM COLHER DE PEDREIRO. ARGAMASSA TRAÇO 1:3 COM",
+      "quantidade": 539.53,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S1-13.2": {
+      "item_original": "S1-13.2",
+      "descricao": "MASSA ÚNICA, PARA RECEBIMENTO DE PINTURA, EM ARGAMASSA TRAÇO 1:2:8,",
+      "quantidade": 378.91,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S1-14.7": {
+      "item_original": "S1-14.7",
+      "descricao": "APLICAÇÃO E LIXAMENTO DE MASSA LÁTEX EM TETO, DUAS DEMÃOS. AF_06/2014",
+      "quantidade": 503.17,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-2.2-A": {
+      "item_original": "S2-2.2-A",
+      "descricao": "D M E A M N O U L A I L Ç , Ã S O E D M E R R E E A V P E R S O T V IM E E IT N A T M O E C N E T R O Â . M A I F C _ O 1 , 2 D /2 E 0 1 F 7 O RMA",
+      "quantidade": 22.61,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-2.3": {
+      "item_original": "S2-2.3",
+      "descricao": "REAPROVEITAMENTO. AF_12/2017",
+      "quantidade": 35.11,
+      "unidade": "M2",
+      "source": "text_line"
+    },
+    "S2-2.14": {
+      "item_original": "S2-2.14",
+      "descricao": "Remoção de cobogó ou bloco de vidro - Rev 02",
+      "quantidade": 30.0,
+      "unidade": "M2",
+      "source": "text_line"
+    },
+    "S2-3.8": {
+      "item_original": "S2-3.8",
+      "descricao": "para Uso Geral, com formas planas em compensado resinado 12mm (05",
+      "quantidade": 1.38,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S2-5.3": {
+      "item_original": "S2-5.3",
+      "descricao": "ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS FURADOS NA HORIZONTAL DE 9X19X19 CM (ESPESSURA 9 CM) E ARGAMASSA DE ASSENTAMENTO COM PREPARO EM BETONEIRA. AF_12/2021",
+      "quantidade": 6.16,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-5.4": {
+      "item_original": "S2-5.4",
+      "descricao": "(ESPESSURA 19 CM), ASSENTADO EM ARGAMASSA TRACO 1:4 (CIMENTO",
+      "quantidade": 11.43,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-5.5": {
+      "item_original": "S2-5.5",
+      "descricao": "Cobogo cimento tipo \"veneziana\", dim: 40 x 40 x 9cm",
+      "quantidade": 33.0,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-6.5": {
+      "item_original": "S2-6.5",
+      "descricao": "TELHADO COM ATÉ DUAS ÁGUAS, INCLUSO IÇAMENTO. - REFERÊNCIA",
+      "quantidade": 34.26,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-6.6": {
+      "item_original": "S2-6.6",
+      "descricao": "para Uso Geral, com formas planas em compensado resinado 12mm (05",
+      "quantidade": 0.3668,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S2-6.7": {
+      "item_original": "S2-6.7",
+      "descricao": "ousimilar, exclusive condutores",
+      "quantidade": 20.2,
+      "unidade": "M",
+      "source": "text_line"
+    },
+    "S2-6.8": {
+      "item_original": "S2-6.8",
+      "descricao": "EM RAMAL DE ENCAMINHAMENTO. AF_06/2022",
+      "quantidade": 25.52,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-6.9": {
+      "item_original": "S2-6.9",
+      "descricao": "EM RAMAL DE ENCAMINHAMENTO. AF_06/2022",
+      "quantidade": 0.2,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-6.10": {
+      "item_original": "S2-6.10",
+      "descricao": "MM, JUNTA ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-6.11": {
+      "item_original": "S2-6.11",
+      "descricao": "ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO.",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-6.12": {
+      "item_original": "S2-6.12",
+      "descricao": "ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO.",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-6.13": {
+      "item_original": "S2-6.13",
+      "descricao": "ELÁSTICA, FORNECIDO E INSTALADO EM RAMAL DE ENCAMINHAMENTO.",
+      "quantidade": 12.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-6.14": {
+      "item_original": "S2-6.14",
+      "descricao": "TE, PVC, SERIE NORMAL, ESGOTO PREDIAL, DN 50 X 50 MM, JUNTA ELÁSTICA, FORNECIDO E INSTALADO EM PRUMADA DE ESGOTO SANITÁRIO OU VENTILAÇÃO. AF_08/2022",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-6.15": {
+      "item_original": "S2-6.15",
+      "descricao": "INSTALADO EM RAMAIS DE ENCAMINHAMENTO DE ÁGUA PLUVIAL.",
+      "quantidade": 4.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-7.4": {
+      "item_original": "S2-7.4",
+      "descricao": "PORTA PIVOTANTE DE VIDRO TEMPERADO, 90X210 CM, ESPESSURA 10 MM,",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-7.5": {
+      "item_original": "S2-7.5",
+      "descricao": "INSTALAÇÃO DE VIDRO TEMPERADO, E = 10 MM, ENCAIXADO EM PERFIL U.",
+      "quantidade": 10.4,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-7.6": {
+      "item_original": "S2-7.6",
+      "descricao": "PORTA COMPLETA, BLINDOR/CHUMBO (0,80X2,10)m (S/ACESSÓRIOS)",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-7.7": {
+      "item_original": "S2-7.7",
+      "descricao": "PORTA COMPLETA, BLINDOR/CHUMBO (1,20X2,10)m (S/ACESSÓRIOS)",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-7.8": {
+      "item_original": "S2-7.8",
+      "descricao": "JANELA DE ALUMÍNIO DE CORRER COM 4 FOLHAS PARA VIDROS, COM VIDROS,",
+      "quantidade": 4.8,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-7.9": {
+      "item_original": "S2-7.9",
+      "descricao": "Visor plumbífero com moldura, esp=80mm (nacional)",
+      "quantidade": 1.02,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-7.10": {
+      "item_original": "S2-7.10",
+      "descricao": "PORTA EM VIDRO, TEMPERADO 0,60X1,6M, ESPESSURA 8,0MM, INCLUSIVE",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-7.11": {
+      "item_original": "S2-7.11",
+      "descricao": "M² 2,10 externas verticais em alumínio anodizado branco de 1.1/2\" x 1.1/2\" com",
+      "quantidade": 2.1,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-7.12": {
+      "item_original": "S2-7.12",
+      "descricao": "M 2,05 inclusive roldanas",
+      "quantidade": 2.05,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-7.13": {
+      "item_original": "S2-7.13",
+      "descricao": "Trilho para fixação (parte superior) de porta de correr em perfil \"u\", inclusive roldanas",
+      "quantidade": 2.05,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-8.20": {
+      "item_original": "S2-8.20",
+      "descricao": "Chuveiro elétrico de plástico (lorenzetti ou similar)",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S2-8.21": {
+      "item_original": "S2-8.21",
+      "descricao": "ACABAMENTO E CANOPLA CROMADOS - FORNECIMENTO E INSTALAÇÃO.",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S2-9.3": {
+      "item_original": "S2-9.3",
+      "descricao": "ELÉTRICA, ELETRODUTO, CABO, RASGO, QUEBRA E CHUMBAMENTO.",
+      "quantidade": 7.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-9.5": {
+      "item_original": "S2-9.5",
+      "descricao": "20A/250V, CAIXA ELÉTRICA, ELETRODUTO, CABO 4,00 MM² , RASGO,",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S2-9.11": {
+      "item_original": "S2-9.11",
+      "descricao": "UN 19,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "quantidade": 10.0,
+      "unidade": "UN",
+      "source": "text_line_mid"
+    },
+    "S2-9.12": {
+      "item_original": "S2-9.12",
+      "descricao": "Quadro de distribuição de embutir, em resina termoplástica, para até 16",
+      "quantidade": 1.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S2-9.13-A": {
+      "item_original": "S2-9.13-A",
+      "descricao": "UN 5,00 FORNECIMENTO E INSTALAÇÃO. AF_10/2020",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-9.14": {
+      "item_original": "S2-9.14",
+      "descricao": "PARA CIRCUITOS TERMINAIS - FORNECIMENTO E INSTALAÇÃO.",
+      "quantidade": 22.0,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-10.5": {
+      "item_original": "S2-10.5",
+      "descricao": "RASGOS NAS PAREDES, INCLUSO TOMADA PARA ANTENA, ELETRODUTO,",
+      "quantidade": 7.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-12.1": {
+      "item_original": "S2-12.1",
+      "descricao": "CONCRETO MAGRO PARA LASTRO, TRAÇO 1:4,5:4,5 (EM MASSA SECA DE CIMENTO/",
+      "quantidade": 1.48,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S2-12.7": {
+      "item_original": "S2-12.7",
+      "descricao": "MANUAL, APLICADO EM ÁREAS SECAS SOBRE LAJE, ADERIDO,",
+      "quantidade": 49.17,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-12.8": {
+      "item_original": "S2-12.8",
+      "descricao": "Polimento de piso de alta resistência (existente)",
+      "quantidade": 485.3,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-12.9": {
+      "item_original": "S2-12.9",
+      "descricao": "Aterro com argila para jardim (paisagismo)",
+      "quantidade": 3.38,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S2-12.10": {
+      "item_original": "S2-12.10",
+      "descricao": "Pó de pedra",
+      "quantidade": 0.5,
+      "unidade": "M3",
+      "source": "?"
+    },
+    "S2-12.11": {
+      "item_original": "S2-12.11",
+      "descricao": "M² 18,05 ALTURA MINIMA DE 50MM (FORNECIMENTO E COLOCAÇÃO)",
+      "quantidade": 18.05,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-12.12": {
+      "item_original": "S2-12.12",
+      "descricao": "RETANGULAR COR NATURAL DE 20 X 10 CM, ESPESSURA 6 CM.",
+      "quantidade": 28.45,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-12.13": {
+      "item_original": "S2-12.13",
+      "descricao": "EXECUÇÃO DE PASSEIO EM PISO INTERTRAVADO, COM BLOCO RETANGULAR COLORIDO DE 20 X 10 CM, ESPESSURA 6 CM. AF_10/2022",
+      "quantidade": 4.0,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-12.14": {
+      "item_original": "S2-12.14",
+      "descricao": "ASSENTAMENTO DE GUIA (MEIO-FIO) EM TRECHO RETO, CONFECCIONADA EM CONCRETO PRÉ-FABRICADO, DIMENSÕES 100X15X13X30 CM (COMPRIMENTO X BASE INFERIOR X BASE SUPERIOR X ALTURA). AF_01/2024",
+      "quantidade": 56.04151,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-12.15": {
+      "item_original": "S2-12.15",
+      "descricao": "CONCRETO OU LAJE SOBRE SOLO, COM COMPACTADOR DE SOLOS A",
+      "quantidade": 55.55,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-13.1": {
+      "item_original": "S2-13.1",
+      "descricao": "INTERNAS, COM COLHER DE PEDREIRO. ARGAMASSA TRAÇO 1:3 COM",
+      "quantidade": 331.11,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-13.2": {
+      "item_original": "S2-13.2",
+      "descricao": "MASSA ÚNICA, PARA RECEBIMENTO DE PINTURA, EM ARGAMASSA TRAÇO 1:2:8,",
+      "quantidade": 331.11,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.1": {
+      "item_original": "S2-14.1",
+      "descricao": "APLICAÇÃO E LIXAMENTO DE MASSA LÁTEX EM PAREDES, DUAS DEMÃOS.",
+      "quantidade": 81.36,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.7": {
+      "item_original": "S2-14.7",
+      "descricao": "APLICAÇÃO E LIXAMENTO DE MASSA LÁTEX EM TETO, DUAS DEMÃOS. AF_06/2014",
+      "quantidade": 44.1,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.8": {
+      "item_original": "S2-14.8",
+      "descricao": "PINTURA LÁTEX ACRÍLICA ECONÔMICA, APLICAÇÃO MANUAL EM TETO, DUAS DEMÃOS. AF_04/2023",
+      "quantidade": 48.28,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.9": {
+      "item_original": "S2-14.9",
+      "descricao": "M² 394,07 EXTERNAS DE CASAS. AF_03/2024",
+      "quantidade": 394.07,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.10": {
+      "item_original": "S2-14.10",
+      "descricao": "APLICAÇÃO MANUAL DE MASSA ACRÍLICA EM PAREDES EXTERNAS DE CASAS, DUAS DEMÃOS. AF_03/2024",
+      "quantidade": 312.71,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.11": {
+      "item_original": "S2-14.11",
+      "descricao": "PINTURA LÁTEX ACRÍLICA ECONÔMICA, APLICAÇÃO MANUAL EM PAREDES, DUAS DEMÃOS. AF_04/2023",
+      "quantidade": 394.07,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.12": {
+      "item_original": "S2-14.12",
+      "descricao": "PINTURA DE PISO COM TINTA ACRÍLICA, APLICAÇÃO MANUAL, 2 DEMÃOS, INCLUSO FUNDO PREPARADOR. AF_05/2021",
+      "quantidade": 134.6,
+      "unidade": "M2",
+      "source": "?"
+    },
+    "S2-14.13": {
+      "item_original": "S2-14.13",
+      "descricao": "PINTURA DE MEIO-FIO COM TINTA BRANCA A BASE DE CAL (CAIAÇÃO). AF_05/2021",
+      "quantidade": 56.04,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-14.14": {
+      "item_original": "S2-14.14",
+      "descricao": "PINTURA ESMALTE BASE SOLVENTE EM POSTES OU TUBULAÇÕES 2 DEMÃOS",
+      "quantidade": 60.6,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-16.1": {
+      "item_original": "S2-16.1",
+      "descricao": "Fornecimento e montagem de tubo de aço galvanizado de 1\"",
+      "quantidade": 60.6,
+      "unidade": "M",
+      "source": "?"
+    },
+    "S2-16.2": {
+      "item_original": "S2-16.2",
+      "descricao": "Planta - Palmeira Areca (alt=1,00m), fornecimento e plantio",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "text_line"
+    },
+    "S2-16.3": {
+      "item_original": "S2-16.3",
+      "descricao": "Planta - Palmeira Vecthia, h=3,00m, fornecimento e plantio",
+      "quantidade": 2.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-16.4": {
+      "item_original": "S2-16.4",
+      "descricao": "PLANTIO DE ARBUSTO OU CERCA VIVA. AF_07/2024",
+      "quantidade": 33.0,
+      "unidade": "UN",
+      "source": "?"
+    },
+    "S2-16.5": {
+      "item_original": "S2-16.5",
+      "descricao": "Banco com encosto, compr=1,50m, largura=30cm, pé de ferro fundido e com 10 réguas de madeira, inclusive pintura",
+      "quantidade": 3.0,
+      "unidade": "UN",
+      "source": "?"
+    }
+  },
+  "itens_por_base": {
+    "1.1": [
+      "1.1"
+    ],
+    "2.1": [
+      "2.1"
+    ],
+    "2.2": [
+      "2.2",
+      "S1-2.2",
+      "S2-2.2-A"
+    ],
+    "2.3": [
+      "2.3",
+      "S2-2.3"
+    ],
+    "2.4": [
+      "2.4"
+    ],
+    "2.5": [
+      "2.5"
+    ],
+    "2.6": [
+      "2.6"
+    ],
+    "2.7": [
+      "2.7"
+    ],
+    "2.8": [
+      "2.8"
+    ],
+    "2.9": [
+      "2.9"
+    ],
+    "2.10": [
+      "2.10"
+    ],
+    "2.11": [
+      "2.11"
+    ],
+    "2.12": [
+      "2.12"
+    ],
+    "2.13": [
+      "2.13"
+    ],
+    "3.1": [
+      "3.1"
+    ],
+    "3.2": [
+      "3.2"
+    ],
+    "3.3": [
+      "3.3"
+    ],
+    "3.4": [
+      "3.4"
+    ],
+    "3.5": [
+      "3.5"
+    ],
+    "3.6": [
+      "3.6"
+    ],
+    "3.7": [
+      "3.7"
+    ],
+    "4.1": [
+      "4.1",
+      "S1-4.1"
+    ],
+    "5.1": [
+      "5.1"
+    ],
+    "5.2": [
+      "5.2"
+    ],
+    "6.1": [
+      "6.1"
+    ],
+    "6.2": [
+      "6.2"
+    ],
+    "6.3": [
+      "6.3"
+    ],
+    "7.1": [
+      "7.1"
+    ],
+    "7.2": [
+      "7.2"
+    ],
+    "7.3": [
+      "7.3"
+    ],
+    "7.4": [
+      "7.4",
+      "S2-7.4"
+    ],
+    "7.5": [
+      "7.5",
+      "S2-7.5"
+    ],
+    "7.6": [
+      "7.6",
+      "S2-7.6"
+    ],
+    "7.7": [
+      "7.7",
+      "S2-7.7"
+    ],
+    "7.8": [
+      "7.8",
+      "S2-7.8"
+    ],
+    "7.9": [
+      "7.9",
+      "S2-7.9"
+    ],
+    "7.10": [
+      "7.10",
+      "S2-7.10"
+    ],
+    "8.1": [
+      "8.1"
+    ],
+    "8.2": [
+      "8.2"
+    ],
+    "8.3": [
+      "8.3"
+    ],
+    "8.4": [
+      "8.4"
+    ],
+    "8.5": [
+      "8.5"
+    ],
+    "8.6": [
+      "8.6"
+    ],
+    "8.7": [
+      "8.7"
+    ],
+    "8.8": [
+      "8.8"
+    ],
+    "8.9": [
+      "8.9"
+    ],
+    "8.10": [
+      "8.10"
+    ],
+    "8.11": [
+      "8.11"
+    ],
+    "8.12": [
+      "8.12"
+    ],
+    "8.13": [
+      "8.13"
+    ],
+    "8.14": [
+      "8.14"
+    ],
+    "8.15": [
+      "8.15"
+    ],
+    "8.16": [
+      "8.16"
+    ],
+    "8.17": [
+      "8.17"
+    ],
+    "8.18": [
+      "8.18"
+    ],
+    "9.1": [
+      "9.1"
+    ],
+    "9.2": [
+      "9.2"
+    ],
+    "9.3": [
+      "9.3",
+      "S1-9.3",
+      "S2-9.3"
+    ],
+    "9.4": [
+      "9.4"
+    ],
+    "10.1": [
+      "10.1"
+    ],
+    "10.2": [
+      "10.2"
+    ],
+    "10.3": [
+      "10.3"
+    ],
+    "10.4": [
+      "10.4"
+    ],
+    "11.1": [
+      "11.1"
+    ],
+    "11.2": [
+      "11.2"
+    ],
+    "11.3": [
+      "11.3"
+    ],
+    "11.4": [
+      "11.4"
+    ],
+    "11.5": [
+      "11.5"
+    ],
+    "12.1": [
+      "12.1",
+      "S2-12.1"
+    ],
+    "12.2": [
+      "12.2"
+    ],
+    "12.3": [
+      "12.3"
+    ],
+    "12.4": [
+      "12.4"
+    ],
+    "12.5": [
+      "12.5"
+    ],
+    "13.1": [
+      "13.1",
+      "S1-13.1",
+      "S2-13.1"
+    ],
+    "13.2": [
+      "13.2",
+      "S1-13.2",
+      "S2-13.2"
+    ],
+    "13.3": [
+      "13.3"
+    ],
+    "13.4": [
+      "13.4"
+    ],
+    "14.1": [
+      "14.1",
+      "S2-14.1"
+    ],
+    "14.2": [
+      "14.2"
+    ],
+    "14.3": [
+      "14.3"
+    ],
+    "14.4": [
+      "14.4"
+    ],
+    "14.5": [
+      "14.5"
+    ],
+    "15.1": [
+      "15.1"
+    ],
+    "15.2": [
+      "15.2"
+    ],
+    "8.20": [
+      "S1-8.20",
+      "S2-8.20"
+    ],
+    "8.21": [
+      "S1-8.21",
+      "S2-8.21"
+    ],
+    "8.22": [
+      "S1-8.22"
+    ],
+    "8.23": [
+      "S1-8.23"
+    ],
+    "8.24": [
+      "S1-8.24"
+    ],
+    "9.5": [
+      "S1-9.5",
+      "S2-9.5"
+    ],
+    "9.6": [
+      "S1-9.6"
+    ],
+    "9.7": [
+      "S1-9.7"
+    ],
+    "9.8": [
+      "S1-9.8"
+    ],
+    "9.9": [
+      "S1-9.9"
+    ],
+    "9.10": [
+      "S1-9.10"
+    ],
+    "9.11": [
+      "S1-9.11",
+      "S2-9.11"
+    ],
+    "9.12": [
+      "S1-9.12",
+      "S2-9.12"
+    ],
+    "9.13": [
+      "S1-9.13",
+      "S2-9.13-A"
+    ],
+    "12.7": [
+      "S1-12.7",
+      "S2-12.7"
+    ],
+    "14.7": [
+      "S1-14.7",
+      "S2-14.7"
+    ],
+    "2.14": [
+      "S2-2.14"
+    ],
+    "3.8": [
+      "S2-3.8"
+    ],
+    "5.3": [
+      "S2-5.3"
+    ],
+    "5.4": [
+      "S2-5.4"
+    ],
+    "5.5": [
+      "S2-5.5"
+    ],
+    "6.5": [
+      "S2-6.5"
+    ],
+    "6.6": [
+      "S2-6.6"
+    ],
+    "6.7": [
+      "S2-6.7"
+    ],
+    "6.8": [
+      "S2-6.8"
+    ],
+    "6.9": [
+      "S2-6.9"
+    ],
+    "6.10": [
+      "S2-6.10"
+    ],
+    "6.11": [
+      "S2-6.11"
+    ],
+    "6.12": [
+      "S2-6.12"
+    ],
+    "6.13": [
+      "S2-6.13"
+    ],
+    "6.14": [
+      "S2-6.14"
+    ],
+    "6.15": [
+      "S2-6.15"
+    ],
+    "7.11": [
+      "S2-7.11"
+    ],
+    "7.12": [
+      "S2-7.12"
+    ],
+    "7.13": [
+      "S2-7.13"
+    ],
+    "9.14": [
+      "S2-9.14"
+    ],
+    "10.5": [
+      "S2-10.5"
+    ],
+    "12.8": [
+      "S2-12.8"
+    ],
+    "12.9": [
+      "S2-12.9"
+    ],
+    "12.10": [
+      "S2-12.10"
+    ],
+    "12.11": [
+      "S2-12.11"
+    ],
+    "12.12": [
+      "S2-12.12"
+    ],
+    "12.13": [
+      "S2-12.13"
+    ],
+    "12.14": [
+      "S2-12.14"
+    ],
+    "12.15": [
+      "S2-12.15"
+    ],
+    "14.8": [
+      "S2-14.8"
+    ],
+    "14.9": [
+      "S2-14.9"
+    ],
+    "14.10": [
+      "S2-14.10"
+    ],
+    "14.11": [
+      "S2-14.11"
+    ],
+    "14.12": [
+      "S2-14.12"
+    ],
+    "14.13": [
+      "S2-14.13"
+    ],
+    "14.14": [
+      "S2-14.14"
+    ],
+    "16.1": [
+      "S2-16.1"
+    ],
+    "16.2": [
+      "S2-16.2"
+    ],
+    "16.3": [
+      "S2-16.3"
+    ],
+    "16.4": [
+      "S2-16.4"
+    ],
+    "16.5": [
+      "S2-16.5"
+    ]
+  }
+}

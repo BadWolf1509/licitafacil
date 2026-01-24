@@ -231,24 +231,28 @@ class GeminiProvider(BaseAIProvider):
             )
 
     def extract_atestado_from_images(self, images: List[bytes]) -> Dict[str, Any]:
-        """Extrai informações de atestado usando Gemini Vision."""
-        from services.gemini_analyzer import gemini_analyzer
-        return gemini_analyzer.extract_atestado_from_images(images)
+        """Extrai informacoes de atestado usando Gemini Vision."""
+        from services.ai.extraction_service import AIExtractionService
+        service = AIExtractionService()
+        return service.extract_atestado_from_images(images, provider=self)
 
     def extract_atestado_info(self, texto: str) -> Dict[str, Any]:
-        """Extrai informações de atestado a partir de texto."""
-        from services.gemini_analyzer import gemini_analyzer
-        return gemini_analyzer.extract_atestado_info(texto)
+        """Extrai informacoes de atestado a partir de texto."""
+        from services.ai.extraction_service import AIExtractionService
+        service = AIExtractionService()
+        return service.extract_atestado_info(texto, provider=self)
 
     def extract_atestado_metadata(self, texto: str) -> Dict[str, Any]:
         """Extrai apenas metadados de atestado a partir de texto."""
-        from services.gemini_analyzer import gemini_analyzer
-        return gemini_analyzer.extract_atestado_metadata(texto)
+        from services.ai.extraction_service import AIExtractionService
+        service = AIExtractionService()
+        return service.extract_atestado_metadata(texto, provider=self)
 
     def extract_edital_requirements(self, texto: str) -> List[Dict[str, Any]]:
         """Extrai requisitos de edital."""
-        from services.gemini_analyzer import gemini_analyzer
-        return gemini_analyzer.extract_edital_requirements(texto)
+        from services.ai.extraction_service import AIExtractionService
+        service = AIExtractionService()
+        return service.extract_edital_requirements(texto, provider=self)
 
     def get_model_info(self) -> Dict[str, Any]:
         """Retorna informações sobre os modelos configurados."""

@@ -11,9 +11,15 @@ from typing import List, Optional
 from datetime import datetime
 
 from .models import JobStatus, ProcessingJob
-
 from logging_config import get_logger
+
 logger = get_logger('services.job_repository')
+
+
+def _now_iso() -> str:
+    """Retorna timestamp ISO com timezone local para parsing correto no frontend."""
+    # Usar timezone-aware datetime para que o frontend interprete corretamente
+    return datetime.now().astimezone().isoformat()
 
 
 class JobRepository:
@@ -265,7 +271,7 @@ class JobRepository:
             error: Mensagem de erro (opcional)
             result: Resultado (opcional)
         """
-        now = datetime.now().isoformat()
+        now = _now_iso()
 
         conn = self._get_connection()
         cursor = conn.cursor()

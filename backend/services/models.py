@@ -11,6 +11,11 @@ from enum import Enum
 from typing import Dict, Any, Optional, List
 
 
+def _now_iso() -> str:
+    """Retorna timestamp ISO com timezone local para parsing correto no frontend."""
+    return datetime.now().astimezone().isoformat()
+
+
 # === Modelos do Processing Queue ===
 
 class JobStatus(str, Enum):
@@ -47,7 +52,7 @@ class ProcessingJob:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now().isoformat()
+            self.created_at = _now_iso()
 
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário."""
