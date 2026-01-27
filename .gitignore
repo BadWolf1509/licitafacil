@@ -45,3 +45,8 @@ debug_images/
 # Windows artifacts
 nul
 .secrets/
+
+# Arquivos temporários de teste/debug
+backend/tmp_*.py
+backend/.tmp_*
+backend/relatorio_*.json
