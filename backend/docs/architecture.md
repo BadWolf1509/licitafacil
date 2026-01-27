@@ -110,12 +110,11 @@ table_extraction/
 │   ├── grid_ocr.py      # extract_servicos_from_grid_ocr
 │   └── ocr_layout.py    # extract_servicos_from_ocr_layout
 ├── analyzers/           # Analisadores
-│   ├── document.py      # analyze_document_type
-│   └── quality.py       # calc_quality_metrics (duplicado)
+│   └── document.py      # analyze_document_type
 └── utils/               # Utilitários
     ├── planilha.py      # Gerenciamento de planilhas
     ├── merge.py         # Merge de fontes de tabela
-    ├── quality.py       # calc_qty_ratio, calc_complete_ratio
+    ├── quality.py       # calc_qty_ratio, calc_complete_ratio, calc_quality_metrics (fonte única)
     ├── pdf_render.py    # render_pdf_page, crop_page_image
     ├── grid_detect.py   # detect_grid_rows
     └── debug_utils.py   # summarize_table_debug
@@ -187,6 +186,9 @@ Todos implementam `BaseAIProvider`:
 | Módulo | Responsabilidade |
 |--------|------------------|
 | `text_processor.py` | Extração de itens a partir de texto |
+| `deduplication.py` | Deduplicação de serviços (pares, prefixos, planilhas) |
+| `service_merger.py` | Mesclagem de planilhas fragmentadas |
+| `service_filter.py` | Filtros de validação (headers, quantidade, código) |
 
 **TextProcessor** métodos principais:
 - `extract_item_codes_from_text_lines()` - Extrai códigos de item
@@ -194,6 +196,23 @@ Todos implementam `BaseAIProvider`:
 - `extract_items_from_text_section()` - Extrai da seção "SERVICOS EXECUTADOS"
 - `extract_quantities_from_text()` - Extrai quantidades para códigos conhecidos
 - `backfill_quantities_from_text()` - Preenche quantidades faltantes
+
+**ServiceDeduplicator** métodos principais:
+- `remove_duplicate_pairs()` - Remove pares X.Y e X.Y.1
+- `dedupe_by_restart_prefix()` - Remove duplicatas com prefixos S1-, S2-
+- `dedupe_within_planilha()` - Remove duplicatas por código/planilha
+- `dedupe_all()` - Aplica todas as estratégias
+
+**ServiceMerger** métodos principais:
+- `merge_fragmented()` - Mescla planilhas fragmentadas
+- `normalize_prefixes()` - Normaliza prefixos de restart
+- `merge_and_normalize()` - Executa ambas operações
+
+**ServiceFilter** métodos principais:
+- `filter_headers()` - Remove cabeçalhos de seção
+- `filter_no_quantity()` - Remove itens sem quantidade
+- `filter_no_code()` - Remove itens sem código válido
+- `filter_all()` - Aplica todos os filtros
 
 ### services/ - Serviços de Alto Nível
 
@@ -312,16 +331,33 @@ class AtestadoProcessingConfig:
 
 | Módulo | Linhas | Status |
 |--------|--------|--------|
-| `document_processor.py` | ~2500 | Ativo |
-| `table_extraction_service.py` | 353 | Ativo (wrapper com delegações) |
+| `document_processor.py` | ~653 | Ativo (refatorado) |
+| `table_extraction_service.py` | 304 | Ativo (wrapper limpo) |
 | `aditivo_processor.py` | 21 | Ativo (wrapper com delegações) |
 | `services/aditivo/` (pacote) | ~1200 | Ativo |
 | `services/table_extraction/` (pacote) | ~2500 | Ativo |
-| `services/extraction/` (pacote) | ~600 | Ativo |
+| `services/extraction/` (pacote) | ~1100 | Ativo (expandido) |
+| `services/processors/` (pacote) | ~1800 | Ativo (expandido) |
 
-**Nota**: Refatoração concluída com redução de 87%:
-- `table_extraction_service.py`: 2894 → 353 linhas (-2541 linhas)
+**Nota**: Refatoração concluída:
+- `table_extraction_service.py`: 2894 → 304 linhas (-2590 linhas)
 - `aditivo_processor.py`: 1141 → 21 linhas (-1120 linhas)
+- `document_processor.py`: 1151 → 653 linhas (-498 linhas)
+- `item_filters.py`: 670 → 46 linhas (wrapper de re-export)
+- `text_processor.py`: 857 → 514 linhas (-343 linhas)
+- `services/processors/`: Pacote com lógica extraída do DocumentProcessor
+  - `deduplication.py`: ServiceDeduplicator (260 linhas)
+  - `service_merger.py`: ServiceMerger (250 linhas)
+  - `service_filter.py`: ServiceFilter (255 linhas)
+  - `text_processor.py`: TextProcessor (514 linhas)
+  - `text_cleanup.py`: Funções de limpeza de texto (207 linhas)
+  - `text_line_parser.py`: Parser de linhas (351 linhas)
+  - `text_section_builder.py`: Construtor de seções (233 linhas)
+  - `quantity_extractor.py`: Extração de quantidades (280 linhas)
+- `services/extraction/`: Módulos de validação e filtro
+  - `validation_filters.py`: Filtros de validação (333 linhas)
+  - `classification_filters.py`: Filtros de classificação (157 linhas)
+  - `item_filters.py`: Re-exports para retrocompatibilidade (46 linhas)
 
 ## Testes Unitários
 
@@ -331,8 +367,83 @@ class AtestadoProcessingConfig:
 | `tests/test_patterns.py` | patterns.py (18 testes) |
 | `tests/test_aditivo.py` | services/aditivo (17 testes) |
 | `tests/test_table_extraction.py` | services/table_extraction (49 testes) |
-| `tests/test_text_processor.py` | TextProcessor |
-| `tests/test_sanitize_description.py` | sanitize_description |
-| `tests/test_matching_service.py` | MatchingService |
+| `tests/test_text_processor.py` | TextProcessor (29 testes) |
+| `tests/test_sanitize_description.py` | sanitize_description (20 testes) |
+| `tests/test_matching_service.py` | MatchingService (8 testes) |
+| `tests/test_deduplication.py` | ServiceDeduplicator (26 testes) |
+| `tests/test_service_merger.py` | ServiceMerger (15 testes) |
+| `tests/test_service_filter.py` | ServiceFilter (23 testes) |
 
-**Total**: 275 testes passando
+**Total**: 339 testes passando
+
+## Convenções de Código
+
+### Estrutura de Módulos
+
+1. **Limite de Linhas**: Módulos devem ter no máximo ~500-800 linhas
+2. **Responsabilidade Única**: Cada módulo tem uma responsabilidade clara
+3. **Pacotes para Funcionalidades Complexas**: Agrupar módulos relacionados em pacotes
+
+### Padrão de Re-export para Retrocompatibilidade
+
+Ao refatorar módulos grandes, manter o módulo original como wrapper:
+
+```python
+# item_filters.py (wrapper)
+"""
+NOTA: Este módulo foi reorganizado. As funções foram movidas para:
+- classification_filters.py: filter_classification_paths
+- validation_filters.py: filter_servicos_by_item_length
+"""
+from .classification_filters import filter_classification_paths
+from .validation_filters import filter_servicos_by_item_length
+```
+
+### Convenções de Naming
+
+| Tipo | Convenção | Exemplo |
+|------|-----------|---------|
+| Módulos de filtro | `*_filters.py` | `validation_filters.py` |
+| Módulos de parse | `*_parser.py` | `text_line_parser.py` |
+| Módulos de extração | `*_extractor.py` | `quantity_extractor.py` |
+| Módulos de limpeza | `*_cleanup.py` | `text_cleanup.py` |
+| Classes principais | CamelCase | `TextProcessor` |
+| Instâncias singleton | snake_case | `text_processor` |
+| Funções privadas | `_prefixo` | `_build_description` |
+| Constantes | UPPER_SNAKE | `STOP_PREFIXES` |
+
+### Padrão Singleton
+
+Classes com instância singleton para uso conveniente:
+
+```python
+class TextProcessor:
+    """Processador de texto."""
+    ...
+
+# Instância singleton para uso conveniente
+text_processor = TextProcessor()
+```
+
+### Organização de Imports
+
+1. Stdlib primeiro
+2. Dependências externas
+3. Imports internos do projeto
+4. Imports relativos do mesmo pacote
+
+```python
+import re
+from typing import Dict, List, Optional
+
+from config import AtestadoProcessingConfig
+from services.extraction import normalize_unit, parse_quantity
+
+from .text_cleanup import strip_trailing_unit_qty
+```
+
+### Testes
+
+- Arquivos de teste em `tests/` seguem o padrão `test_<modulo>.py`
+- Cada módulo público deve ter testes correspondentes
+- Ao mover funções, atualizar imports nos testes

@@ -4,7 +4,6 @@ Testes unitários para patterns.py.
 Testa os padrões regex compilados usados na extração.
 """
 
-import pytest
 from services.extraction.patterns import Patterns
 
 

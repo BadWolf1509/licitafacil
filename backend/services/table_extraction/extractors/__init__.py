@@ -7,6 +7,9 @@ from .helpers import (
     extract_trailing_unit,
     infer_missing_units,
 )
+from .column_detector import ColumnDetector, column_detector
+from .confidence_calculator import ConfidenceCalculator, confidence_calculator
+from .row_processor import RowProcessor, row_processor
 from .ocr_helpers import (
     build_table_from_ocr_words,
     infer_item_column_from_words,
@@ -35,6 +38,15 @@ __all__ = [
     "extract_hidden_item_from_text",
     "extract_trailing_unit",
     "infer_missing_units",
+    # Column detection
+    "ColumnDetector",
+    "column_detector",
+    # Confidence calculation
+    "ConfidenceCalculator",
+    "confidence_calculator",
+    # Row processing
+    "RowProcessor",
+    "row_processor",
     # OCR helpers
     "build_table_from_ocr_words",
     "infer_item_column_from_words",

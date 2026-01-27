@@ -10,7 +10,7 @@ import re
 from .table_processor import parse_item_tuple, item_tuple_to_str
 
 
-def normalize_item_code(item: Any) -> Optional[str]:
+def normalize_item_code(item: Any, strip_suffixes: bool = False) -> Optional[str]:
     """
     Normaliza código de item para formato padrão.
 
@@ -18,6 +18,7 @@ def normalize_item_code(item: Any) -> Optional[str]:
 
     Args:
         item: Código do item (string ou qualquer tipo)
+        strip_suffixes: Se True, também remove sufixos como -A, -B, -C
 
     Returns:
         Código normalizado (ex: "1.2.3") ou None se inválido
@@ -31,6 +32,8 @@ def normalize_item_code(item: Any) -> Optional[str]:
         '1.2.3'
         >>> normalize_item_code("1 2 3")
         '1.2.3'
+        >>> normalize_item_code("1.2.3-A", strip_suffixes=True)
+        '1.2.3'
         >>> normalize_item_code("invalid")
         None
     """
@@ -40,8 +43,12 @@ def normalize_item_code(item: Any) -> Optional[str]:
     if not item_str:
         return None
 
-    # Remover prefixos de aditivo ou restart (AD-, Sx-)
-    item_str = re.sub(r'^(AD-|S\d+-)', '', item_str, flags=re.IGNORECASE).strip()
+    # Remover prefixos de aditivo ou restart (AD-, AD1-, Sx-)
+    item_str = re.sub(r'^(AD\d*-|S\d+-)', '', item_str, flags=re.IGNORECASE).strip()
+
+    # Remover sufixos -A, -B, -C se solicitado
+    if strip_suffixes:
+        item_str = re.sub(r'-[A-Z]$', '', item_str, flags=re.IGNORECASE).strip()
 
     # Usar parse_item_tuple para normalização robusta
     item_tuple = parse_item_tuple(item_str)

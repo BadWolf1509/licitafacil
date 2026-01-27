@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
+from config import PAID_SERVICES_ENABLED
 
 load_dotenv()
 
@@ -33,6 +34,8 @@ class DocumentAIService:
     @property
     def is_configured(self) -> bool:
         if not _DOC_AI_AVAILABLE:
+            return False
+        if not PAID_SERVICES_ENABLED:
             return False
         return bool(
             os.getenv("DOCUMENT_AI_PROJECT_ID")

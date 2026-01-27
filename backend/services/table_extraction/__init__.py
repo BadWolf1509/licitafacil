@@ -42,13 +42,15 @@ from .utils import (
     merge_table_sources,
 )
 
-# Métricas de qualidade - disponíveis em analyzers/ e utils/ para compatibilidade
-from .analyzers import (
+# Métricas de qualidade (fonte única em utils/)
+from .utils import (
     calc_qty_ratio,
     calc_complete_ratio,
     calc_quality_metrics,
-    analyze_document_type,
 )
+
+# Análise de documento
+from .analyzers import analyze_document_type
 
 # Estratégia de cascata
 from .cascade import CascadeStrategy

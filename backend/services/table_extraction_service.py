@@ -8,53 +8,15 @@ Responsável por:
 - Cascata de extração com thresholds de qualidade
 """
 
-from typing import Dict, Any, List, Optional, Callable
+from typing import Optional, Callable
 
-from .pdf_extractor import pdf_extractor
-from .ocr_service import ocr_service
-from .document_ai_service import document_ai_service
-from .pdf_extraction_service import pdf_extraction_service
-from .extraction import (
-    normalize_description,
-    normalize_unit,
-    normalize_header,
-    parse_item_tuple,
-    item_tuple_to_str,
-    parse_quantity,
-    is_valid_item_context,
-    score_item_column,
-    detect_header_row,
-    guess_columns_by_header,
-    compute_column_stats,
-    guess_columns_by_content,
-    validate_column_mapping,
-    build_description_from_cells,
-    filter_servicos_by_item_prefix,
-    filter_servicos_by_item_length,
-    repair_missing_prefix,
-    description_similarity,
-    dominant_item_length,
-    UNIT_TOKENS,
-)
-from .extraction.quality_assessor import compute_servicos_stats, compute_quality_score
 
 # Importar módulos extraídos do pacote table_extraction
 from .table_extraction.parsers import (
-    parse_unit_qty_from_text,
-    find_unit_qty_pairs,
     parse_row_text_to_servicos as _parse_row_text_to_servicos,
-)
-from .table_extraction.filters import (
-    is_row_noise,
-    is_section_header_row,
-    is_page_metadata,
-    strip_section_header_prefix,
-    is_header_row as is_header_row_filter,
 )
 from .table_extraction.extractors import (
     TableExtractor,
-    extract_hidden_item_from_text,
-    extract_trailing_unit,
     infer_missing_units,
     extract_servicos_from_tables as _extract_servicos_from_tables,
     extract_servicos_from_document_ai as _extract_servicos_from_document_ai,
@@ -62,7 +24,6 @@ from .table_extraction.extractors import (
     extract_servicos_from_ocr_layout as _extract_servicos_from_ocr_layout,
     build_table_from_ocr_words as _build_table_from_ocr_words,
     infer_item_column_from_words as _infer_item_column_from_words,
-    item_sequence_suspicious as _item_sequence_suspicious,
     assign_itemless_items as _assign_itemless_items,
     is_retry_result_better as _is_retry_result_better,
     extract_from_ocr_words as _extract_from_ocr_words,
@@ -86,9 +47,6 @@ from .table_extraction.utils import (
 from .table_extraction.analyzers import analyze_document_type as _analyze_document_type
 from .table_extraction.cascade import CascadeStrategy
 
-from exceptions import PDFError, OCRError, AzureAPIError
-from config import AtestadoProcessingConfig as APC, TableExtractionConfig as TEC
-from utils.text_utils import sanitize_description
 
 from logging_config import get_logger
 logger = get_logger('services.table_extraction_service')
@@ -113,37 +71,8 @@ class TableExtractionService:
         """Inicializa o serviço com a estratégia de cascata."""
         self._cascade = CascadeStrategy(self)
 
-    def _parse_unit_qty_from_text(self, text: str) -> Optional[tuple]:
-        """Delega para função extraída do pacote table_extraction."""
-        return parse_unit_qty_from_text(text)
-
-    def _find_unit_qty_pairs(self, text: str) -> list:
-        """Delega para função extraída do pacote table_extraction."""
-        return find_unit_qty_pairs(text)
-
-    def _is_row_noise(self, text: str) -> bool:
-        """Delega para função extraída do pacote table_extraction."""
-        return is_row_noise(text)
-
-    def _is_section_header_row(self, item_val: str, desc_val: str, unit_val: str, qty_present: bool) -> bool:
-        """Delega para função extraída do pacote table_extraction."""
-        return is_section_header_row(item_val, desc_val, unit_val, qty_present)
-
-    def _is_page_metadata(self, text: str) -> bool:
-        """Delega para função extraída do pacote table_extraction."""
-        return is_page_metadata(text)
-
-    def _strip_section_header_prefix(self, desc: str) -> str:
-        """Delega para função extraída do pacote table_extraction."""
-        return strip_section_header_prefix(desc)
-
-    def _extract_hidden_item_from_text(self, text: str) -> Optional[dict]:
-        """Delega para função extraída do pacote table_extraction."""
-        return extract_hidden_item_from_text(text)
-
-    def _extract_trailing_unit(self, desc: str, expected_qty: Optional[float] = None) -> tuple:
-        """Delega para função extraída do pacote table_extraction."""
-        return extract_trailing_unit(desc, expected_qty)
+    # ==================== Métodos Delegados Utilizados ====================
+    # Mantidos apenas os métodos chamados pelos extratores
 
     def _infer_missing_units(self, servicos: list) -> int:
         """Delega para função extraída do pacote table_extraction."""
@@ -275,10 +204,6 @@ class TableExtractionService:
         """Delega para funcao extraida do pacote table_extraction.extractors."""
         return _extract_from_ocr_words(self, words, row_tol_factor, col_tol_factor, enable_refine)
 
-    def _item_sequence_suspicious(self, servicos: list) -> tuple[bool, dict]:
-        """Delega para funcao extraida do pacote table_extraction.extractors."""
-        return _item_sequence_suspicious(servicos)
-
     def _assign_itemless_items(self, servicos: list, page_number: int) -> None:
         """Delega para funcao extraida do pacote table_extraction.extractors."""
         return _assign_itemless_items(servicos, page_number)
@@ -286,10 +211,6 @@ class TableExtractionService:
     def _detect_grid_rows(self, image_bytes: bytes) -> tuple[list, dict]:
         """Delega para funcao extraida do pacote table_extraction.utils."""
         return _detect_grid_rows(image_bytes)
-
-    def _is_header_row(self, text: str) -> bool:
-        """Delega para funcao extraida do pacote table_extraction.filters."""
-        return is_header_row_filter(text)
 
     def _parse_row_text_to_servicos(self, row_text: str) -> list:
         """Delega para funcao extraida do pacote table_extraction.parsers."""

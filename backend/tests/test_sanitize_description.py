@@ -4,7 +4,6 @@ Testes unitários para sanitize_description.
 Testa sanitização de descrições extraídas de documentos.
 """
 
-import pytest
 from utils.text_utils import sanitize_description
 
 

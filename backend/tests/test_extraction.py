@@ -1,5 +1,5 @@
 """
-Testes para os módulos de extração (text_normalizer, table_processor, service_filter).
+Testes para os módulos de extração (text_normalizer, table_processor, item_filters).
 """
 from services.extraction.text_normalizer import (
     normalize_description,
@@ -13,9 +13,11 @@ from services.extraction.table_processor import (
     parse_quantity,
     detect_header_row,
 )
-from services.extraction.service_filter import (
+from services.extraction.item_filters import (
     filter_classification_paths,
     is_summary_row,
+)
+from services.extraction.similarity import (
     quantities_similar,
     descriptions_similar,
     items_similar,

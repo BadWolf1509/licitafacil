@@ -4,7 +4,6 @@ Testes unitários para o pacote services/table_extraction.
 Testa parsers, filtros, extratores e utilitários.
 """
 
-import pytest
 from services.table_extraction import (
     # Parsers
     parse_unit_qty_from_text,

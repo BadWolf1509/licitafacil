@@ -14,8 +14,8 @@ from services.extraction import normalize_unit, parse_quantity, UNIT_TOKENS
 # Unidades de parada (preposições que podem parecer unidades)
 STOP_UNITS = {"DE", "DA", "DO", "EM", "COM", "PARA", "POR", "QUE"}
 
-# Unidades permitidas
-ALLOWED_UNITS = set(UNIT_TOKENS) | {"MES"}
+# Unidades permitidas (MES já está incluído em UNIT_TOKENS)
+ALLOWED_UNITS = UNIT_TOKENS
 
 # Unidades dimensionais (não são unidades de quantidade)
 DIMENSIONAL_UNITS = {"MM", "CM"}

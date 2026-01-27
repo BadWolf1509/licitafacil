@@ -86,30 +86,29 @@ NARRATIVE_TOKENS = (
     "DATA",
 )
 
-# Unidades de medida válidas
-VALID_UNITS = (
-    "UN",
-    "M",
-    "M2",
-    "M3",
-    "M²",
-    "M³",
-    "KG",
-    "L",
-    "VB",
-    "CJ",
-    "PC",
-    "GL",
-    "T",
-    "HA",
-    "KM",
-    "MES",
-    "GB",
-    "PT",
-    "PÇ",
-    "JG",
-    "CONJ",
-)
+# Unidades de medida válidas (frozenset para lookup O(1))
+VALID_UNITS = frozenset({
+    # Unidade
+    "UN", "UND", "UNID", "UNIDADE",
+    # Metro linear e derivados
+    "M", "ML", "M2", "M²", "M3", "M³",
+    # Peso
+    "KG", "G", "T", "TON",
+    # Volume
+    "L", "LT", "LITRO",
+    # Verba/Global
+    "VB", "VERBA", "GB", "GLOBAL",
+    # Conjunto
+    "CJ", "CONJ", "CONJUNTO",
+    # Peça
+    "PC", "PÇ", "PEÇA", "PECA",
+    # Outros
+    "GL", "PT", "PONTO",
+    "HA", "HECTARE",
+    "KM", "QUILOMETRO",
+    "MES", "MÊS", "MENSAL",
+    "JG", "JOGO",
+})
 
 # Unidades que devem ser ignoradas (medidas dimensionais, não de quantidade)
 IGNORE_UNITS = ("MM", "CM")

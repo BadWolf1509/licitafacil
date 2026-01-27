@@ -4,7 +4,6 @@ Testes unitários para o pacote services/aditivo.
 Testa validadores, detector de seções e transformador de aditivos.
 """
 
-import pytest
 from services.aditivo import (
     detect_aditivo_sections,
     prefix_aditivo_items,

@@ -88,7 +88,8 @@ class DocumentAnalysisService:
         self,
         images: List[bytes],
         progress_callback: ProgressCallback = None,
-        cancel_check: CancelCheck = None
+        cancel_check: CancelCheck = None,
+        provider: Optional[str] = None
     ) -> List[dict]:
         """
         Extrai serviços página por página usando Vision AI.
@@ -125,7 +126,7 @@ class DocumentAnalysisService:
             cropped = pdf_extraction_service.crop_region(image_bytes, 0.05, 0.15, 0.95, 0.92)
             try:
                 # Usa provider padrão (Gemini gratuito quando disponível, com fallback para OpenAI)
-                result = ai_provider.extract_atestado_from_images([cropped])
+                result = ai_provider.extract_atestado_from_images([cropped], provider=provider)
                 page_servicos = result.get("servicos", []) if isinstance(result, dict) else []
                 logger.info(f"Pagewise: pagina {page_index + 1} extraiu {len(page_servicos)} servicos")
                 for s in page_servicos:
@@ -147,7 +148,12 @@ class DocumentAnalysisService:
         table_used: bool,
         progress_callback: ProgressCallback = None,
         cancel_check: CancelCheck = None,
-        images: Optional[List[bytes]] = None
+        images: Optional[List[bytes]] = None,
+        doc_analysis: Optional[dict] = None,
+        force_pagewise: bool = False,
+        vision_provider: Optional[str] = None,
+        pagewise_min_items: Optional[int] = None,
+        filter_invalid_codes: bool = False
     ) -> tuple[dict, str, dict]:
         """
         Extrai dados do atestado usando IA (Vision e/ou OCR text).
@@ -179,15 +185,54 @@ class DocumentAnalysisService:
         llm_fallback_only = APC.LLM_FALLBACK_ONLY
         use_ai_for_services = not llm_fallback_only or not table_used
 
+        skip_ocr_services = False
+        if isinstance(doc_analysis, dict):
+            if doc_analysis.get("has_image_tables") or int(doc_analysis.get("dominant_image_pages") or 0) > 0:
+                if filter_invalid_codes:
+                    skip_ocr_services = True
+
+        pagewise_min_items = pagewise_min_items or APC.PAGEWISE_MIN_ITEMS
+
+        def _build_vision_meta() -> dict:
+            meta: dict[str, Any] = dados_meta or {}
+
+            def pick(field: str) -> Any:
+                value = meta.get(field)
+                if value is None or value == "":
+                    return dados_ocr.get(field) if dados_ocr else None
+                return value
+
+            return {
+                "descricao_servico": pick("descricao_servico"),
+                "contratante": pick("contratante"),
+                "data_emissao": pick("data_emissao"),
+                "quantidade": pick("quantidade"),
+                "unidade": pick("unidade"),
+            }
+
+        def _filter_invalid_item_codes(servicos: List[Dict[str, Any]], min_valid: int = 5) -> List[Dict[str, Any]]:
+            from .extraction import parse_item_tuple
+            if not servicos:
+                return servicos
+            valid = [
+                s for s in servicos
+                if parse_item_tuple(str(s.get("item") or ""))
+            ]
+            if len(valid) >= min_valid:
+                return valid
+            return servicos
+
         # Método 1: OCR + análise de texto
         pdf_extraction_service._notify_progress(progress_callback, 0, 0, "ia", "Extraindo metadados com IA")
         pdf_extraction_service._check_cancel(cancel_check)
         dados_meta = ai_provider.extract_atestado_metadata(texto)
 
-        if use_ai_for_services:
+        if use_ai_for_services and not skip_ocr_services:
             pdf_extraction_service._notify_progress(progress_callback, 0, 0, "ia", "Analisando texto com IA")
             pdf_extraction_service._check_cancel(cancel_check)
             dados_ocr = ai_provider.extract_atestado_info(texto)
+        elif use_ai_for_services and skip_ocr_services:
+            logger.info("OCR services pulado: tabela em imagem, confiando em Vision")
 
         # Método 2: Vision (GPT-4o ou Gemini)
         # OTIMIZAÇÃO: Só chamar Vision se precisamos da IA para serviços
@@ -212,8 +257,38 @@ class DocumentAnalysisService:
                 if vision_images:
                     pdf_extraction_service._notify_progress(progress_callback, 0, 0, "ia", "Analisando imagens com IA")
                     pdf_extraction_service._check_cancel(cancel_check)
-                    dados_vision = ai_provider.extract_atestado_from_images(vision_images)
-                    images = vision_images
+
+                    if force_pagewise:
+                        page_servicos = self.extract_servicos_pagewise(
+                            vision_images,
+                            progress_callback,
+                            cancel_check,
+                            provider=vision_provider
+                        )
+                        if filter_invalid_codes:
+                            page_servicos = _filter_invalid_item_codes(page_servicos)
+
+                        # Fallback: se pagewise vier fraco, tentar multi-page e mesclar
+                        if len(page_servicos) < pagewise_min_items:
+                            multi_result = ai_provider.extract_atestado_from_images(
+                                vision_images,
+                                provider=vision_provider
+                            )
+                            multi_servicos = multi_result.get("servicos", []) if isinstance(multi_result, dict) else []
+                            if filter_invalid_codes:
+                                multi_servicos = _filter_invalid_item_codes(multi_servicos)
+                            page_servicos = merge_servicos_prefer_primary(page_servicos, multi_servicos)
+                            vision_reprocessed = True
+
+                        dados_vision = _build_vision_meta()
+                        dados_vision["servicos"] = page_servicos
+                        images = vision_images
+                    else:
+                        dados_vision = ai_provider.extract_atestado_from_images(
+                            vision_images,
+                            provider=vision_provider
+                        )
+                        images = vision_images
             except (OpenAIError, ValueError, KeyError) as e:
                 logger.warning(f"Erro no Vision: {e}")
                 dados_vision = None
@@ -221,6 +296,8 @@ class DocumentAnalysisService:
             logger.info("Vision pulado: tabela extraiu serviços com sucesso (economia de custo)")
 
         servicos_vision = filter_summary_rows(dados_vision.get("servicos", []) if dados_vision else [])
+        if filter_invalid_codes and servicos_vision:
+            servicos_vision = _filter_invalid_item_codes(servicos_vision)
         servicos_ocr = filter_summary_rows(dados_ocr.get("servicos", []) if dados_ocr else [])
         vision_stats = compute_servicos_stats(servicos_vision)
         ocr_stats = compute_servicos_stats(servicos_ocr)
@@ -235,31 +312,21 @@ class DocumentAnalysisService:
             f"Pagewise check: enabled={pagewise_enabled}, use_vision={use_vision}, "
             f"images={len(images) if images else 0}, providers={ai_provider.available_providers}"
         )
-        if pagewise_enabled and use_vision and images and has_vision_provider:
+        if pagewise_enabled and use_vision and images and has_vision_provider and not force_pagewise:
             quality_threshold = APC.VISION_QUALITY_THRESHOLD
             min_pages = APC.PAGEWISE_MIN_PAGES
-            min_items = APC.PAGEWISE_MIN_ITEMS
+            min_items = pagewise_min_items
             logger.info(
                 f"Pagewise condition: vision_score={vision_score:.2f} < {quality_threshold} OR "
                 f"(pages={len(images)} >= {min_pages} AND items={vision_stats.get('total', 0)} < {min_items})"
             )
             if vision_score < quality_threshold or (len(images) >= min_pages and vision_stats.get("total", 0) < min_items):
-                page_servicos = self.extract_servicos_pagewise(images, progress_callback, cancel_check)
+                page_servicos = self.extract_servicos_pagewise(
+                    images, progress_callback, cancel_check, provider=vision_provider
+                )
                 if page_servicos:
                     if dados_vision is None:
-                        meta = dados_meta or {}
-                        def pick_meta(field: str) -> Any:
-                            value = meta.get(field)
-                            if value is None or value == "":
-                                return dados_ocr.get(field) if dados_ocr else None
-                            return value
-                        dados_vision = {
-                            "descricao_servico": pick_meta("descricao_servico"),
-                            "contratante": pick_meta("contratante"),
-                            "data_emissao": pick_meta("data_emissao"),
-                            "quantidade": pick_meta("quantidade"),
-                            "unidade": pick_meta("unidade"),
-                        }
+                        dados_vision = _build_vision_meta()
                     dados_vision["servicos"] = page_servicos
                     servicos_vision = filter_summary_rows(page_servicos)
                     vision_stats = compute_servicos_stats(servicos_vision)

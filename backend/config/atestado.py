@@ -2,7 +2,7 @@
 Configuracoes de processamento de atestados do LicitaFacil.
 Dividido em sub-classes para melhor organizacao.
 """
-from .base import env_int, env_float, env_bool
+from .base import env_int, env_float, env_bool, PAID_SERVICES_ENABLED
 
 
 class OCRLayoutConfig:
@@ -48,6 +48,11 @@ class TableConfig:
     """Configuracoes de extracao de tabelas."""
     CONFIDENCE_THRESHOLD = env_float("ATTESTADO_TABLE_CONFIDENCE_THRESHOLD", 0.7)
     MIN_ITEMS = env_int("ATTESTADO_TABLE_MIN_ITEMS", 10)
+    QUALITY_MIN_ITEMS = env_int("ATTESTADO_TABLE_QUALITY_MIN_ITEMS", 15)
+    MIN_UNIT_RATIO = env_float("ATTESTADO_TABLE_MIN_UNIT_RATIO", 0.7)
+    MIN_ITEM_RATIO = env_float("ATTESTADO_TABLE_MIN_ITEM_RATIO", 0.8)
+    BAD_INVALID_CODE_RATIO = env_float("ATTESTADO_TABLE_BAD_INVALID_CODE_RATIO", 0.1)
+    BAD_BIG_COMPONENT_RATIO = env_float("ATTESTADO_TABLE_BAD_BIG_COMPONENT_RATIO", 0.2)
 
 
 class DocumentAIConfig:
@@ -62,7 +67,7 @@ class DocumentAIConfig:
     Variaveis de ambiente:
       - DOCUMENT_AI_PROJECT_ID, DOCUMENT_AI_LOCATION, DOCUMENT_AI_PROCESSOR_ID
     """
-    ENABLED = env_bool("DOCUMENT_AI_ENABLED", False)
+    ENABLED = env_bool("DOCUMENT_AI_ENABLED", False) and PAID_SERVICES_ENABLED
     FALLBACK_ONLY = env_bool("DOCUMENT_AI_FALLBACK_ONLY", True)
     MIN_ITEMS = env_int("ATTESTADO_DOCUMENT_AI_MIN_ITEMS", 20)
 
@@ -84,6 +89,8 @@ class ScannedDocConfig:
     """Configuracoes de deteccao de documento escaneado."""
     MIN_CHARS_PER_PAGE = env_int("ATTESTADO_SCANNED_MIN_CHARS", 200)
     IMAGE_PAGE_RATIO = env_float("ATTESTADO_SCANNED_IMG_RATIO", 0.5)
+    DOMINANT_IMAGE_RATIO = env_float("ATTESTADO_DOMINANT_IMAGE_RATIO", 0.6)
+    DOMINANT_IMAGE_MIN_PAGES = env_int("ATTESTADO_DOMINANT_IMAGE_MIN_PAGES", 2)
 
 
 class VisionConfig:
@@ -99,13 +106,13 @@ class VisionConfig:
 class RestartConfig:
     """Configuracoes de restart de numeracao (prefixo Sx-)."""
     MIN_CODES = env_int("ATTESTADO_RESTART_MIN_CODES", 8)
-    MIN_OVERLAP = env_int("ATTESTADO_RESTART_MIN_OVERLAP", 3)
+    MIN_OVERLAP = env_int("ATTESTADO_RESTART_MIN_OVERLAP", 2)
     MIN_OVERLAP_RATIO = env_float("ATTESTADO_RESTART_MIN_OVERLAP_RATIO", 0.25)
 
 
 class TextSectionConfig:
     """Configuracoes de texto (fallback/descricoes)."""
-    MAX_DESC_LEN = env_int("ATTESTADO_TEXT_SECTION_MAX_DESC_LEN", 240)
+    MAX_DESC_LEN = env_int("ATTESTADO_TEXT_SECTION_MAX_DESC_LEN", 500)
     # Aumentado para ser mais conservador e garantir extração de texto
     TABLE_CONFIDENCE_MIN = env_float("ATTESTADO_TEXT_SECTION_TABLE_CONFIDENCE_MIN", 0.85)
     QTY_RATIO_MIN = env_float("ATTESTADO_TEXT_SECTION_QTY_RATIO_MIN", 0.90)  # Aumentado de 0.8 para 0.90
@@ -166,6 +173,11 @@ class AtestadoProcessingConfig:
     # Tabelas
     TABLE_CONFIDENCE_THRESHOLD = TableConfig.CONFIDENCE_THRESHOLD
     TABLE_MIN_ITEMS = TableConfig.MIN_ITEMS
+    TABLE_QUALITY_MIN_ITEMS = TableConfig.QUALITY_MIN_ITEMS
+    TABLE_MIN_UNIT_RATIO = TableConfig.MIN_UNIT_RATIO
+    TABLE_MIN_ITEM_RATIO = TableConfig.MIN_ITEM_RATIO
+    TABLE_BAD_INVALID_CODE_RATIO = TableConfig.BAD_INVALID_CODE_RATIO
+    TABLE_BAD_BIG_COMPONENT_RATIO = TableConfig.BAD_BIG_COMPONENT_RATIO
     # Document AI
     DOCUMENT_AI_ENABLED = DocumentAIConfig.ENABLED
     DOCUMENT_AI_FALLBACK_ONLY = DocumentAIConfig.FALLBACK_ONLY
@@ -177,6 +189,8 @@ class AtestadoProcessingConfig:
     # Documento escaneado
     SCANNED_MIN_CHARS_PER_PAGE = ScannedDocConfig.MIN_CHARS_PER_PAGE
     SCANNED_IMAGE_PAGE_RATIO = ScannedDocConfig.IMAGE_PAGE_RATIO
+    DOMINANT_IMAGE_RATIO = ScannedDocConfig.DOMINANT_IMAGE_RATIO
+    DOMINANT_IMAGE_MIN_PAGES = ScannedDocConfig.DOMINANT_IMAGE_MIN_PAGES
     # LLM e Vision
     LLM_FALLBACK_ONLY = VisionConfig.LLM_FALLBACK_ONLY
     PAGEWISE_VISION_ENABLED = VisionConfig.PAGEWISE_ENABLED

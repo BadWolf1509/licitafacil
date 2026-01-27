@@ -8,7 +8,7 @@ Funções extraídas para evitar duplicação e facilitar testes unitários.
 """
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
 from .extraction import (
     normalize_description,
@@ -21,7 +21,6 @@ from .extraction import (
     NARRATIVE_TOKENS,
     # Item utilities - importados de item_utils.py
     normalize_item_code,
-    item_code_in_text,
     split_restart_prefix,
 )
 

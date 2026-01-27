@@ -24,9 +24,11 @@ from .text_normalizer import (
     normalize_unit,
     normalize_header,
     normalize_desc_for_match,
+    normalize_accents,
     extract_keywords,
     description_similarity,
     is_garbage_text,
+    is_corrupted_text,
     UNIT_TOKENS,
 )
 
@@ -44,21 +46,36 @@ from .table_processor import (
     build_description_from_cells,
 )
 
-from .service_filter import (
+# Filtros de classificação
+from .classification_filters import (
     filter_classification_paths,
-    remove_duplicate_services,
+    is_classification_path,
+)
+
+# Filtros de validação
+from .validation_filters import (
     filter_servicos_by_item_length,
     filter_servicos_by_item_prefix,
     repair_missing_prefix,
     is_summary_row,
     filter_summary_rows,
+    dominant_item_length,
+    is_valid_unit,
+)
+
+# Funções de deduplicação (único local de implementação)
+from .deduplication_utils import (
+    build_keyword_index,
+    remove_duplicate_services,
     deduplicate_by_description,
+    merge_servicos_prefer_primary,
+)
+
+from .similarity import (
     quantities_similar,
     descriptions_similar,
     items_similar,
     servico_key,
-    merge_servicos_prefer_primary,
-    dominant_item_length,
 )
 
 from .quality_assessor import (
@@ -66,6 +83,10 @@ from .quality_assessor import (
     compute_description_quality,
     is_ocr_noisy,
     compute_quality_score,
+)
+
+from .normalizers import (
+    DescriptionNormalizer,
 )
 
 from .item_utils import (
@@ -94,9 +115,11 @@ __all__ = [
     'normalize_unit',
     'normalize_header',
     'normalize_desc_for_match',
+    'normalize_accents',
     'extract_keywords',
     'description_similarity',
     'is_garbage_text',
+    'is_corrupted_text',
     'UNIT_TOKENS',
     # table_processor
     'parse_item_tuple',
@@ -110,21 +133,27 @@ __all__ = [
     'guess_columns_by_content',
     'validate_column_mapping',
     'build_description_from_cells',
-    # service_filter
+    # classification_filters
     'filter_classification_paths',
-    'remove_duplicate_services',
+    'is_classification_path',
+    # validation_filters
     'filter_servicos_by_item_length',
     'filter_servicos_by_item_prefix',
     'repair_missing_prefix',
     'is_summary_row',
     'filter_summary_rows',
+    'dominant_item_length',
+    'is_valid_unit',
+    # deduplication_utils
+    'build_keyword_index',
+    'remove_duplicate_services',
     'deduplicate_by_description',
+    'merge_servicos_prefer_primary',
+    # similarity
     'quantities_similar',
     'descriptions_similar',
     'items_similar',
     'servico_key',
-    'merge_servicos_prefer_primary',
-    'dominant_item_length',
     # quality_assessor
     'compute_servicos_stats',
     'compute_description_quality',
@@ -136,4 +165,6 @@ __all__ = [
     'split_restart_prefix',
     'item_code_in_text',
     'max_restart_prefix_index',
+    # normalizers
+    'DescriptionNormalizer',
 ]

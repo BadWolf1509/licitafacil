@@ -98,6 +98,10 @@ OCR_MAX_WORKERS = env_int("OCR_MAX_WORKERS", 4)
 OCR_PREPROCESS_ENABLED = env_bool("OCR_PREPROCESS", True)
 OCR_TESSERACT_FALLBACK = env_bool("OCR_TESSERACT_FALLBACK", True)
 
+# === Serviços externos pagos ===
+# Desliga provedores pagos (OpenAI/Gemini/Document AI) por padrão
+PAID_SERVICES_ENABLED = env_bool("PAID_SERVICES_ENABLED", False)
+
 
 # === Fila de Processamento ===
 QUEUE_MAX_CONCURRENT = env_int("QUEUE_MAX_CONCURRENT", 3)

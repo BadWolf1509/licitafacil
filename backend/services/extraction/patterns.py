@@ -155,6 +155,155 @@ class Patterns:
         re.IGNORECASE
     )
 
+    # =========================================================================
+    # PADRÕES PARA DESCRIPTION FIXER
+    # =========================================================================
+
+    # Marcador de página flexível: "Página 3 / 10", "PÁGINA 5/10", "Pagina 1 / 20"
+    PAGE_MARKER = re.compile(
+        r'[Pp][aáAÁ][gG][iI][nN][aA]\s+(\d+)\s*/\s*\d+',
+        re.IGNORECASE
+    )
+
+    # Item no início com descrição: "1.2.3 Descrição completa"
+    ITEM_PATTERN = re.compile(
+        r'^(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+(.+)',
+        re.IGNORECASE
+    )
+
+    # Cabeçalho de seção amplo: "2 DEMOLIÇÕES E RETIRADAS" (mínimo 5 chars maiúsculas)
+    SECTION_HEADER_BROAD = re.compile(
+        r'^\d{1,2}\s+[A-ZÁÉÍÓÚÀÂÊÔÃÕÇ\s]{5,}$'
+    )
+
+    # CÓDIGO + UNIDADE + QUANTIDADE no início
+    # Ex: "9.9 UN 1,00 ..." - indica que descrição está na linha anterior
+    UNIT_FIRST = re.compile(
+        r'^(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+'
+        r'(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+'
+        r'([\d.,]+)',
+        re.IGNORECASE
+    )
+
+    # CÓDIGO ... UNIDADE QUANTIDADE no final
+    # Ex: "9.5 20A/250V, CAIXA ELÉTRICA, ... UN 19,00"
+    UNIT_LAST = re.compile(
+        r'^(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+'
+        r'(.+?)\s+'
+        r'(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+'
+        r'([\d.,]+)\s*$',
+        re.IGNORECASE
+    )
+
+    # Linha que é APENAS código AF: "AF_01/2021" ou "AF_01/2021_P"
+    AF_ONLY = re.compile(r'^AF_\d+/\d+(_\w+)?$', re.IGNORECASE)
+
+    # Paginação simples: "Página 5/10"
+    PAGINATION_SIMPLE = re.compile(r'^P[aá]gina\s+\d+\s*/\s*\d+$', re.IGNORECASE)
+
+    # Código AF em qualquer posição (inclui sufixo opcional como _PS, _P)
+    AF_CODE_ANYWHERE = re.compile(r'\bAF_\d+/\d+(?:_\w+)?', re.IGNORECASE)
+
+    # AF no final da linha
+    AF_CODE_END = re.compile(r'AF_\d+/\d+(_\w+)?\s*$', re.IGNORECASE)
+
+    # Unidade/quantidade no final do texto (para extração)
+    UNIT_QTY_EXTRACT_END = re.compile(
+        r'\b(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+([\d.,]+)\s*$',
+        re.IGNORECASE
+    )
+
+    # Unidade/quantidade no meio do texto (seguida de letra)
+    UNIT_QTY_EXTRACT_MID = re.compile(
+        r'\b(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+([\d.,]+)\s+[A-Z]',
+        re.IGNORECASE
+    )
+
+    # Unidade/quantidade no início (após remover código)
+    # Ex: "m³ 143,56 CARGA MANUAL..." -> "CARGA MANUAL..."
+    UNIT_QTY_DESC_START = re.compile(
+        r'^(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+[\d.,]+\s+',
+        re.IGNORECASE
+    )
+
+    # Unidade/quantidade no meio ou final (para remoção)
+    UNIT_QTY_DESC_MID = re.compile(
+        r'\s+(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+[\d.,]+(?:\s|$)',
+        re.IGNORECASE
+    )
+
+    # Palavras de continuação no final da linha
+    CONTINUATION_WORDS_END = re.compile(
+        r'\s(PARA|COM|DE|DA|DO|EM|NO|NA|E|OU|A|O)\s*$',
+        re.IGNORECASE
+    )
+
+    # Descrição que começa com unidade/quantidade (erro comum)
+    DESC_STARTS_WITH_UNIT = re.compile(
+        r'^(UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+[\d.,]+',
+        re.IGNORECASE
+    )
+
+    # Descrição que é só unidade/quantidade (lixo)
+    DESC_ONLY_UNIT_QTY = re.compile(r'^[A-Z]{1,3}\s*[\d.,]+$')
+
+    # Prefixo de segmento: S1-, S2-, etc.
+    SEGMENT_PREFIX = re.compile(r'^S(\d+)-')
+
+    # Código de item no MEIO da linha (não no início)
+    # Ex: "...texto 6.6 para Uso Geral..." - detecta "6.6" no meio
+    ITEM_CODE_MID = re.compile(
+        r'\s(\d{1,2}\.\d{1,2})\s+(?:UN|M|M2|M3|M²|M³|KG|L|VB|CJ|PC|GL|PAR|JG|SC)\s+[\d.,]+',
+        re.IGNORECASE
+    )
+
+    # =========================================================================
+    # PADRÕES PARA ADITIVO TRANSFORMER
+    # =========================================================================
+
+    # Item de contrato com descrição e opcional unidade/quantidade
+    # Ex: "1.1 DESCRIÇÃO DO SERVIÇO UN 100,00"
+    CONTRATO_ITEM = re.compile(
+        r"^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+([A-ZÀ-ÚÇ][\w\sÀ-ÚÇ,.\-/()]+?)"
+        r"(?:\s*,?\s*(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL|und|un|m|m²|m³|pç|pc)\s+([\d,.]+))?\s*$",
+        re.IGNORECASE
+    )
+
+    # Item de aditivo com descrição e opcional unidade/quantidade
+    # Ex: "1.1 DESCRIÇÃO UN 50,00"
+    ADITIVO_ITEM = re.compile(
+        r"^\s*(\d+\.\d+)\s+(\S.*?)"
+        r"(?:\s+(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL|un|m|m²|m³)\s+([\d,.]+))?\s*$",
+        re.IGNORECASE
+    )
+
+    # Item embutido no final da linha: "DESCRIÇÃO... 1.1 UN 100,00"
+    EMBEDDED_ITEM_END = re.compile(
+        r'(\d+\.\d+)\s+(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL)\s+([\d,.]+)\s*$',
+        re.IGNORECASE
+    )
+
+    # Unidade + quantidade inline (detecção rápida)
+    UNIT_QTY_INLINE = re.compile(
+        r"\b(?:UN|M|KG|M2|M3|L|VB|CJ)\s+\d+",
+        re.IGNORECASE
+    )
+
+    # Código de item no final da linha (para remoção)
+    TRAILING_ITEM_CODE = re.compile(r'\s+\d+\.\d+\s*$')
+
+    # Palavra com 4+ letras (para validar texto)
+    WORD_4PLUS_LETTERS = re.compile(r'[A-Za-zÀ-ÿ]{4,}')
+
+    # Sufixo de item: -A, -B, -C no final
+    ITEM_SUFFIX = re.compile(r'-[A-Z]$')
+
+    # Sufixo de item com captura
+    ITEM_SUFFIX_CAPTURE = re.compile(r'-([A-Z])$')
+
+    # Item simples no início da linha: "1.1 A..."
+    ITEM_LINE_SIMPLE = re.compile(r"^\s*(\d{1,2}\.\d{1,2})\s+[A-Z]")
+
 
 # Aliases para compatibilidade
 PAGE_METADATA_PATTERNS = (

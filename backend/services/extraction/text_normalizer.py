@@ -306,3 +306,47 @@ def is_garbage_text(text: str, threshold: float = 0.4) -> bool:
     return ratio < (1 - threshold)
 
 
+def normalize_accents(text: str) -> str:
+    """
+    Remove acentos de texto para comparação normalizada.
+
+    Usa unicodedata para normalização robusta de caracteres Unicode.
+
+    Args:
+        text: Texto a normalizar
+
+    Returns:
+        Texto sem acentos
+    """
+    if not text:
+        return ""
+    nfkd = unicodedata.normalize('NFKD', text)
+    return nfkd.encode('ASCII', 'ignore').decode('ASCII')
+
+
+def is_corrupted_text(text: str) -> bool:
+    """
+    Detecta texto corrompido por OCR (caracteres intercalados com espaços).
+
+    Exemplo: "D M E A M N O U L A I L" ao invés de "DEMOLIÇÃO DE ALVENARIA"
+
+    Args:
+        text: Texto a verificar
+
+    Returns:
+        True se o texto parece corrompido por OCR
+    """
+    if not text or len(text) < 20:
+        return False
+
+    # Contar sequências de caracteres únicos separados por espaços
+    parts = text.split()
+    single_char_count = sum(1 for part in parts if len(part) == 1 and part.isalpha())
+
+    # Se mais de 30% das "palavras" são caracteres únicos, é texto corrompido
+    if len(parts) > 5 and single_char_count / len(parts) > 0.3:
+        return True
+
+    return False
+
+

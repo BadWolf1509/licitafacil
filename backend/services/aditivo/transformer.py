@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Set, Tuple, Optional
 from logging_config import get_logger
 from ..extraction import parse_item_tuple
 from ..extraction.item_utils import strip_restart_prefix, max_restart_prefix_index
+from ..extraction.patterns import Patterns
 from utils.text_utils import sanitize_description
 
 from .detector import detect_aditivo_sections, get_aditivo_start_line
@@ -85,6 +86,9 @@ class AditivoTransformer:
         # FASE 3: Validação e filtragem
         result = self._fase3_validate_and_filter(result)
 
+        # FASE 4: Limpar sufixos órfãos
+        result = self._fase4_cleanup_orphan_suffixes(result)
+
         # Log resumo
         aditivo_count = sum(1 for r in result if r.get("_section") == "AD")
         contrato_count = len(result) - aditivo_count
@@ -151,7 +155,7 @@ class AditivoTransformer:
                     found_before = True
                 else:
                     found_after = True
-                    if re.search(r"\b(?:UN|M|KG|M2|M3|L|VB|CJ)\s+\d+", line, re.IGNORECASE):
+                    if Patterns.UNIT_QTY_INLINE.search(line):
                         aditivo_has_qty = True
 
         return (found_before, found_after, aditivo_has_qty)
@@ -243,11 +247,7 @@ class AditivoTransformer:
         result_items = set(r.get("item", "") for r in result)
         logger.info(f"[CONTRATO-FASE1.5] Detectando itens faltantes do contrato (linhas 0-{self.aditivo_start_line})")
 
-        contrato_item_pattern = re.compile(
-            r"^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+([A-ZÀ-ÚÇ][\w\sÀ-ÚÇ,.\-/()]+?)"
-            r"(?:\s*,?\s*(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL|und|un|m|m²|m³|pç|pc)\s+([\d,.]+))?\s*$",
-            re.IGNORECASE
-        )
+        contrato_item_pattern = Patterns.CONTRATO_ITEM
 
         items_added = 0
         for i, line in enumerate(self.lines):
@@ -297,11 +297,7 @@ class AditivoTransformer:
         result_items = set(r.get("item", "") for r in result)
         logger.info(f"[ADITIVO-FASE2] INICIANDO. Total itens: {len(result_items)}")
 
-        aditivo_item_pattern = re.compile(
-            r"^\s*(\d+\.\d+)\s+(\S.*?)"
-            r"(?:\s+(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL|un|m|m²|m³)\s+([\d,.]+))?\s*$",
-            re.IGNORECASE
-        )
+        aditivo_item_pattern = Patterns.ADITIVO_ITEM
 
         for i, line in enumerate(self.lines):
             if i < self.aditivo_start_line:
@@ -313,14 +309,11 @@ class AditivoTransformer:
 
             if not match:
                 # Detectar itens embutidos
-                embedded_pattern = re.search(
-                    r'(\d+\.\d+)\s+(UN|M|KG|M2|M3|M²|M³|L|VB|CJ|PC|GL)\s+([\d,.]+)\s*$',
-                    line, re.IGNORECASE
-                )
+                embedded_pattern = Patterns.EMBEDDED_ITEM_END.search(line)
                 if embedded_pattern and embedded_pattern.start(1) > 15:
                     before_text = line[:embedded_pattern.start(1)].strip()
-                    before_text = re.sub(r'\s+\d+\.\d+\s*$', '', before_text).strip()
-                    if re.search(r'[A-Za-zÀ-ÿ]{4,}', before_text) and len(before_text) > 15:
+                    before_text = Patterns.TRAILING_ITEM_CODE.sub('', before_text).strip()
+                    if Patterns.WORD_4PLUS_LETTERS.search(before_text) and len(before_text) > 15:
                         embedded_item_str = embedded_pattern.group(1)
                         embedded_match = embedded_pattern
 
@@ -413,7 +406,7 @@ class AditivoTransformer:
     def _extract_embedded_item(self, line: str, embedded_match) -> Dict[str, Any]:
         """Extrai informações de item embutido."""
         before_text = line[:embedded_match.start(1)].strip()
-        before_text = re.sub(r'\s+\d+\.\d+\s*$', '', before_text).strip()
+        before_text = Patterns.TRAILING_ITEM_CODE.sub('', before_text).strip()
         unit_val = embedded_match.group(2).upper().replace("²", "2").replace("³", "3")
         qty_str = embedded_match.group(3).replace(",", ".")
 
@@ -442,7 +435,9 @@ class AditivoTransformer:
             desc = (r.get("descricao") or "").strip()[:100].lower()
             qty = r.get("quantidade", 0)
             unit = (r.get("unidade") or "").strip().upper()
-            key = (item, desc, qty, unit)
+            planilha_id = int(r.get("_planilha_id") or 0)
+            # Não deduplicar entre planilhas diferentes
+            key = (planilha_id, item, desc, qty, unit)
 
             if key in seen_exact:
                 exact_removed += 1
@@ -454,20 +449,23 @@ class AditivoTransformer:
             logger.info(f"[DEDUP-EXATO] {exact_removed} duplicatas exatas removidas")
 
         # Renomear duplicatas com sufixo
-        item_counts: Dict[str, int] = {}
+        # Contar duplicatas por planilha para não renomear entre planilhas
+        item_counts: Dict[tuple, int] = {}
         deduped_result = []
         duplicates_renamed = 0
 
         for r in exact_deduped:
             item = r.get("item", "")
             if item:
-                count = item_counts.get(item, 0)
+                planilha_id = int(r.get("_planilha_id") or 0)
+                item_key = (planilha_id, item)
+                count = item_counts.get(item_key, 0)
                 if count == 0:
-                    item_counts[item] = 1
+                    item_counts[item_key] = 1
                 else:
                     suffix = chr(ord('A') + count - 1)
                     r["item"] = f"{item}-{suffix}"
-                    item_counts[item] = count + 1
+                    item_counts[item_key] = count + 1
                     duplicates_renamed += 1
             deduped_result.append(r)
 
@@ -483,7 +481,7 @@ class AditivoTransformer:
         # 3.1: Extrair seções X.Y do texto
         secoes_texto: Set[str] = set()
         for linha in self.lines:
-            match = re.match(r"^\s*(\d{1,2}\.\d{1,2})\s+[A-Z]", linha)
+            match = Patterns.ITEM_LINE_SIMPLE.match(linha)
             if match:
                 secoes_texto.add(match.group(1))
 
@@ -497,7 +495,7 @@ class AditivoTransformer:
                 filtered_result.append(r)
                 continue
 
-            base_item = re.sub(r"-[A-Z]$", "", item)
+            base_item = Patterns.ITEM_SUFFIX.sub("", item)
             parts = base_item.split(".")
 
             if len(parts) == 3:
@@ -505,7 +503,7 @@ class AditivoTransformer:
                 if parent not in secoes_texto:
                     siblings = [
                         r2.get("item", "") for r2 in result
-                        if re.sub(r"-[A-Z]$", "", r2.get("item", "")).startswith(parent + ".")
+                        if Patterns.ITEM_SUFFIX.sub("", r2.get("item", "")).startswith(parent + ".")
                         and r2.get("item", "") != item
                     ]
                     if not siblings:
@@ -523,7 +521,7 @@ class AditivoTransformer:
             if r.get("_section") == "AD":
                 desc = (r.get("descricao") or "").strip()[:50].lower()
                 qtd = r.get("quantidade", 0)
-                base_item = re.sub(r"-[A-Z]$", "", strip_restart_prefix(item))
+                base_item = Patterns.ITEM_SUFFIX.sub("", strip_restart_prefix(item))
                 aditivo_map[(desc, qtd, base_item)] = item
 
         final_result = []
@@ -531,10 +529,10 @@ class AditivoTransformer:
 
         for r in filtered_result:
             item = r.get("item", "")
-            if r.get("_section") != "AD" and re.search(r"-[A-Z]$", item):
+            if r.get("_section") != "AD" and Patterns.ITEM_SUFFIX.search(item):
                 desc = (r.get("descricao") or "").strip()[:50].lower()
                 qtd = r.get("quantidade", 0)
-                base_item = re.sub(r"-[A-Z]$", "", item)
+                base_item = Patterns.ITEM_SUFFIX.sub("", item)
                 dup_key = (desc, qtd, base_item)
 
                 if dup_key in aditivo_map:
@@ -546,6 +544,53 @@ class AditivoTransformer:
             logger.info(f"[VALIDACAO] {items_removed_dup} itens removidos por duplicata contrato/aditivo")
 
         return final_result
+
+    def _fase4_cleanup_orphan_suffixes(
+        self, result: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        FASE 4: Limpar sufixos órfãos (-A, -B, etc).
+
+        Se um item tem sufixo -A mas não existe o item base (sem sufixo)
+        NA MESMA PLANILHA, remove o sufixo pois não há duplicata real.
+
+        Exemplo: Se existe 2.2-A na planilha 2 mas não existe 2.2 na planilha 2,
+        renomeia para 2.2 (mesmo que exista 2.2 na planilha 1).
+        """
+        # Coletar (item_base, planilha_id) para itens sem sufixo
+        base_codes_by_planilha: Set[Tuple[str, int]] = set()
+        for r in result:
+            item = r.get("item", "")
+            planilha_id = int(r.get("_planilha_id") or 0)
+            if item and not Patterns.ITEM_SUFFIX.search(item):
+                # Item sem sufixo - é um base code real
+                base_codes_by_planilha.add((item, planilha_id))
+
+        # Identificar e corrigir sufixos órfãos
+        cleaned_count = 0
+        for r in result:
+            item = r.get("item", "")
+            if not item:
+                continue
+
+            # Verificar se tem sufixo
+            suffix_match = Patterns.ITEM_SUFFIX_CAPTURE.search(item)
+            if not suffix_match:
+                continue
+
+            # Obter código base (sem sufixo) e planilha
+            base = item[:-2]  # Remove "-X"
+            planilha_id = int(r.get("_planilha_id") or 0)
+
+            # Se o código base não existe NA MESMA PLANILHA, remover sufixo
+            if (base, planilha_id) not in base_codes_by_planilha:
+                r["item"] = base
+                cleaned_count += 1
+
+        if cleaned_count > 0:
+            logger.info(f"[SUFIXO] {cleaned_count} sufixos órfãos removidos")
+
+        return result
 
 
 def prefix_aditivo_items(servicos: List[Dict[str, Any]], texto: str) -> List[Dict[str, Any]]:

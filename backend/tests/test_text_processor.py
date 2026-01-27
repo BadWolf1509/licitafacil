@@ -4,8 +4,11 @@ Testes unitários para o TextProcessor.
 Testa extração de itens de serviço a partir de texto.
 """
 
-import pytest
 from services.processors.text_processor import TextProcessor, text_processor
+from services.processors.text_cleanup import (
+    parse_unit_qty_from_line,
+    strip_trailing_unit_qty,
+)
 
 
 class TestExtractItemCodesFromTextLines:
@@ -85,34 +88,34 @@ class TestExtractItemsFromTextLines:
 
 
 class TestParseUnitQtyFromLine:
-    """Testes para _parse_unit_qty_from_line."""
+    """Testes para parse_unit_qty_from_line."""
 
     def test_parses_unit_qty(self):
-        result = text_processor._parse_unit_qty_from_line("DESCRICAO UN 10,50")
+        result = parse_unit_qty_from_line("DESCRICAO UN 10,50")
         assert result is not None
         assert result[0] == "UN"
         assert result[1] == 10.5
 
     def test_parses_m2(self):
-        result = text_processor._parse_unit_qty_from_line("AREA M2 25,00")
+        result = parse_unit_qty_from_line("AREA M2 25,00")
         assert result is not None
         assert result[0] == "M2"
         assert result[1] == 25.0
 
     def test_ignores_mm_cm(self):
-        result = text_processor._parse_unit_qty_from_line("TUBO MM 50")
+        result = parse_unit_qty_from_line("TUBO MM 50")
         assert result is None
 
     def test_no_match_returns_none(self):
-        result = text_processor._parse_unit_qty_from_line("SEM UNIDADE")
+        result = parse_unit_qty_from_line("SEM UNIDADE")
         assert result is None
 
 
 class TestStripTrailingUnitQty:
-    """Testes para _strip_trailing_unit_qty."""
+    """Testes para strip_trailing_unit_qty."""
 
     def test_strips_trailing(self):
-        result = text_processor._strip_trailing_unit_qty(
+        result = strip_trailing_unit_qty(
             "FORNECIMENTO DE MATERIAL UN 10,00",
             unit="UN",
             qty=10.0
@@ -120,7 +123,7 @@ class TestStripTrailingUnitQty:
         assert result == "FORNECIMENTO DE MATERIAL"
 
     def test_preserves_if_unit_mismatch(self):
-        result = text_processor._strip_trailing_unit_qty(
+        result = strip_trailing_unit_qty(
             "FORNECIMENTO DE MATERIAL UN 10,00",
             unit="M2",
             qty=10.0
@@ -128,7 +131,7 @@ class TestStripTrailingUnitQty:
         assert result == "FORNECIMENTO DE MATERIAL UN 10,00"
 
     def test_preserves_if_qty_mismatch(self):
-        result = text_processor._strip_trailing_unit_qty(
+        result = strip_trailing_unit_qty(
             "FORNECIMENTO DE MATERIAL UN 10,00",
             unit="UN",
             qty=20.0
@@ -136,8 +139,8 @@ class TestStripTrailingUnitQty:
         assert result == "FORNECIMENTO DE MATERIAL UN 10,00"
 
     def test_empty_returns_empty(self):
-        assert text_processor._strip_trailing_unit_qty("") == ""
-        assert text_processor._strip_trailing_unit_qty(None) is None
+        assert strip_trailing_unit_qty("") == ""
+        assert strip_trailing_unit_qty(None) is None
 
 
 class TestStripUnitQtyPrefix:

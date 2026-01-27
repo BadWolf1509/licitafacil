@@ -62,6 +62,15 @@ class AtestadoProcessor:
         Returns:
             Dicionario com dados extraidos do atestado
         """
+        # Preferir pipeline completo quando disponível (inclui adição de itens do texto)
+        if self._doc_processor:
+            return self._doc_processor.process_atestado(
+                file_path,
+                use_vision=use_vision,
+                progress_callback=progress_callback,
+                cancel_check=cancel_check
+            )
+
         pdf_extraction_service._check_cancel(cancel_check)
         file_ext = Path(file_path).suffix.lower()
 
@@ -82,11 +91,11 @@ class AtestadoProcessor:
                     images, progress_callback, cancel_check
                 )
             else:
-                texto = self._extract_texto_from_file(
+                texto = text_extraction_service.extract_text_from_file(
                     file_path, file_ext, progress_callback, cancel_check
                 )
         else:
-            texto = self._extract_texto_from_file(
+            texto = text_extraction_service.extract_text_from_file(
                 file_path, file_ext, progress_callback, cancel_check
             )
 
@@ -133,6 +142,20 @@ class AtestadoProcessor:
 
         # 3. Extrair dados com IA (se configurada)
         use_ai = ai_provider.is_configured
+        force_pagewise = False
+        filter_invalid_codes = False
+        vision_provider = None
+        pagewise_min_items = None
+        if isinstance(doc_analysis, dict):
+            has_image_tables = bool(doc_analysis.get("has_image_tables"))
+            dominant_pages_count = int(doc_analysis.get("dominant_image_pages") or 0)
+            if has_image_tables or dominant_pages_count >= APC.DOMINANT_IMAGE_MIN_PAGES:
+                filter_invalid_codes = True
+                pagewise_min_items = 30
+                if "gemini" in ai_provider.available_providers:
+                    vision_provider = "gemini"
+                elif "openai" in ai_provider.available_providers:
+                    vision_provider = "openai"
 
         if use_ai:
             dados, primary_source, ai_debug_info = document_analysis_service.extract_dados_with_ai(
@@ -144,7 +167,12 @@ class AtestadoProcessor:
                 table_used,
                 progress_callback,
                 cancel_check,
-                images=images
+                images=images,
+                doc_analysis=doc_analysis,
+                force_pagewise=force_pagewise,
+                vision_provider=vision_provider,
+                pagewise_min_items=pagewise_min_items,
+                filter_invalid_codes=filter_invalid_codes
             )
 
             dados["_debug"] = {
@@ -160,6 +188,12 @@ class AtestadoProcessor:
                 "primary_source": primary_source,
                 "provider_config": ai_provider.current_provider,
             }
+            if (force_pagewise or vision_provider or pagewise_min_items) and isinstance(dados.get("_debug"), dict):
+                dados["_debug"]["vision_policy"] = {
+                    "force_pagewise": force_pagewise,
+                    "provider": vision_provider,
+                    "pagewise_min_items": pagewise_min_items,
+                }
         else:
             # IA nao configurada - usar apenas tabela
             servicos_table_filtered = prefix_aditivo_items(
@@ -240,12 +274,8 @@ class AtestadoProcessor:
         cancel_check=None
     ) -> str:
         """Extrai texto do arquivo."""
-        if self._doc_processor:
-            return self._doc_processor._extract_texto_from_file(
-                file_path, file_ext, progress_callback, cancel_check
-            )
-        return pdf_extraction_service.extract_text_with_ocr_fallback(
-            file_path, progress_callback, cancel_check
+        return text_extraction_service.extract_text_from_file(
+            file_path, file_ext, progress_callback, cancel_check
         )
 
     def _clear_item_code_quantities(self, servicos: list) -> int:

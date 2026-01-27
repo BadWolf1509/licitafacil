@@ -7,6 +7,7 @@ Contém funções para detectar linhas contaminadas e validar descrições.
 import re
 from ..extraction.constants import KNOWN_CATEGORIES
 from ..extraction.patterns import Patterns
+from ..extraction.text_normalizer import normalize_accents
 
 
 def is_contaminated_line(line: str) -> bool:
@@ -68,9 +69,9 @@ def is_contaminated_line(line: str) -> bool:
     if category_match:
         category_name = category_match.group(2).strip()
         # Normalizar acentos para comparação
-        category_normalized = _normalize_accents(category_name)
+        category_normalized = normalize_accents(category_name)
         for known in KNOWN_CATEGORIES:
-            known_normalized = _normalize_accents(known)
+            known_normalized = normalize_accents(known)
             if category_normalized.startswith(known_normalized):
                 return True
 
@@ -139,19 +140,3 @@ def is_good_description(desc: str) -> bool:
         return False
 
     return True
-
-
-def _normalize_accents(text: str) -> str:
-    """Remove acentos para comparação normalizada."""
-    replacements = {
-        'Á': 'A', 'À': 'A', 'Â': 'A', 'Ã': 'A',
-        'É': 'E', 'È': 'E', 'Ê': 'E',
-        'Í': 'I', 'Ì': 'I', 'Î': 'I',
-        'Ó': 'O', 'Ò': 'O', 'Ô': 'O', 'Õ': 'O',
-        'Ú': 'U', 'Ù': 'U', 'Û': 'U',
-        'Ç': 'C',
-    }
-    result = text
-    for accented, plain in replacements.items():
-        result = result.replace(accented, plain)
-    return result

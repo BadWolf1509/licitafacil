@@ -4,7 +4,6 @@ Testes unitários para item_utils.
 Testa funções de manipulação de códigos de item.
 """
 
-import pytest
 from services.extraction.item_utils import (
     normalize_item_code,
     strip_restart_prefix,

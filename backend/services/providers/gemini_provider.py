@@ -16,7 +16,7 @@ from services.base_ai_provider import (
     AIResponse,
     AIProviderException
 )
-from config import AIModelConfig
+from config import AIModelConfig, PAID_SERVICES_ENABLED
 
 load_dotenv()
 
@@ -33,6 +33,9 @@ class GeminiProvider(BaseAIProvider):
 
     def _initialize(self) -> None:
         """Inicializa o cliente Gemini."""
+        if not PAID_SERVICES_ENABLED:
+            self._client = None
+            return
         api_key = self._api_key or os.getenv("GOOGLE_API_KEY")
         if not api_key or api_key == "sua-chave-google-aqui":
             self._client = None

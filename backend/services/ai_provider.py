@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from enum import Enum
 from dotenv import load_dotenv
 from exceptions import AINotConfiguredError
+from config import PAID_SERVICES_ENABLED
 from .base_ai_provider import BaseAIProvider
 
 from logging_config import get_logger
@@ -43,6 +44,8 @@ def get_provider(provider_type: str) -> BaseAIProvider:
     Raises:
         ValueError: Se provider_type inválido
     """
+    if not PAID_SERVICES_ENABLED:
+        raise ValueError("Serviços pagos desativados (PAID_SERVICES_ENABLED=false)")
     if provider_type == "openai":
         from .providers.openai_provider import OpenAIProvider
         return OpenAIProvider()
@@ -127,6 +130,8 @@ class AIProviderManager:
     @property
     def available_providers(self) -> List[str]:
         """Retorna lista de provedores disponíveis (com API key configurada)."""
+        if not PAID_SERVICES_ENABLED:
+            return []
         available = []
 
         openai = self._get_openai()
@@ -326,6 +331,7 @@ class AIProviderManager:
 
         return {
             "provider_configurado": self._provider,
+            "paid_services_enabled": PAID_SERVICES_ENABLED,
             "openai": {
                 "configurado": openai.is_configured,
                 "modelo_texto": getattr(openai, '_text_model', 'N/A'),
@@ -340,6 +346,8 @@ class AIProviderManager:
 
     def _get_recommendation(self) -> str:
         """Retorna recomendação de provedor baseado na configuração."""
+        if not PAID_SERVICES_ENABLED:
+            return "Serviços pagos desativados. Ative PAID_SERVICES_ENABLED=true para usar IA."
         available = self.available_providers
 
         if not available:

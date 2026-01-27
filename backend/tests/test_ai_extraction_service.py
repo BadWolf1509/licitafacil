@@ -5,7 +5,7 @@ Testa o serviço unificado de extração via IA.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 from services.ai.extraction_service import AIExtractionService, extraction_service
 
 
@@ -160,7 +160,7 @@ class TestBatchProcessing:
         service = AIExtractionService(provider=mock_provider)
         # 5 imagens = 3 batches (2, 2, 1)
         images = [b"img"] * 5
-        result = service.extract_atestado_from_images(images, provider=mock_provider)
+        service.extract_atestado_from_images(images, provider=mock_provider)
 
         # Deve ter chamado generate_with_vision 3 vezes (batches de 2, 2, 1)
         assert mock_provider.generate_with_vision.call_count == 3

@@ -2,19 +2,21 @@
 Servico de extracao de texto de documentos.
 Extrai itens, quantidades e descricoes de texto bruto.
 """
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, Optional, Set, Callable
 import re
 
 from .extraction import (
     normalize_description,
     normalize_unit,
-    parse_item_tuple,
-    item_tuple_to_str,
     parse_quantity,
     UNIT_TOKENS,
     normalize_item_code as _normalize_item_code,
     item_code_in_text as _item_code_in_text,
 )
+from .pdf_extractor import pdf_extractor
+from .ocr_service import ocr_service
+from .pdf_extraction_service import pdf_extraction_service
+from exceptions import PDFError, OCRError, UnsupportedFileError, TextExtractionError
 from logging_config import get_logger
 
 logger = get_logger('services.text_extraction')
@@ -219,352 +221,32 @@ class TextExtractionService:
     def extract_items_from_text_lines(self, texto: str) -> list:
         """
         Extrai itens de servico do texto linha a linha.
-        Reconhece varios padroes de formatacao.
+
+        Delega para TextProcessor que tem implementação mais completa.
         """
-        if not texto:
-            return []
-        items = []
-        lines = texto.split('\n')
-        segment_index = 1
-        last_tuple = None
-        prev_line = ""
-
-        for idx, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Padrao 1: Linha comeca com codigo do item
-            match = re.match(r'^(\d+\.\d+(?:\.\d+){0,3})\s+(.+)$', line)
-            if match:
-                item_raw = match.group(1)
-                rest = match.group(2).strip()
-                unit_match = re.search(
-                    r'\b([A-Za-z0-9\u00ba\u00b0/%\u00b2\u00b3\.]+)\s+([\d.,]+)\s*$',
-                    rest
-                )
-                if unit_match:
-                    unit_raw = unit_match.group(1)
-                    qty_raw = unit_match.group(2)
-                    if parse_quantity(qty_raw) is not None:
-                        item_tuple = parse_item_tuple(item_raw)
-                        if item_tuple:
-                            if last_tuple and item_tuple < last_tuple:
-                                segment_index += 1
-                            last_tuple = item_tuple
-                            desc = rest[:unit_match.start()].strip()
-                            unit_norm = normalize_unit(unit_raw)
-                            if unit_norm:
-                                # Verificar se descricao parece truncada
-                                desc_looks_truncated = (
-                                    desc and (
-                                        desc[0].islower() or
-                                        desc[0].isdigit() or
-                                        len(desc) < 30
-                                    )
-                                )
-                                prev_ends_continuation = (
-                                    prev_line and
-                                    re.search(r'[,\-]\s*$', prev_line)
-                                )
-                                prev_is_valid_desc = (
-                                    prev_line and
-                                    not re.match(r'^\d+\.\d+', prev_line) and
-                                    len(prev_line) > 10 and
-                                    any(c.isalpha() for c in prev_line)
-                                )
-                                should_merge = prev_is_valid_desc and (
-                                    desc_looks_truncated or prev_ends_continuation
-                                )
-                                if should_merge:
-                                    prev_clean = re.sub(r'\s*[,\-]\s*$', '', prev_line).strip()
-                                    desc = f"{prev_clean} {desc}"
-
-                                prefix = f"S{segment_index}-" if segment_index > 1 else ""
-                                items.append({
-                                    'item': f"{prefix}{item_tuple_to_str(item_tuple)}",
-                                    'descricao': desc,
-                                    'unidade': unit_norm,
-                                    'quantidade': qty_raw,
-                                    '_source': 'text_line'
-                                })
-                                prev_line = line
-                                continue
-
-            # Padrao 2: Codigo no meio da linha
-            mid_pattern = re.search(
-                r'(.{10,}?)\s+(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+'
-                r'(UN|M|M2|M3|KG|VB|CJ|L|T|HA|KM|MES|GB|PC|PT)\s+'
-                r'([\d.,]+)\s*(.*)$',
-                line,
-                re.IGNORECASE
-            )
-            if mid_pattern:
-                desc_start = mid_pattern.group(1).strip()
-                item_raw = mid_pattern.group(2)
-                unit_raw = mid_pattern.group(3)
-                qty_raw = mid_pattern.group(4)
-                desc_end = mid_pattern.group(5).strip()
-
-                if re.search(r'\blinha\s*$', desc_start, re.IGNORECASE):
-                    prev_line = line
-                    continue
-
-                item_tuple = parse_item_tuple(item_raw)
-                if not item_tuple:
-                    prev_line = line
-                    continue
-
-                qty = parse_quantity(qty_raw)
-                if qty is None:
-                    prev_line = line
-                    continue
-
-                unit_norm = normalize_unit(unit_raw)
-                if not unit_norm:
-                    prev_line = line
-                    continue
-
-                desc_start_clean = re.sub(r'\s*-\s*$', '', desc_start).strip()
-                if desc_end:
-                    full_desc = f"{desc_start_clean} - {desc_end}"
-                else:
-                    full_desc = desc_start_clean
-
-                if last_tuple and item_tuple < last_tuple:
-                    segment_index += 1
-                last_tuple = item_tuple
-
-                prefix = f"S{segment_index}-" if segment_index > 1 else ""
-                items.append({
-                    'item': f"{prefix}{item_tuple_to_str(item_tuple)}",
-                    'descricao': full_desc,
-                    'unidade': unit_norm,
-                    'quantidade': qty_raw,
-                    '_source': 'text_line_mid'
-                })
-                prev_line = line
-                continue
-
-            prev_line = line
-
-        return items
+        # Import local para evitar dependência circular
+        from .processors.text_processor import text_processor
+        return text_processor.extract_items_from_text_lines(texto)
 
     def extract_items_without_codes_from_text(self, texto: str) -> list:
-        """Extrai itens sem codigo do texto."""
-        if not texto:
-            return []
-        lines = [line.strip() for line in texto.splitlines()]
-        anchor_idx = self.find_servicos_anchor_line(lines)
-        if anchor_idx is None:
-            return []
+        """
+        Extrai itens sem codigo do texto.
 
-        items = []
-        pending_desc = ""
-        last_item = None
-        stop_prefixes = (
-            "CNPJ", "CPF CNPJ", "PREFEITURA", "CONSELHO REGIONAL",
-            "CREA", "CEP", "E MAIL", "EMAIL", "TEL", "TELEFONE",
-            "IMPRESSO", "DOCUSIGN",
-        )
-        footer_tokens = (
-            "CNPJ", "CPF", "PREFEITURA", "CONSELHO REGIONAL", "CREA",
-            "DOCUSIGN", "CEP", "JOAO PESSOA", "ARARUNA", "RUA",
-            "EMAIL", "TEL", "IMPRESSO", "AGRONOMIA",
-        )
-
-        for idx in range(anchor_idx + 1, len(lines)):
-            line = lines[idx]
-            if not line:
-                continue
-            normalized = normalize_description(line)
-            if not normalized:
-                continue
-            if normalized.startswith("PAGINA"):
-                continue
-            if normalized.startswith(stop_prefixes):
-                continue
-            if "SERVICOS EXECUTADOS" in normalized:
-                continue
-            if "DESCRICAO" in normalized and "QUANT" in normalized and "UND" in normalized:
-                pending_desc = ""
-                continue
-
-            unit_match = self.find_unit_qty_in_line(line)
-            if unit_match:
-                unit, qty, start, end = unit_match
-                before = line[:start].strip()
-                after = line[end:].strip()
-                anchors = [
-                    "FORNEC", "LOCAÇÃO", "LOCACAO", "EXECUÇÃO", "EXECUCAO",
-                    "ESCAVAÇÃO", "ESCAVACAO", "REATERRO", "LASTRO",
-                    "FUNDAÇÃO", "FUNDACAO", "CONCRETO", "ADMINISTRAÇÃO",
-                    "ADMINISTRACAO", "MOBILIZAÇÃO", "MOBILIZACAO",
-                    "PLACA", "PERFURAÇÃO", "PERFURACAO"
-                ]
-                if before:
-                    upper_before = before.upper()
-                    anchor_pos = None
-                    for anchor in anchors:
-                        pos = upper_before.find(anchor)
-                        if pos == -1:
-                            continue
-                        if anchor_pos is None or pos < anchor_pos:
-                            anchor_pos = pos
-                    if anchor_pos is not None and anchor_pos > 0:
-                        before = before[anchor_pos:].strip()
-                        pending_desc = ""
-                parts = []
-                if pending_desc:
-                    parts.append(pending_desc)
-                    pending_desc = ""
-                if before:
-                    parts.append(before)
-                if after:
-                    parts.append(after)
-                desc = " ".join(parts).strip()
-                desc = self.strip_footer_prefix_from_desc(desc)
-                desc = self.strip_trailing_unit_qty(desc, unit, qty)
-                if desc:
-                    item = {
-                        "item": None,
-                        "descricao": desc,
-                        "unidade": unit,
-                        "quantidade": qty,
-                        "_source": "text_no_code"
-                    }
-                    items.append(item)
-                    last_item = item
-                continue
-
-            has_footer = False
-            for token in footer_tokens:
-                if re.search(rf'\b{re.escape(token)}\b', normalized):
-                    has_footer = True
-                    break
-            if has_footer:
-                pending_desc = ""
-                continue
-
-            cont_prefixes = (
-                "A ", "DE ", "DO ", "DA ", "DOS ", "DAS ", "COM ", "SEM ",
-                "INCLUINDO", "INCLUSIVE", "BORRACHA", "AF_"
-            )
-            if last_item and line.upper().startswith(cont_prefixes):
-                last_desc = (last_item.get("descricao") or "").strip()
-                last_item["descricao"] = (last_desc + " " + line).strip() if last_desc else line
-                continue
-
-            if not re.search(r'\d', line):
-                if len(normalized) <= 40 and line == line.upper():
-                    pending_desc = ""
-                    continue
-            pending_desc = (pending_desc + " " + line).strip() if pending_desc else line
-
-        return items
+        Delega para TextProcessor que tem implementação mais completa.
+        """
+        # Import local para evitar dependência circular
+        from .processors.text_processor import text_processor
+        return text_processor.extract_items_without_codes_from_text(texto)
 
     def extract_quantities_from_text(self, texto: str, item_codes: Set[str]) -> Dict[str, list]:
-        """Extrai quantidades do texto para codigos de item especificos."""
-        if not texto or not item_codes:
-            return {}
-        pattern = re.compile(r'(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4})(?!\s*/\s*\d)')
-        qty_map: Dict[str, list] = {}
-        current_code = None
-        pending_unit = None
+        """
+        Extrai quantidades do texto para codigos de item especificos.
 
-        def add_qty(code: str, unit_qty: tuple) -> None:
-            qty_map.setdefault(code, []).append(unit_qty)
-
-        def find_unit_in_text(segment: str) -> Optional[str]:
-            for token in reversed(re.findall(r'[\w\u00ba\u00b0/%\u00b2\u00b3\.]+', segment)):
-                unit_norm = normalize_unit(token)
-                if unit_norm and unit_norm in UNIT_TOKENS:
-                    return unit_norm
-            return None
-
-        def find_last_qty(line: str) -> Optional[float]:
-            for token in reversed(re.findall(r'[\d.,]+', line)):
-                qty = parse_quantity(token)
-                if qty not in (None, 0):
-                    return qty
-            return None
-
-        for raw_line in texto.splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            any_code_match = bool(pattern.search(line))
-            raw_matches = list(pattern.finditer(line))
-            matches: List[tuple] = []
-            for match in raw_matches:
-                raw_code = re.sub(r'\s+', '', match.group(1))
-                code = self.normalize_item_code(raw_code)
-                if code and code in item_codes:
-                    matches.append((match.start(), match.end(), code))
-            if matches:
-                if current_code:
-                    prefix = line[:matches[0][0]].strip()
-                    if prefix:
-                        parsed = self.parse_unit_qty_from_line(prefix)
-                        if parsed:
-                            add_qty(current_code, parsed)
-                            current_code = None
-                            pending_unit = None
-                        elif pending_unit:
-                            qty = find_last_qty(prefix)
-                            if qty is not None:
-                                add_qty(current_code, (pending_unit, qty))
-                                current_code = None
-                                pending_unit = None
-
-                current_code = None
-                pending_unit = None
-                last_unfilled = None
-                for idx, item_match in enumerate(matches):
-                    start = item_match[0]
-                    end = matches[idx + 1][0] if idx + 1 < len(matches) else len(line)
-                    segment = line[start:end].strip()
-                    code = item_match[2]
-                    parsed = self.parse_unit_qty_from_line(segment)
-                    if parsed:
-                        add_qty(code, parsed)
-                        continue
-                    unit_norm = find_unit_in_text(segment)
-                    if unit_norm:
-                        pending_unit = unit_norm
-                    last_unfilled = code
-                if last_unfilled:
-                    current_code = last_unfilled
-                continue
-
-            if current_code:
-                if any_code_match:
-                    current_code = None
-                    pending_unit = None
-                    continue
-
-                parsed = self.parse_unit_qty_from_line(line)
-                if parsed:
-                    add_qty(current_code, parsed)
-                    current_code = None
-                    pending_unit = None
-                    continue
-
-                if pending_unit:
-                    qty = find_last_qty(line)
-                    if qty is not None:
-                        add_qty(current_code, (pending_unit, qty))
-                        current_code = None
-                        pending_unit = None
-                        continue
-
-                if not re.search(r'\d', line):
-                    unit_norm = normalize_unit(line)
-                    if unit_norm and unit_norm in UNIT_TOKENS:
-                        pending_unit = unit_norm
-                        continue
-
-        return qty_map
+        Delega para TextProcessor que usa QuantityExtractor.
+        """
+        # Import local para evitar dependência circular
+        from .processors.text_processor import text_processor
+        return text_processor.extract_quantities_from_text(texto, item_codes)
 
     def detect_planilha_signature(self, texto: str) -> Optional[str]:
         """Detecta assinatura de planilha no texto (ORCAMENTO, FISICO, etc)."""
@@ -583,29 +265,106 @@ class TextExtractionService:
             return "ORCAMENTO"
         return None
 
+    def _extract_item_codes_from_page(self, page_text: str) -> list:
+        """
+        Extrai códigos de item de uma página e retorna como tuplas ordenáveis.
+
+        Considera apenas códigos no início de linhas para evitar falsos positivos
+        (ex: datas, medidas).
+        """
+        codes = []
+        # Padrão: código no início da linha seguido de espaço e texto
+        pattern = re.compile(r'^\s*(\d{1,2}\.\d{1,2}(?:\.\d{1,2})?)\s+\S', re.MULTILINE)
+        for match in pattern.finditer(page_text):
+            code = match.group(1)
+            parts = code.split('.')
+            try:
+                tup = tuple(int(p) for p in parts)
+                # Filtrar códigos suspeitos (segundo componente > 30)
+                if len(tup) > 1 and tup[1] > 30:
+                    continue
+                codes.append(tup)
+            except (TypeError, ValueError):
+                continue
+        return codes
+
+    def _detect_restart(self, prev_codes: list, curr_codes: list) -> bool:
+        """
+        Detecta se há reinício de numeração entre duas páginas.
+
+        Analisa a progressão de itens para detectar quando uma nova planilha
+        começa com numeração reiniciada (ex: de 3.10 volta para 1.1).
+
+        Critérios de detecção:
+        1. Seção principal (primeiro componente) diminuiu
+        2. Mesma seção, mas numeração secundária regrediu significativamente
+        """
+        if not prev_codes or not curr_codes:
+            return False
+
+        prev_max = max(prev_codes)
+        curr_min = min(curr_codes)
+
+        # Se a numeração atual não é menor que a anterior, não há reinício
+        if curr_min >= prev_max:
+            return False
+
+        # Regra 1: Seção principal (primeiro componente) diminuiu
+        # Ex: prev_max = (3, 10), curr_min = (1, 1) → 3 > 1 → reinício
+        if curr_min[0] < prev_max[0]:
+            return True
+
+        # Regra 2: Mesma seção, mas numeração secundária regrediu significativamente
+        # Ex: prev_max = (2, 15), curr_min = (2, 1) → de 15 para 1 = reinício
+        if len(curr_min) > 1 and len(prev_max) > 1:
+            if curr_min[0] == prev_max[0]:  # Mesma seção
+                item_regression = prev_max[1] - curr_min[1]
+                # Grande regressão (>= 5) E começando do início (item <= 3)
+                if item_regression >= 5 and curr_min[1] <= 3:
+                    return True
+
+        return False
+
     def build_page_planilha_map(self, page_segments: list) -> tuple:
-        """Constroi mapeamento de pagina para planilha baseado em assinaturas."""
+        """Constroi mapeamento de pagina para planilha baseado em reinício de numeração."""
         if not page_segments:
             return {}, []
         page_map: Dict[int, int] = {}
         audit: list = []
-        current_sig = None
         planilha_id = 0
-        found_signature = False
+        prev_codes: list = []
+        started = False
+
         for page_num, page_text in page_segments:
-            sig = self.detect_planilha_signature(page_text)
-            if sig:
-                found_signature = True
-                if sig != current_sig:
+            curr_codes = self._extract_item_codes_from_page(page_text)
+
+            # Detectar nova planilha por reinício de numeração
+            restart_reason = None
+
+            # Só começar a contar planilhas quando encontrar itens
+            if curr_codes and not started:
+                started = True
+                planilha_id = 1
+                restart_reason = "first_items"
+
+            # Verificar reinício de numeração
+            elif curr_codes and prev_codes:
+                if self._detect_restart(prev_codes, curr_codes):
                     planilha_id += 1
-                    current_sig = sig
+                    restart_reason = f"restart:{min(curr_codes)}<{max(prev_codes)}"
+
             page_map[page_num] = planilha_id if planilha_id else 0
             audit.append({
                 "page": page_num,
                 "planilha_id": page_map[page_num],
-                "signature": sig or current_sig
+                "restart": restart_reason
             })
-        if not found_signature:
+
+            # Atualizar códigos anteriores
+            if curr_codes:
+                prev_codes = curr_codes
+
+        if not started:
             return {}, []
         return page_map, audit
 
@@ -631,6 +390,63 @@ class TextExtractionService:
                 servico.pop("_planilha_label", None)
                 remapped += 1
         return remapped
+
+    def extract_text_from_file(
+        self,
+        file_path: str,
+        file_ext: str,
+        progress_callback: Optional[Callable] = None,
+        cancel_check: Optional[Callable] = None
+    ) -> str:
+        """
+        Extrai texto do arquivo (PDF ou imagem) usando OCR quando necessário.
+
+        Args:
+            file_path: Caminho para o arquivo
+            file_ext: Extensão do arquivo (ex: ".pdf", ".png")
+            progress_callback: Callback para progresso
+            cancel_check: Função para verificar cancelamento
+
+        Returns:
+            Texto extraído do documento
+
+        Raises:
+            PDFError, OCRError, UnsupportedFileError, TextExtractionError
+        """
+        texto = ""
+
+        if file_ext == ".pdf":
+            try:
+                texto = pdf_extraction_service.extract_text_with_ocr_fallback(
+                    file_path,
+                    progress_callback=progress_callback,
+                    cancel_check=cancel_check
+                )
+            except (PDFError, TextExtractionError) as e:
+                logger.warning(f"Fallback para OCR apos erro: {e}")
+                try:
+                    images = pdf_extractor.pdf_to_images(file_path)
+                    texto = pdf_extraction_service.ocr_image_list(
+                        images,
+                        progress_callback=progress_callback,
+                        cancel_check=cancel_check
+                    )
+                except (PDFError, OCRError) as e2:
+                    raise PDFError("processar", f"{e} / OCR: {e2}")
+        elif file_ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]:
+            try:
+                pdf_extraction_service._check_cancel(cancel_check)
+                pdf_extraction_service._notify_progress(progress_callback, 1, 1, "ocr", "OCR da imagem")
+                texto = ocr_service.extract_text_from_image(file_path)
+            except (OCRError, IOError) as e:
+                raise OCRError(str(e))
+        else:
+            raise UnsupportedFileError(file_ext)
+
+        if not texto.strip():
+            raise TextExtractionError("documento")
+
+        return texto
 
 
 # Singleton

@@ -13,6 +13,15 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from config import AtestadoProcessingConfig as APC
 from logging_config import get_logger
 
+from .extraction_strategies import (
+    ExtractionResult,
+    PdfPlumberStrategy,
+    DocumentAIStrategy,
+    OCRLayoutStrategy,
+    GridOCRStrategy,
+    DocumentAIFallbackStrategy,
+)
+
 logger = get_logger('services.table_extraction.cascade')
 
 ProgressCallback = Optional[Callable[[str, int], None]]
@@ -25,6 +34,8 @@ class CascadeStrategy:
 
     Tenta multiplas fontes de extracao em sequencia ate encontrar
     um resultado satisfatorio com base em thresholds de qualidade.
+
+    Usa o Strategy Pattern para encapsular cada método de extração.
     """
 
     def __init__(self, service: Any):
@@ -33,6 +44,13 @@ class CascadeStrategy:
             service: Instancia do TableExtractionService para delegar extracoes
         """
         self._service = service
+
+        # Inicializar estratégias
+        self._pdfplumber_strategy = PdfPlumberStrategy(service)
+        self._document_ai_strategy = DocumentAIStrategy(service)
+        self._ocr_layout_strategy = OCRLayoutStrategy(service)
+        self._grid_ocr_strategy = GridOCRStrategy(service)
+        self._document_ai_fallback_strategy = DocumentAIFallbackStrategy(service)
 
     def execute(
         self,
@@ -121,7 +139,7 @@ class CascadeStrategy:
         table_debug: Dict[str, Any],
         table_attempts: Dict[str, Any],
     ) -> Tuple[List[Dict], float, Dict, Dict]:
-        """Extrai de arquivo PDF usando cascata de metodos."""
+        """Extrai de arquivo PDF usando cascata de estratégias."""
         servicos_table: List[Dict] = []
         table_confidence = 0.0
 
@@ -136,410 +154,187 @@ class CascadeStrategy:
         large_images = int(_da.get("large_images_count") or 0)
         allow_itemless_doc = bool(is_scanned or has_image_tables)
 
-        # ETAPA 1: pdfplumber
-        pdf_result = self._try_pdfplumber(
-            file_path=file_path,
-            is_scanned=is_scanned,
-            table_attempts=table_attempts,
-        )
-        pdf_servicos, pdf_conf, pdf_debug = pdf_result[:3]
-        pdf_qty_ratio, pdf_complete_ratio = pdf_result[3], pdf_result[4]
+        # Contexto compartilhado entre estratégias
+        context: Dict[str, Any] = {
+            "is_scanned": is_scanned,
+            "text_useful": text_useful,
+            "large_images": large_images,
+            "allow_itemless": allow_itemless_doc,
+            "document_ai_ready": document_ai_ready,
+            "document_ai_fallback_only": document_ai_fallback_only,
+            "stage2_threshold": stage2_threshold,
+            "min_items_for_confidence": min_items_for_confidence,
+        }
+
+        # ETAPA 1: pdfplumber (usando estratégia)
+        pdf_result = self._pdfplumber_strategy.execute(file_path, context)
+        self._record_attempt(table_attempts, pdf_result)
 
         # Sucesso se qty_ratio >= threshold E complete_ratio > 0
-        pdf_ok = pdf_servicos and pdf_qty_ratio >= stage1_threshold
-        if pdf_ok and pdf_complete_ratio > 0:
+        pdf_ok = pdf_result.servicos and pdf_result.qty_ratio >= stage1_threshold
+        if pdf_ok and pdf_result.complete_ratio > 0:
             logger.info(
-                f"Cascata: pdfplumber SUCESSO - {len(pdf_servicos)} servicos, "
-                f"qty_ratio={pdf_qty_ratio:.0%}, complete_ratio={pdf_complete_ratio:.0%}"
+                f"Cascata: pdfplumber SUCESSO - {len(pdf_result.servicos)} servicos, "
+                f"qty_ratio={pdf_result.qty_ratio:.0%}, complete_ratio={pdf_result.complete_ratio:.0%}"
             )
-            table_debug.update(pdf_debug)
+            table_debug.update(pdf_result.debug)
             table_debug["cascade_stage"] = 1
             table_debug["cascade_reason"] = "pdfplumber_success"
             self._add_cascade_summary(table_debug, table_attempts)
-            return pdf_servicos, pdf_conf, table_debug, table_attempts
+            return pdf_result.servicos, pdf_result.confidence, table_debug, table_attempts
 
         logger.info(
-            f"Cascata: pdfplumber insuficiente - {len(pdf_servicos)} servicos, "
-            f"qty_ratio={pdf_qty_ratio:.0%}, complete_ratio={pdf_complete_ratio:.0%}"
+            f"Cascata: pdfplumber insuficiente - {len(pdf_result.servicos)} servicos, "
+            f"qty_ratio={pdf_result.qty_ratio:.0%}, complete_ratio={pdf_result.complete_ratio:.0%}"
         )
 
-        # ETAPA 2: Document AI
-        doc_servicos: List[Dict] = []
-        doc_conf = 0.0
-        doc_debug: Dict[str, Any] = {}
-        doc_qty_ratio = 0.0
-        doc_complete_ratio = 0.0
+        # Atualizar contexto com resultados do pdfplumber
+        context["pdf_servicos"] = pdf_result.servicos
 
-        if document_ai_ready and not document_ai_fallback_only:
-            doc_servicos, doc_conf, doc_debug, doc_qty_ratio, doc_complete_ratio = self._try_document_ai(
-                file_path=file_path,
-                allow_itemless=allow_itemless_doc,
-                text_useful=text_useful,
-                pdf_servicos=pdf_servicos,
-                stage2_threshold=stage2_threshold,
-                table_attempts=table_attempts,
-            )
+        # ETAPA 2: Document AI (usando estratégia)
+        doc_result = self._document_ai_strategy.execute(file_path, context)
+        if doc_result.servicos or doc_result.debug.get("error"):
+            self._record_attempt(table_attempts, doc_result)
 
-            if doc_servicos and doc_qty_ratio >= stage2_threshold:
-                logger.info(
-                    f"Cascata: Document AI SUCESSO - {len(doc_servicos)} servicos, "
-                    f"qty_ratio={doc_qty_ratio:.0%}, complete_ratio={doc_complete_ratio:.0%}"
-                )
-                table_debug.update(doc_debug)
-                table_debug["cascade_stage"] = 2
-                table_debug["cascade_reason"] = "document_ai_success"
-                self._add_cascade_summary(table_debug, table_attempts)
-                return doc_servicos, doc_conf, table_debug, table_attempts
-
+        if doc_result.servicos and doc_result.qty_ratio >= stage2_threshold:
             logger.info(
-                f"Cascata: Document AI insuficiente - {len(doc_servicos)} servicos, "
-                f"qty_ratio={doc_qty_ratio:.0%}, complete_ratio={doc_complete_ratio:.0%}"
+                f"Cascata: Document AI SUCESSO - {len(doc_result.servicos)} servicos, "
+                f"qty_ratio={doc_result.qty_ratio:.0%}, complete_ratio={doc_result.complete_ratio:.0%}"
+            )
+            table_debug.update(doc_result.debug)
+            table_debug["cascade_stage"] = 2
+            table_debug["cascade_reason"] = "document_ai_success"
+            self._add_cascade_summary(table_debug, table_attempts)
+            return doc_result.servicos, doc_result.confidence, table_debug, table_attempts
+
+        if doc_result.servicos:
+            logger.info(
+                f"Cascata: Document AI insuficiente - {len(doc_result.servicos)} servicos, "
+                f"qty_ratio={doc_result.qty_ratio:.0%}, complete_ratio={doc_result.complete_ratio:.0%}"
             )
 
             # Usar Document AI se tiver melhor qualidade
-            if doc_qty_ratio > pdf_qty_ratio or doc_complete_ratio > pdf_complete_ratio:
-                servicos_table = doc_servicos
-                table_confidence = doc_conf
-                table_debug.update(doc_debug)
+            if doc_result.qty_ratio > pdf_result.qty_ratio or doc_result.complete_ratio > pdf_result.complete_ratio:
+                servicos_table = doc_result.servicos
+                table_confidence = doc_result.confidence
+                table_debug.update(doc_result.debug)
                 table_debug["cascade_stage"] = 2
                 table_debug["cascade_reason"] = "document_ai_better"
 
-        elif document_ai_ready and document_ai_fallback_only:
-            logger.info("Cascata: Document AI aguardando fallback pos-OCR")
-            table_attempts["document_ai"] = {"skipped": True, "reason": "fallback_only"}
-        else:
-            logger.info("Cascata: Document AI nao disponivel")
+        # Atualizar contexto para OCR
+        context["doc_servicos"] = doc_result.servicos
+        context["doc_qty_ratio"] = doc_result.qty_ratio
 
-        # ETAPA 2.5: OCR layout
-        best_ocr_servicos, best_ocr_conf, best_ocr_debug, best_ocr_qty_ratio, best_ocr_complete_ratio, best_ocr_label = \
-            self._try_ocr_methods(
-                file_path=file_path,
-                large_images=large_images,
-                pdf_servicos=pdf_servicos,
-                doc_servicos=doc_servicos,
-                doc_qty_ratio=doc_qty_ratio,
-                stage2_threshold=stage2_threshold,
-                min_items_for_confidence=min_items_for_confidence,
-                progress_callback=progress_callback,
-                cancel_check=cancel_check,
-                table_attempts=table_attempts,
-            )
+        # ETAPA 2.5: OCR Layout (usando estratégia)
+        ocr_result = self._ocr_layout_strategy.execute(
+            file_path, context, progress_callback, cancel_check
+        )
+        if ocr_result.servicos or ocr_result.debug.get("error"):
+            self._record_attempt(table_attempts, ocr_result)
+
+        best_ocr_result = ocr_result
+        best_ocr_label = "ocr_layout"
+
+        # ETAPA 2.6: Grid OCR (usando estratégia)
+        context["best_ocr_count"] = len(ocr_result.servicos)
+        grid_result = self._grid_ocr_strategy.execute(
+            file_path, context, progress_callback, cancel_check
+        )
+        if grid_result.servicos or grid_result.debug.get("error"):
+            self._record_attempt(table_attempts, grid_result)
+
+        # Selecionar melhor resultado OCR
+        if grid_result.servicos and (
+            grid_result.qty_ratio > best_ocr_result.qty_ratio
+            or grid_result.complete_ratio > best_ocr_result.complete_ratio
+            or len(grid_result.servicos) >= len(best_ocr_result.servicos) + 2
+        ):
+            best_ocr_result = grid_result
+            best_ocr_label = "grid_ocr"
 
         # Usar o melhor OCR se superar Document AI
         if (
-            best_ocr_servicos
-            and (best_ocr_qty_ratio > doc_qty_ratio or best_ocr_complete_ratio > doc_complete_ratio)
+            best_ocr_result.servicos
+            and (best_ocr_result.qty_ratio > doc_result.qty_ratio or best_ocr_result.complete_ratio > doc_result.complete_ratio)
         ):
-            servicos_table = best_ocr_servicos
-            table_confidence = best_ocr_conf
-            table_debug.update(best_ocr_debug)
+            servicos_table = best_ocr_result.servicos
+            table_confidence = best_ocr_result.confidence
+            table_debug.update(best_ocr_result.debug)
             table_debug["cascade_stage"] = 3
             table_debug["cascade_reason"] = f"{best_ocr_label}_better"
 
-        # ETAPA 2.7: Document AI fallback
-        if document_ai_ready and document_ai_fallback_only:
-            servicos_table, table_confidence, table_debug = self._try_document_ai_fallback(
-                file_path=file_path,
-                allow_itemless=allow_itemless_doc,
-                text_useful=text_useful,
-                pdf_servicos=pdf_servicos,
-                best_ocr_servicos=best_ocr_servicos,
-                best_ocr_qty_ratio=best_ocr_qty_ratio,
-                best_ocr_complete_ratio=best_ocr_complete_ratio,
-                stage2_threshold=stage2_threshold,
-                min_items_for_confidence=min_items_for_confidence,
-                servicos_table=servicos_table,
-                table_confidence=table_confidence,
-                table_debug=table_debug,
-                table_attempts=table_attempts,
-            )
+        # ETAPA 2.7: Document AI fallback (usando estratégia)
+        context["best_ocr_count"] = len(best_ocr_result.servicos)
+        context["current_count"] = len(servicos_table)
+        context["grid_low_quality"] = self._check_grid_low_quality(table_attempts)
+
+        fallback_result = self._document_ai_fallback_strategy.execute(file_path, context)
+        if fallback_result.servicos or fallback_result.debug.get("error"):
+            self._record_attempt(table_attempts, fallback_result, key="document_ai")
+
+            if fallback_result.servicos and fallback_result.qty_ratio >= stage2_threshold:
+                table_debug.update(fallback_result.debug)
+                table_debug["cascade_stage"] = 2
+                table_debug["cascade_reason"] = "document_ai_fallback"
+                self._add_cascade_summary(table_debug, table_attempts)
+                return fallback_result.servicos, fallback_result.confidence, table_debug, table_attempts
+
+            if fallback_result.servicos and (
+                fallback_result.qty_ratio > best_ocr_result.qty_ratio
+                or fallback_result.complete_ratio > best_ocr_result.complete_ratio
+            ):
+                servicos_table = fallback_result.servicos
+                table_confidence = fallback_result.confidence
+                table_debug.update(fallback_result.debug)
+                table_debug["cascade_stage"] = 2
+                table_debug["cascade_reason"] = "document_ai_fallback_better"
 
         # FALLBACK
-        if not servicos_table and pdf_servicos:
-            servicos_table = pdf_servicos
-            table_confidence = pdf_conf
-            table_debug.update(pdf_debug)
+        if not servicos_table and pdf_result.servicos:
+            servicos_table = pdf_result.servicos
+            table_confidence = pdf_result.confidence
+            table_debug.update(pdf_result.debug)
             table_debug["cascade_stage"] = 1
             table_debug["cascade_reason"] = "pdfplumber_fallback"
-            logger.info(f"Cascata: Usando pdfplumber como fallback ({len(pdf_servicos)} servicos)")
+            logger.info(f"Cascata: Usando pdfplumber como fallback ({len(pdf_result.servicos)} servicos)")
 
         self._add_cascade_summary(table_debug, table_attempts)
         return servicos_table, table_confidence, table_debug, table_attempts
 
-    def _try_pdfplumber(
+    def _record_attempt(
         self,
-        file_path: str,
-        is_scanned: bool,
         table_attempts: Dict[str, Any],
-    ) -> Tuple[List[Dict], float, Dict, float, float]:
-        """Tenta extracao com pdfplumber."""
-        if is_scanned:
-            logger.info("Cascata: pulando pdfplumber (documento escaneado)")
-            table_attempts["pdfplumber"] = {"skipped": True, "reason": "scanned"}
-            return [], 0.0, {}, 0.0, 0.0
-
-        logger.info("Cascata Etapa 1: Tentando pdfplumber...")
-        pdf_servicos, pdf_conf, pdf_debug = self._service.extract_servicos_from_tables(file_path)
-        pdf_debug["source"] = "pdfplumber"
-        pdf_qty_ratio = self._service.calc_qty_ratio(pdf_servicos)
-        pdf_complete_ratio = self._service.calc_complete_ratio(pdf_servicos)
-        table_attempts["pdfplumber"] = {
-            "count": len(pdf_servicos),
-            "confidence": pdf_conf,
-            "qty_ratio": pdf_qty_ratio,
-            "complete_ratio": pdf_complete_ratio,
-            "debug": self._service._summarize_table_debug(pdf_debug)
-        }
-        return pdf_servicos, pdf_conf, pdf_debug, pdf_qty_ratio, pdf_complete_ratio
-
-    def _try_document_ai(
-        self,
-        file_path: str,
-        allow_itemless: bool,
-        text_useful: bool,
-        pdf_servicos: List[Dict],
-        stage2_threshold: float,
-        table_attempts: Dict[str, Any],
-    ) -> Tuple[List[Dict], float, Dict, float, float]:
-        """Tenta extracao com Document AI."""
-        logger.info("Cascata Etapa 2: Tentando Document AI...")
-        try:
-            doc_servicos, doc_conf, doc_debug = self._service.extract_servicos_from_document_ai(
-                file_path,
-                allow_itemless=allow_itemless
-            )
-            doc_debug["source"] = "document_ai"
-
-            if (
-                doc_debug.get("error")
-                and "PAGE_LIMIT_EXCEEDED" in str(doc_debug.get("error"))
-                and not text_useful
-            ):
-                logger.info("Cascata: Document AI page limit, tentando imageless...")
-                doc_servicos, doc_conf, doc_debug = self._service.extract_servicos_from_document_ai(
-                    file_path,
-                    use_native_pdf_parsing=True,
-                    allow_itemless=allow_itemless
-                )
-                doc_debug["source"] = "document_ai"
-                doc_debug["retry_reason"] = "page_limit_exceeded"
-
-            if doc_servicos and pdf_servicos:
-                doc_servicos, merge_debug = self._service._merge_table_sources(doc_servicos, pdf_servicos)
-                doc_debug["merge"] = merge_debug
-
-            doc_qty_ratio = self._service.calc_qty_ratio(doc_servicos)
-            doc_complete_ratio = self._service.calc_complete_ratio(doc_servicos)
-            table_attempts["document_ai"] = {
-                "count": len(doc_servicos),
-                "confidence": doc_conf,
-                "qty_ratio": doc_qty_ratio,
-                "complete_ratio": doc_complete_ratio,
-                "debug": self._service._summarize_table_debug(doc_debug)
+        result: ExtractionResult,
+        key: Optional[str] = None
+    ) -> None:
+        """Registra uma tentativa de extração no dict de attempts."""
+        attempt_key = key or result.source
+        if result.debug.get("error"):
+            table_attempts[attempt_key] = {"error": str(result.debug.get("error"))}
+        elif not result.servicos and not result.debug:
+            table_attempts[attempt_key] = {"skipped": True, "reason": "not_applicable"}
+        else:
+            table_attempts[attempt_key] = {
+                "count": len(result.servicos),
+                "confidence": result.confidence,
+                "qty_ratio": result.qty_ratio,
+                "complete_ratio": result.complete_ratio,
+                "debug": self._service._summarize_table_debug(result.debug)
             }
-            return doc_servicos, doc_conf, doc_debug, doc_qty_ratio, doc_complete_ratio
 
-        except Exception as e:
-            logger.warning(f"Cascata: Document AI falhou - {e}")
-            table_attempts["document_ai"] = {"error": str(e)}
-            return [], 0.0, {}, 0.0, 0.0
-
-    def _try_ocr_methods(
-        self,
-        file_path: str,
-        large_images: int,
-        pdf_servicos: List[Dict],
-        doc_servicos: List[Dict],
-        doc_qty_ratio: float,
-        stage2_threshold: float,
-        min_items_for_confidence: int,
-        progress_callback: ProgressCallback,
-        cancel_check: CancelCheck,
-        table_attempts: Dict[str, Any],
-    ) -> Tuple[List[Dict], float, Dict, float, float, str]:
-        """Tenta extracao com OCR layout e Grid OCR."""
-        ocr_servicos: List[Dict] = []
-        ocr_conf = 0.0
-        ocr_debug: Dict[str, Any] = {}
-        ocr_qty_ratio = 0.0
-        ocr_complete_ratio = 0.0
-
-        should_try_ocr = (
-            large_images > 0
-            and not pdf_servicos
-            and (not doc_servicos or doc_qty_ratio < stage2_threshold)
-        )
-
-        if should_try_ocr:
-            logger.info("Cascata Etapa 2.5: Tentando OCR layout (tabela em imagem)...")
-            try:
-                ocr_servicos, ocr_conf, ocr_debug = self._service.extract_servicos_from_ocr_layout(
-                    file_path,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check
-                )
-                ocr_debug["source"] = "ocr_layout"
-                ocr_qty_ratio = self._service.calc_qty_ratio(ocr_servicos)
-                ocr_complete_ratio = self._service.calc_complete_ratio(ocr_servicos)
-                table_attempts["ocr_layout"] = {
-                    "count": len(ocr_servicos),
-                    "confidence": ocr_conf,
-                    "qty_ratio": ocr_qty_ratio,
-                    "complete_ratio": ocr_complete_ratio,
-                    "debug": self._service._summarize_table_debug(ocr_debug)
-                }
-            except Exception as exc:
-                logger.warning(f"Cascata: OCR layout falhou - {exc}")
-                table_attempts["ocr_layout"] = {"error": str(exc)}
-
-        best_ocr_servicos = ocr_servicos
-        best_ocr_conf = ocr_conf
-        best_ocr_debug = ocr_debug
-        best_ocr_qty_ratio = ocr_qty_ratio
-        best_ocr_complete_ratio = ocr_complete_ratio
-        best_ocr_label = "ocr_layout"
-
-        # ETAPA 2.6: Grid OCR (OpenCV)
-        grid_servicos: List[Dict] = []
-        grid_conf = 0.0
-        grid_debug: Dict[str, Any] = {}
-        grid_qty_ratio = 0.0
-        grid_complete_ratio = 0.0
-        best_ocr_count = len(best_ocr_servicos) if best_ocr_servicos else 0
-
-        should_try_grid = (
-            large_images > 0
-            and best_ocr_count < min_items_for_confidence
-        )
-
-        if should_try_grid:
-            logger.info("Cascata Etapa 2.6: Tentando Grid OCR (OpenCV)...")
-            try:
-                grid_servicos, grid_conf, grid_debug = self._service.extract_servicos_from_grid_ocr(
-                    file_path,
-                    progress_callback=progress_callback,
-                    cancel_check=cancel_check
-                )
-                grid_debug["source"] = "grid_ocr"
-                grid_qty_ratio = self._service.calc_qty_ratio(grid_servicos)
-                grid_complete_ratio = self._service.calc_complete_ratio(grid_servicos)
-                table_attempts["grid_ocr"] = {
-                    "count": len(grid_servicos),
-                    "confidence": grid_conf,
-                    "qty_ratio": grid_qty_ratio,
-                    "complete_ratio": grid_complete_ratio,
-                    "debug": self._service._summarize_table_debug(grid_debug)
-                }
-
-                if grid_servicos and (
-                    grid_qty_ratio > best_ocr_qty_ratio
-                    or grid_complete_ratio > best_ocr_complete_ratio
-                    or len(grid_servicos) >= len(best_ocr_servicos) + 2
-                ):
-                    best_ocr_servicos = grid_servicos
-                    best_ocr_conf = grid_conf
-                    best_ocr_debug = grid_debug
-                    best_ocr_qty_ratio = grid_qty_ratio
-                    best_ocr_complete_ratio = grid_complete_ratio
-                    best_ocr_label = "grid_ocr"
-
-            except Exception as exc:
-                logger.warning(f"Cascata: Grid OCR falhou - {exc}")
-                table_attempts["grid_ocr"] = {"error": str(exc)}
-
-        return best_ocr_servicos, best_ocr_conf, best_ocr_debug, best_ocr_qty_ratio, best_ocr_complete_ratio, best_ocr_label
-
-    def _try_document_ai_fallback(
-        self,
-        file_path: str,
-        allow_itemless: bool,
-        text_useful: bool,
-        pdf_servicos: List[Dict],
-        best_ocr_servicos: List[Dict],
-        best_ocr_qty_ratio: float,
-        best_ocr_complete_ratio: float,
-        stage2_threshold: float,
-        min_items_for_confidence: int,
-        servicos_table: List[Dict],
-        table_confidence: float,
-        table_debug: Dict[str, Any],
-        table_attempts: Dict[str, Any],
-    ) -> Tuple[List[Dict], float, Dict]:
-        """Tenta Document AI como fallback apos OCR."""
-        ocr_count = len(best_ocr_servicos) if best_ocr_servicos else 0
-        current_count = len(servicos_table) if servicos_table else 0
-
-        # Verificar qualidade do grid
+    def _check_grid_low_quality(self, table_attempts: Dict[str, Any]) -> bool:
+        """Verifica se Grid OCR teve baixa qualidade."""
         grid_debug_raw = table_attempts.get("grid_ocr", {})
-        grid_servicos = grid_debug_raw.get("count", 0) if isinstance(grid_debug_raw, dict) else 0
-        _raw_stats = grid_debug_raw.get("debug", {}).get("stats") if isinstance(grid_debug_raw, dict) else None
+        if not isinstance(grid_debug_raw, dict):
+            return False
+
+        grid_servicos = grid_debug_raw.get("count", 0)
+        _raw_stats = grid_debug_raw.get("debug", {}).get("stats") if isinstance(grid_debug_raw.get("debug"), dict) else None
         grid_stats: Dict[str, Any] = _raw_stats if isinstance(_raw_stats, dict) else {}
         grid_dup_ratio = float(grid_stats.get("duplicate_ratio") or 0.0)
         grid_has_items = int(grid_stats.get("with_item") or 0) > 0
-        grid_low_quality = bool(grid_servicos) and (not grid_has_items) and grid_dup_ratio >= 0.25
 
-        if (ocr_count < min_items_for_confidence and current_count < min_items_for_confidence) or grid_low_quality:
-            if grid_low_quality:
-                logger.info("Cascata Etapa 2.7: Grid OCR com baixa qualidade, tentando Document AI...")
-            else:
-                logger.info("Cascata Etapa 2.7: Tentando Document AI como fallback...")
-
-            try:
-                doc_servicos, doc_conf, doc_debug = self._service.extract_servicos_from_document_ai(
-                    file_path,
-                    allow_itemless=allow_itemless
-                )
-                doc_debug["source"] = "document_ai"
-                doc_debug["fallback_only"] = True
-                if grid_low_quality:
-                    doc_debug["fallback_reason"] = "grid_ocr_low_quality"
-
-                if (
-                    doc_debug.get("error")
-                    and "PAGE_LIMIT_EXCEEDED" in str(doc_debug.get("error"))
-                    and not text_useful
-                ):
-                    logger.info("Cascata: Document AI page limit, tentando imageless...")
-                    doc_servicos, doc_conf, doc_debug = self._service.extract_servicos_from_document_ai(
-                        file_path,
-                        use_native_pdf_parsing=True,
-                        allow_itemless=allow_itemless
-                    )
-                    doc_debug["source"] = "document_ai"
-                    doc_debug["retry_reason"] = "page_limit_exceeded"
-
-                if doc_servicos and pdf_servicos:
-                    doc_servicos, merge_debug = self._service._merge_table_sources(doc_servicos, pdf_servicos)
-                    doc_debug["merge"] = merge_debug
-
-                doc_qty_ratio = self._service.calc_qty_ratio(doc_servicos)
-                doc_complete_ratio = self._service.calc_complete_ratio(doc_servicos)
-                table_attempts["document_ai"] = {
-                    "count": len(doc_servicos),
-                    "confidence": doc_conf,
-                    "qty_ratio": doc_qty_ratio,
-                    "complete_ratio": doc_complete_ratio,
-                    "debug": self._service._summarize_table_debug(doc_debug)
-                }
-
-                if doc_servicos and doc_qty_ratio >= stage2_threshold:
-                    table_debug.update(doc_debug)
-                    table_debug["cascade_stage"] = 2
-                    table_debug["cascade_reason"] = "document_ai_fallback"
-                    return doc_servicos, doc_conf, table_debug
-                elif doc_servicos and (
-                    doc_qty_ratio > best_ocr_qty_ratio or doc_complete_ratio > best_ocr_complete_ratio
-                ):
-                    table_debug.update(doc_debug)
-                    table_debug["cascade_stage"] = 2
-                    table_debug["cascade_reason"] = "document_ai_fallback_better"
-                    return doc_servicos, doc_conf, table_debug
-
-            except Exception as e:
-                logger.warning(f"Cascata: Document AI fallback falhou - {e}")
-                table_attempts["document_ai"] = {"error": str(e)}
-
-        return servicos_table, table_confidence, table_debug
+        return bool(grid_servicos) and (not grid_has_items) and grid_dup_ratio >= 0.25
 
     def _extract_from_image(
         self,
