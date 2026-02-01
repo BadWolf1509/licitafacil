@@ -15,13 +15,19 @@
     <!-- Header -->
     <header class="header">
         <a href="dashboard.html" class="header-logo">LicitaFácil</a>
-        <nav class="header-nav">
+
+        <!-- Botão hamburger (mobile) -->
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
             <a href="dashboard.html">Dashboard</a>
             <a href="atestados.html" class="active">Atestados</a>
             <a href="analises.html">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">&#127763;</button>
-            <button class="btn btn-outline btn-sm" onclick="logout()">Sair</button>
+            <a href="perfil.html">Perfil</a>
+            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
         </nav>
     </header>
 
@@ -38,14 +44,6 @@
                 </button>
                 <button class="btn btn-primary" onclick="abrirModalAtestado()">+ Novo Atestado</button>
             </div>
-        </div>
-
-        <!-- Upload de arquivo -->
-        <div class="upload-zone" id="uploadZone">
-            <div class="upload-icon">&#128196;</div>
-            <h3>Arraste um PDF ou imagem aqui</h3>
-            <p class="text-muted">ou clique para selecionar um arquivo</p>
-            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg">
         </div>
 
         <!-- Filtro de atestados -->
@@ -110,30 +108,57 @@
     <div class="modal" id="modalAtestado">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalAtestadoTitle">Cadastrar Atestado</h2>
+                <h2 id="modalAtestadoTitle">Novo Atestado</h2>
                 <button class="modal-close" onclick="fecharModal('modalAtestado')">&times;</button>
             </div>
-            <form id="formAtestado">
-                <input type="hidden" id="atId">
-                <div class="form-group">
-                    <label class="form-label">Descricao da Obra *</label>
-                    <input type="text" class="form-input" id="atDescricao" required
-                        placeholder="Ex: Execucao de pavimentacao asfaltica">
+
+            <!-- Tabs do Modal -->
+            <div class="modal-tabs" id="modalAtestadoTabs">
+                <button class="modal-tab active" data-tab="upload" onclick="switchAtestadoTab('upload')">
+                    📄 Upload de Arquivo
+                </button>
+                <button class="modal-tab" data-tab="manual" onclick="switchAtestadoTab('manual')">
+                    ✏️ Cadastro Manual
+                </button>
+            </div>
+
+            <!-- Conteúdo: Upload -->
+            <div class="modal-tab-content active" id="tabUpload">
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📄</div>
+                    <h3>Arraste um PDF ou imagem aqui</h3>
+                    <p class="text-muted">ou clique para selecionar um arquivo</p>
+                    <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Contratante</label>
-                    <input type="text" class="form-input" id="atContratante"
-                        placeholder="Nome do orgao/empresa contratante">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Data de Emissao</label>
-                    <input type="date" class="form-input" id="atDataEmissao">
-                </div>
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar</button>
-                    <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
-                </div>
-            </form>
+                <p class="text-center text-muted" style="font-size: 0.875rem; margin-top: 1rem;">
+                    O sistema extrairá automaticamente os dados do documento.
+                </p>
+            </div>
+
+            <!-- Conteúdo: Cadastro Manual -->
+            <div class="modal-tab-content" id="tabManual">
+                <form id="formAtestado">
+                    <input type="hidden" id="atId">
+                    <div class="form-group">
+                        <label class="form-label">Descricao da Obra *</label>
+                        <input type="text" class="form-input" id="atDescricao" required
+                            placeholder="Ex: Execucao de pavimentacao asfaltica">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contratante</label>
+                        <input type="text" class="form-input" id="atContratante"
+                            placeholder="Nome do orgao/empresa contratante">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data de Emissao</label>
+                        <input type="date" class="form-input" id="atDataEmissao">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar</button>
+                        <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -186,6 +211,17 @@
         function abrirModalAtestado() { AtestadosModule.abrirModalAtestado(); }
         function abrirRelatorioGeral() { AtestadosModule.abrirRelatorioGeral(); }
         function salvarServicoItem(event) { AtestadosModule.salvarServicoItem(event); }
+
+        // Alternar tabs do modal de atestado
+        function switchAtestadoTab(tabName) {
+            // Atualizar tabs
+            document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.tab === tabName);
+            });
+            // Atualizar conteudos
+            document.getElementById('tabUpload').classList.toggle('active', tabName === 'upload');
+            document.getElementById('tabManual').classList.toggle('active', tabName === 'manual');
+        }
     </script>
 </body>
 </html>

@@ -27,6 +27,8 @@
     --bg-card: #FFFFFF;
     --text-primary: #1F2937;
     --text-secondary: #6B7280;
+    --text-light: #FFFFFF;
+    --text-muted: #D1D5DB;
     --border: #E5E7EB;
     --shadow: rgba(0, 0, 0, 0.1);
 
@@ -54,6 +56,8 @@
     --bg-card: #1F2937;
     --text-primary: #F9FAFB;
     --text-secondary: #9CA3AF;
+    --text-light: #FFFFFF;
+    --text-muted: #9CA3AF;
     --border: #374151;
     --shadow: rgba(0, 0, 0, 0.3);
 }
@@ -284,11 +288,13 @@ body {
 /* Header */
 .header {
     background: var(--secondary);
-    color: #FFFFFF;
+    color: var(--text-light);
     padding: var(--spacing-md) var(--spacing-lg);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    position: relative;
+    z-index: 100;
 }
 
 .header-logo {
@@ -305,7 +311,7 @@ body {
 }
 
 .header-nav a {
-    color: #D1D5DB;
+    color: var(--text-muted);
     text-decoration: none;
     font-weight: 500;
     transition: var(--transition);
@@ -315,15 +321,69 @@ body {
     color: var(--primary);
 }
 
-/* Toggle de tema */
-.theme-toggle {
-    background: var(--secondary-light);
-    border: none;
-    padding: var(--spacing-sm);
-    border-radius: var(--radius-md);
+/* Link Sair consistente */
+.nav-logout {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    transition: var(--transition);
     cursor: pointer;
-    color: #FFFFFF;
-    font-size: 1.25rem;
+    background: none;
+    border: none;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+.nav-logout:hover {
+    color: var(--error);
+}
+
+/* Botão hamburger - oculto em desktop */
+.nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: var(--spacing-sm);
+    z-index: 101;
+}
+
+.hamburger {
+    display: block;
+    width: 24px;
+    height: 2px;
+    background: var(--text-light);
+    position: relative;
+    transition: var(--transition);
+}
+
+.hamburger::before,
+.hamburger::after {
+    content: '';
+    position: absolute;
+    width: 24px;
+    height: 2px;
+    background: var(--text-light);
+    transition: var(--transition);
+    left: 0;
+}
+
+.hamburger::before { top: -8px; }
+.hamburger::after { top: 8px; }
+
+/* Animação X quando aberto */
+.nav-toggle.active .hamburger {
+    background: transparent;
+}
+
+.nav-toggle.active .hamburger::before {
+    transform: rotate(45deg);
+    top: 0;
+}
+
+.nav-toggle.active .hamburger::after {
+    transform: rotate(-45deg);
+    top: 0;
 }
 
 /* Página de Login */
@@ -578,14 +638,44 @@ body {
         padding: var(--spacing-md);
     }
 
+    /* Menu mobile */
+    .nav-toggle {
+        display: block;
+    }
+
     .header {
-        flex-direction: column;
+        flex-direction: row;
         gap: var(--spacing-md);
     }
 
     .header-nav {
-        flex-wrap: wrap;
-        justify-content: center;
+        position: fixed;
+        top: 60px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--secondary);
+        flex-direction: column;
+        padding: var(--spacing-lg);
+        gap: var(--spacing-md);
+        transform: translateX(100%);
+        opacity: 0;
+        visibility: hidden;
+        transition: var(--transition);
+        z-index: 99;
+    }
+
+    .header-nav.active {
+        transform: translateX(0);
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .header-nav a,
+    .header-nav .nav-logout {
+        font-size: 1.125rem;
+        padding: var(--spacing-sm) 0;
+        border-bottom: 1px solid var(--secondary-light);
     }
 
     .auth-card {

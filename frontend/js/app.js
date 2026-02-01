@@ -1,6 +1,9 @@
 // LicitaFácil - Aplicação Principal
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Configurar menu mobile
+    setupMobileNav();
+
     // Verificar autenticação
     verificarAutenticacao();
 
@@ -10,6 +13,41 @@ document.addEventListener('DOMContentLoaded', () => {
         setupFormAtestadoDashboard();
     }
 });
+
+/**
+ * Configura o menu mobile (hamburger)
+ */
+function setupMobileNav() {
+    const toggle = document.querySelector('.nav-toggle');
+    const nav = document.getElementById('headerNav');
+
+    if (!toggle || !nav) return;
+
+    toggle.addEventListener('click', () => {
+        const isOpen = nav.classList.toggle('active');
+        toggle.classList.toggle('active');
+        toggle.setAttribute('aria-expanded', isOpen);
+        toggle.setAttribute('aria-label', isOpen ? 'Fechar menu' : 'Abrir menu');
+    });
+
+    // Fechar ao clicar em link
+    nav.querySelectorAll('a, .nav-logout').forEach(link => {
+        link.addEventListener('click', () => {
+            nav.classList.remove('active');
+            toggle.classList.remove('active');
+            toggle.setAttribute('aria-expanded', 'false');
+        });
+    });
+
+    // Fechar ao clicar fora do menu
+    document.addEventListener('click', (e) => {
+        if (!nav.contains(e.target) && !toggle.contains(e.target) && nav.classList.contains('active')) {
+            nav.classList.remove('active');
+            toggle.classList.remove('active');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
 
 /**
  * Configura o formulário de cadastro rápido de atestado no dashboard
@@ -165,17 +203,6 @@ function fecharModal(modalId) {
  */
 function fecharTodosModais() {
     document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
-}
-
-/**
- * Alterna o tema claro/escuro
- */
-function toggleTheme() {
-    const newTheme = theme.toggle();
-
-    // Atualizar preferência no servidor
-    api.put('/auth/me', { tema_preferido: newTheme })
-        .catch(() => { }); // Ignorar erros de atualização
 }
 
 /**

@@ -15,13 +15,19 @@
     <!-- Header -->
     <header class="header">
         <a href="dashboard.html" class="header-logo">LicitaFácil</a>
-        <nav class="header-nav">
+
+        <!-- Botão hamburger (mobile) -->
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
             <a href="dashboard.html" class="active">Dashboard</a>
             <a href="atestados.html">Atestados</a>
             <a href="analises.html">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
-            <button class="theme-toggle" onclick="toggleTheme()" title="Alternar tema">🌓</button>
-            <button class="btn btn-outline btn-sm" onclick="logout()">Sair</button>
+            <a href="perfil.html">Perfil</a>
+            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
         </nav>
     </header>
 
