@@ -21,7 +21,7 @@ from exceptions import (
     ProcessingError
 )
 
-from logging_config import get_logger
+from logging_config import get_logger, set_correlation_id, clear_correlation_id
 logger = get_logger('main')
 
 # Carregar variáveis de ambiente
@@ -58,6 +58,23 @@ app = FastAPI(
 
 # Configurar Rate Limiting (deve vir antes do CORS)
 app.add_middleware(RateLimitMiddleware)
+
+
+# Middleware para Correlation ID (request tracing)
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    """Adiciona correlation ID para rastreamento de requisições."""
+    # Usar header X-Correlation-ID se fornecido, senão gerar novo
+    correlation_id = request.headers.get("X-Correlation-ID")
+    correlation_id = set_correlation_id(correlation_id)
+
+    response = await call_next(request)
+
+    # Incluir correlation ID na resposta
+    response.headers["X-Correlation-ID"] = correlation_id
+    clear_correlation_id()
+
+    return response
 
 # Configurar CORS com origens da configuração
 # Em desenvolvimento: localhost. Em produção: definir CORS_ORIGINS no .env
@@ -211,6 +228,12 @@ def serve_analises():
 def serve_admin():
     """Painel administrativo."""
     return FileResponse(os.path.join(frontend_path, "admin.html"))
+
+
+@app.get("/perfil.html")
+def serve_perfil():
+    """Página de perfil do usuário."""
+    return FileResponse(os.path.join(frontend_path, "perfil.html"))
 
 
 @app.get("/admin")

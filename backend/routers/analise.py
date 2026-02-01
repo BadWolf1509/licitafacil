@@ -1,18 +1,20 @@
 import os
 import uuid
+from decimal import Decimal
 from typing import Dict, Any
 from fastapi import Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Usuario, Atestado, Analise
-from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse
+from models import Usuario, Analise
+from repositories.atestado_repository import atestado_repository
+from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse, AnaliseManualCreate
 from auth import get_current_approved_user
 from dependencies import ServiceContainer, get_services
 from services.atestado_service import atestados_to_dict
 from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
-from utils.validation import validate_upload_or_raise
+from utils.validation import validate_upload_complete_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 from utils.http_helpers import get_user_resource_or_404
 from routers.base import AuthenticatedRouter
@@ -22,6 +24,17 @@ from utils import handle_exception
 logger = get_logger('routers.analise')
 
 router = AuthenticatedRouter(prefix="/analises", tags=["Análises"])
+
+
+def _serialize_for_json(obj):
+    """Converte Decimal para float para serialização JSON."""
+    if isinstance(obj, dict):
+        return {k: _serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_serialize_for_json(item) for item in obj]
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    return obj
 
 
 @router.get("/status/servicos")
@@ -72,8 +85,8 @@ async def criar_analise(
     Cria uma nova análise de licitação.
     Faz upload do PDF do edital, extrai exigências e faz matching com atestados.
     """
-    # Validar arquivo
-    file_ext = validate_upload_or_raise(file.filename, ALLOWED_PDF_EXTENSIONS)
+    # Validar arquivo (extensão, tamanho e MIME type)
+    file_ext = await validate_upload_complete_or_raise(file, ALLOWED_PDF_EXTENSIONS)
 
     # Criar diretório do usuário e salvar arquivo
     user_upload_dir = get_user_upload_dir(current_user.id, "editais")
@@ -86,10 +99,8 @@ async def criar_analise(
         resultado_edital = services.document_processor.process_edital(filepath)
         exigencias = resultado_edital.get("exigencias", [])
 
-        # Buscar atestados do usuário
-        atestados = db.query(Atestado).filter(
-            Atestado.user_id == current_user.id
-        ).all()
+        # Buscar atestados do usuário usando repository
+        atestados = atestado_repository.get_all_with_services(db, current_user.id)
 
         # Converter atestados para formato de análise
         atestados_dict = atestados_to_dict(atestados)
@@ -120,6 +131,59 @@ async def criar_analise(
         raise handle_exception(e, logger, "ao processar edital")
 
 
+@router.post("/manual", response_model=AnaliseResponse)
+async def criar_analise_manual(
+    dados: AnaliseManualCreate,
+    current_user: Usuario = Depends(get_current_approved_user),
+    db: Session = Depends(get_db),
+    services: ServiceContainer = Depends(get_services)
+) -> AnaliseResponse:
+    """
+    Cria uma análise de licitação com exigências informadas manualmente.
+    Não requer upload de PDF - as exigências são inseridas diretamente.
+    """
+    if not dados.exigencias or len(dados.exigencias) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe pelo menos uma exigência"
+        )
+
+    # Converter exigências para dict (Decimal -> float para JSON)
+    exigencias = [_serialize_for_json(e.model_dump()) for e in dados.exigencias]
+
+    # Buscar atestados do usuário usando repository
+    atestados = atestado_repository.get_all_with_services(db, current_user.id)
+
+    # Converter atestados para formato de análise
+    atestados_dict = atestados_to_dict(atestados)
+
+    # Fazer matching se houver atestados
+    resultado_matching = []
+    if atestados_dict:
+        try:
+            resultado_matching = services.document_processor.analyze_qualification(
+                exigencias, atestados_dict
+            )
+            # Serializar resultado (Decimal -> float)
+            resultado_matching = _serialize_for_json(resultado_matching)
+        except Exception as e:
+            logger.warning(f"Erro no matching: {e}")
+
+    # Criar análise
+    nova_analise = Analise(
+        user_id=current_user.id,
+        nome_licitacao=dados.nome_licitacao,
+        arquivo_path=None,  # Sem arquivo
+        exigencias_json=exigencias,
+        resultado_json=resultado_matching
+    )
+    db.add(nova_analise)
+    db.commit()
+    db.refresh(nova_analise)
+
+    return nova_analise
+
+
 @router.post("/{analise_id}/processar", response_model=AnaliseResponse)
 async def processar_analise(
     analise_id: int,
@@ -141,10 +205,8 @@ async def processar_analise(
             detail=Messages.EDITAL_FILE_NOT_FOUND
         )
 
-    # Buscar atestados do usuário
-    atestados = db.query(Atestado).filter(
-        Atestado.user_id == current_user.id
-    ).all()
+    # Buscar atestados do usuário usando repository
+    atestados = atestado_repository.get_all_with_services(db, current_user.id)
 
     if not atestados:
         raise HTTPException(

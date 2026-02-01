@@ -243,7 +243,7 @@ class OCRService:
         except Exception:
             return None
 
-    def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False, prefer_tesseract: bool = None) -> str:
+    def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False, prefer_tesseract: Optional[bool] = None) -> str:
         """
         Extrai texto de uma imagem em bytes.
         Prioriza Tesseract (leve) e usa EasyOCR como fallback.

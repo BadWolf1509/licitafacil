@@ -777,7 +777,9 @@ const AtestadosModule = {
         try {
             ui.showAlert('Enviando arquivo...', 'info');
             const result = await api.upload('/atestados/upload', formData);
-            ui.showAlert(result.mensagem || 'Arquivo enviado. Processamento iniciado.', 'info');
+            // Fechar o modal apos envio bem-sucedido
+            fecharModal('modalAtestado');
+            ui.showAlert(result.mensagem || 'Arquivo enviado. Processamento iniciado.', 'success');
             if (result.job_id) {
                 this.upsertJob({
                     id: result.job_id,
@@ -825,9 +827,15 @@ const AtestadosModule = {
     },
 
     abrirModalAtestado() {
-        document.getElementById('modalAtestadoTitle').textContent = 'Cadastrar Atestado';
+        document.getElementById('modalAtestadoTitle').textContent = 'Novo Atestado';
         document.getElementById('formAtestado').reset();
         document.getElementById('atId').value = '';
+        // Mostrar tabs e resetar para upload
+        const tabs = document.getElementById('modalAtestadoTabs');
+        if (tabs) {
+            tabs.style.display = 'flex';
+            switchAtestadoTab('upload');
+        }
         abrirModal('modalAtestado');
     },
 
@@ -839,6 +847,12 @@ const AtestadosModule = {
             document.getElementById('atDescricao').value = atestado.descricao_servico || '';
             document.getElementById('atContratante').value = atestado.contratante || '';
             document.getElementById('atDataEmissao').value = atestado.data_emissao ? atestado.data_emissao.split('T')[0] : '';
+            // Ocultar tabs e mostrar apenas formulario
+            const tabs = document.getElementById('modalAtestadoTabs');
+            if (tabs) {
+                tabs.style.display = 'none';
+                switchAtestadoTab('manual');
+            }
             abrirModal('modalAtestado');
         } catch (error) {
             ui.showAlert('Erro ao carregar atestado', 'error');

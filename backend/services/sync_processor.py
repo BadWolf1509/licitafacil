@@ -4,8 +4,6 @@ Processador síncrono para ambientes serverless.
 Processa documentos de forma síncrona, sem fila.
 Ideal para Vercel, AWS Lambda, Google Cloud Functions.
 """
-import os
-import uuid
 from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
@@ -89,17 +87,46 @@ class SyncProcessor:
         original_filename: str,
         resultado: Dict[str, Any]
     ) -> Atestado:
-        """Salva atestado processado no banco."""
-        from services.atestado import salvar_atestado_processado
+        """Salva atestado processado no banco diretamente (modo síncrono)."""
+        from services.atestado.service import parse_date, ordenar_servicos
+        from config import Messages
 
-        # Criar contexto similar ao usado pela fila
-        job_context = {
-            "user_id": user_id,
-            "file_path": file_path,
-            "original_filename": original_filename
-        }
+        data_emissao = parse_date(resultado.get("data_emissao"))
+        servicos = ordenar_servicos(resultado.get("servicos") or [])
 
-        return salvar_atestado_processado(db, resultado, job_context)
+        # Verificar se já existe atestado com este arquivo
+        existente = db.query(Atestado).filter(
+            Atestado.user_id == user_id,
+            Atestado.arquivo_path == file_path
+        ).first()
+
+        if existente:
+            existente.descricao_servico = resultado.get("descricao_servico") or Messages.DESCRICAO_NAO_IDENTIFICADA
+            existente.quantidade = resultado.get("quantidade") or 0  # type: ignore[assignment]
+            existente.unidade = resultado.get("unidade") or ""
+            existente.contratante = resultado.get("contratante")
+            existente.data_emissao = data_emissao  # type: ignore[assignment]
+            existente.texto_extraido = resultado.get("texto_extraido")
+            existente.servicos_json = servicos if servicos else None
+            db.commit()
+            db.refresh(existente)
+            return existente
+
+        novo_atestado = Atestado(
+            user_id=user_id,
+            descricao_servico=resultado.get("descricao_servico") or Messages.DESCRICAO_NAO_IDENTIFICADA,
+            quantidade=resultado.get("quantidade") or 0,
+            unidade=resultado.get("unidade") or "",
+            contratante=resultado.get("contratante"),
+            data_emissao=data_emissao,
+            arquivo_path=file_path,
+            texto_extraido=resultado.get("texto_extraido"),
+            servicos_json=servicos if servicos else None
+        )
+        db.add(novo_atestado)
+        db.commit()
+        db.refresh(novo_atestado)
+        return novo_atestado
 
 
 # Singleton

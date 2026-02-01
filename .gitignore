@@ -55,3 +55,4 @@ backend/relatorio_*.json
 .vercel
 
 .vercel
+backend/dump.sql

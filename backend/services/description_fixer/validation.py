@@ -7,7 +7,7 @@ from typing import List, Optional
 from services.extraction import normalize_accents
 from services.extraction.patterns import Patterns
 from .constants import (
-    STOP_PREFIXES, REVERSED_FOOTER_TOKENS,
+    REVERSED_FOOTER_TOKENS,
     TECHNICAL_NOUNS, COMPOUND_PAIRS
 )
 

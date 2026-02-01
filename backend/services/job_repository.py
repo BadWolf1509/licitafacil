@@ -10,8 +10,6 @@ Usa SQLAlchemy para compatibilidade com SQLite e PostgreSQL.
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
 
 from database import get_db_session
 from models import ProcessingJobModel

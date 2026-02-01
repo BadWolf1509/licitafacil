@@ -573,3 +573,50 @@
     padding: 40px;
     color: var(--text-secondary);
 }
+
+/* === MODAL TABS === */
+.modal-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-tab {
+    flex: 1;
+    padding: var(--spacing-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    border-bottom: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+.modal-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.modal-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.modal-tab-content {
+    display: none;
+}
+
+.modal-tab-content.active {
+    display: block;
+}
+
+/* Upload zone dentro do modal */
+#modalAtestado .upload-zone {
+    margin-bottom: 0;
+    padding: var(--spacing-xl);
+}

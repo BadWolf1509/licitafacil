@@ -18,6 +18,9 @@ from .base import (
     ALLOWED_PDF_EXTENSIONS,
     ALLOWED_IMAGE_EXTENSIONS,
     ALLOWED_DOCUMENT_EXTENSIONS,
+    ALLOWED_MIME_TYPES,
+    MAX_UPLOAD_SIZE_MB,
+    MAX_UPLOAD_SIZE_BYTES,
     get_cors_origins,
     CORS_ORIGINS,
     CORS_ALLOW_CREDENTIALS,
@@ -85,7 +88,13 @@ from .api import (
 )
 
 # Validacao
-from .validation import validate_upload_file
+from .validation import (
+    validate_upload_file,
+    validate_file_size,
+    validate_mime_type,
+    validate_upload_complete,
+    detect_mime_type,
+)
 
 # Exportar tudo
 __all__ = [
@@ -98,6 +107,9 @@ __all__ = [
     "ALLOWED_PDF_EXTENSIONS",
     "ALLOWED_IMAGE_EXTENSIONS",
     "ALLOWED_DOCUMENT_EXTENSIONS",
+    "ALLOWED_MIME_TYPES",
+    "MAX_UPLOAD_SIZE_MB",
+    "MAX_UPLOAD_SIZE_BYTES",
     "get_cors_origins",
     "CORS_ORIGINS",
     "CORS_ALLOW_CREDENTIALS",
@@ -147,4 +159,8 @@ __all__ = [
     "API_PREFIX",
     # Validacao
     "validate_upload_file",
+    "validate_file_size",
+    "validate_mime_type",
+    "validate_upload_complete",
+    "detect_mime_type",
 ]

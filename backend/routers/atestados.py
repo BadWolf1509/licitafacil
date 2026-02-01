@@ -6,16 +6,17 @@ from typing import Union
 
 from database import get_db
 from models import Usuario, Atestado
+from repositories.atestado_repository import atestado_repository
 from schemas import (
     AtestadoCreate, AtestadoUpdate, AtestadoServicosUpdate, AtestadoResponse,
     Mensagem, JobResponse, PaginatedAtestadoResponse
 )
 from auth import get_current_approved_user
 from services.atestado_service import ordenar_servicos, salvar_atestado_processado
-from services.processing_mode import is_serverless, get_processing_mode, ProcessingMode
+from services.processing_mode import is_serverless
 from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
-from utils.validation import validate_upload_or_raise
+from utils.validation import validate_upload_complete_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 from utils.http_helpers import get_user_resource_or_404
 from routers.base import AuthenticatedRouter
@@ -94,8 +95,8 @@ async def upload_atestado(
     Em ambiente serverless (Vercel): processa síncronamente e retorna AtestadoResponse.
     Em ambiente tradicional: enfileira e retorna JobResponse com job_id.
     """
-    # Validar arquivo
-    file_ext = validate_upload_or_raise(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
+    # Validar arquivo (extensão, tamanho e MIME type)
+    file_ext = await validate_upload_complete_or_raise(file, ALLOWED_DOCUMENT_EXTENSIONS)
 
     # Criar diretorio do usuario e salvar arquivo
     user_upload_dir = get_user_upload_dir(current_user.id, "atestados")
@@ -104,12 +105,13 @@ async def upload_atestado(
     save_upload_file(file, filepath)
 
     try:
+        original_filename = file.filename or "documento"
         if is_serverless():
             # Modo serverless: processar síncronamente
-            return await _process_sync(db, current_user, filepath, file.filename)
+            return await _process_sync(db, current_user, filepath, original_filename)
         else:
             # Modo tradicional: enfileirar
-            return _enqueue_processing(current_user, filepath, file.filename)
+            return _enqueue_processing(current_user, filepath, original_filename)
 
     except Exception as e:
         safe_delete_file(filepath)
@@ -139,8 +141,13 @@ async def _process_sync(
             detail=result.get("error", "Erro ao processar documento")
         )
 
-    # Buscar atestado criado
-    atestado = db.query(Atestado).get(result["atestado_id"])
+    # Buscar atestado criado usando repository
+    atestado = atestado_repository.get_by_id(db, result["atestado_id"])
+    if atestado is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno: atestado não encontrado após processamento"
+        )
     return atestado
 
 

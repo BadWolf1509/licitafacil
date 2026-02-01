@@ -287,7 +287,6 @@ class MatchingService:
                     "descricao": req_desc_raw,
                     "quantidade_minima": req_qty,
                     "unidade": req_unit or req_unit_raw,
-                    "percentual_exigido": exig.get("percentual_exigido"),
                     "permitir_soma": allow_sum,
                     "exige_unico": not allow_sum,
                 },

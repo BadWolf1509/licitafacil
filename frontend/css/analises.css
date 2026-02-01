@@ -80,3 +80,107 @@
 .progress-fill.atende { background: var(--success); }
 .progress-fill.parcial { background: var(--warning); }
 .progress-fill.nao-atende { background: var(--error); }
+
+/* === MODAL TABS === */
+.modal-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-tab {
+    flex: 1;
+    padding: var(--spacing-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    border-bottom: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+.modal-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.modal-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.modal-tab-content {
+    display: none;
+}
+
+.modal-tab-content.active {
+    display: block;
+}
+
+/* === EXIGENCIAS FORM === */
+.exigencia-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    position: relative;
+}
+
+.exigencia-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.exigencia-item-numero {
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.exigencia-item-remove {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 1.25rem;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.exigencia-item-remove:hover {
+    opacity: 1;
+}
+
+.exigencia-item .form-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+.exigencia-item .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.exigencia-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.exigencia-row .form-group {
+    flex: 1;
+}
+
+.exigencia-row .form-group.small {
+    flex: 0 0 120px;
+}
+
+/* Modal lg size */
+.modal-lg {
+    max-width: 700px;
+}

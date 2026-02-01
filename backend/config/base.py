@@ -52,6 +52,19 @@ ALLOWED_PDF_EXTENSIONS = [".pdf"]
 ALLOWED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"]
 ALLOWED_DOCUMENT_EXTENSIONS = ALLOWED_PDF_EXTENSIONS + ALLOWED_IMAGE_EXTENSIONS
 
+# === Limite de Upload ===
+MAX_UPLOAD_SIZE_MB = env_int("MAX_UPLOAD_SIZE_MB", 50)
+MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+# === MIME Types Permitidos ===
+ALLOWED_MIME_TYPES = {
+    'application/pdf': ['.pdf'],
+    'image/png': ['.png'],
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/tiff': ['.tiff', '.tif'],
+    'image/bmp': ['.bmp'],
+}
+
 
 # === CORS ===
 def get_cors_origins() -> List[str]:

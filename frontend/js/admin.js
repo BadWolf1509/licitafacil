@@ -75,6 +75,7 @@ async function carregarUsuariosPendentes() {
                 <div class="user-actions">
                     <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
                     <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
+                    <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
                 </div>
             </div>
         `).join('');
@@ -112,11 +113,18 @@ async function carregarTodosUsuarios() {
                     actions = `
                         <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
                         <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
                     `;
                 } else if (!u.is_active) {
-                    actions = `<button class="btn btn-outline btn-sm" onclick="reativarUsuario(${u.id})">Reativar</button>`;
+                    actions = `
+                        <button class="btn btn-outline btn-sm" onclick="reativarUsuario(${u.id})">Reativar</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                    `;
                 } else {
-                    actions = `<button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Desativar</button>`;
+                    actions = `
+                        <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Desativar</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                    `;
                 }
             }
 
@@ -173,5 +181,19 @@ async function reativarUsuario(id) {
         carregarTodosUsuarios();
     } catch (error) {
         ui.showAlert(error.message || 'Erro ao reativar usuario', 'error');
+    }
+}
+
+async function excluirUsuario(id, nome) {
+    if (!confirm(`ATENCAO: Esta acao e irreversivel!\n\nDeseja excluir permanentemente o usuario "${nome}"?\n\nTodos os dados associados a esta conta serao perdidos.`)) return;
+
+    try {
+        await api.delete(`/admin/usuarios/${id}`);
+        ui.showAlert('Usuario excluido permanentemente!', 'success');
+        carregarEstatisticas();
+        carregarUsuariosPendentes();
+        carregarTodosUsuarios();
+    } catch (error) {
+        ui.showAlert(error.message || 'Erro ao excluir usuario', 'error');
     }
 }

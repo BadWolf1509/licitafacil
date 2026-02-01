@@ -60,7 +60,6 @@ class AtestadoProcessor:
         from ..ai_provider import ai_provider
         from ..aditivo_processor import prefix_aditivo_items
         from ..description_fixer import fix_descriptions
-        from ..processing_helpers import clear_item_code_quantities
         from config import AtestadoProcessingConfig as APC
 
         # Preferir pipeline completo quando disponível (inclui adição de itens do texto)

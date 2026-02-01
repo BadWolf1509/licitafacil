@@ -121,6 +121,42 @@ def reativar_usuario(
     )
 
 
+@router.delete("/usuarios/{user_id}", response_model=Mensagem)
+def excluir_usuario(
+    user_id: int,
+    current_user: Usuario = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Exclui permanentemente um usuário do sistema."""
+    usuario = usuario_repository.get_by_id(db, user_id)
+    if not usuario:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=Messages.USER_NOT_FOUND
+        )
+
+    if usuario.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir sua própria conta"
+        )
+
+    if usuario.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é possível excluir um administrador"
+        )
+
+    nome = usuario.nome
+    db.delete(usuario)
+    db.commit()
+
+    return Mensagem(
+        mensagem=f"Usuário {nome} excluído permanentemente!",
+        sucesso=True
+    )
+
+
 @router.get("/estatisticas")
 def obter_estatisticas(
     current_user: Usuario = Depends(get_current_admin_user),

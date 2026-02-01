@@ -181,3 +181,29 @@ class ConnectionError(DatabaseError):
 
     def __init__(self, details: Optional[str] = None):
         super().__init__("Não foi possível conectar ao banco de dados", details)
+
+
+# === Exceções de Recursos e Permissões ===
+
+class ResourceNotFoundError(LicitaFacilError):
+    """
+    Recurso não encontrado.
+
+    Usado quando um atestado, análise ou outro recurso não existe.
+    Retorna HTTP 404 (Not Found).
+    """
+    pass
+
+
+class PermissionDeniedError(LicitaFacilError):
+    """
+    Permissão negada para acessar recurso.
+
+    Usado quando usuário tenta acessar recurso de outro usuário.
+    Retorna HTTP 403 (Forbidden).
+    """
+    pass
+
+
+# Alias para compatibilidade
+ExternalServiceError = ExternalAPIError

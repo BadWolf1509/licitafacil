@@ -4,7 +4,7 @@ Configurações de processamento de atestados do LicitaFácil.
 Usa dataclasses para validação automática e documentação.
 Dividido em sub-classes para melhor organização.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import ClassVar
 
 from .base import env_int, env_float, env_bool, PAID_SERVICES_ENABLED

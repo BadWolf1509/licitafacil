@@ -3,9 +3,14 @@ Utilitários de validação para uploads e outros dados.
 """
 from typing import List, Optional
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, UploadFile
 
-from config import validate_upload_file, ALLOWED_DOCUMENT_EXTENSIONS
+from config import (
+    validate_upload_file,
+    validate_upload_complete,
+    validate_file_size,
+    ALLOWED_DOCUMENT_EXTENSIONS,
+)
 
 
 def validate_upload_or_raise(
@@ -33,5 +38,53 @@ def validate_upload_or_raise(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+async def validate_upload_complete_or_raise(
+    file: UploadFile,
+    allowed_extensions: Optional[List[str]] = None,
+    validate_content: bool = True
+) -> str:
+    """
+    Validação completa de arquivo de upload (extensão, tamanho e MIME type).
+    Levanta HTTPException em caso de erro.
+
+    Args:
+        file: Objeto UploadFile do FastAPI
+        allowed_extensions: Lista de extensões permitidas
+        validate_content: Se True, valida MIME type real do arquivo
+
+    Returns:
+        Extensão do arquivo em minúsculas
+
+    Raises:
+        HTTPException: Se alguma validação falhar (400 Bad Request)
+    """
+    try:
+        return await validate_upload_complete(file, allowed_extensions, validate_content)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+def validate_file_size_or_raise(file_size: int) -> None:
+    """
+    Valida o tamanho do arquivo e levanta HTTPException em caso de erro.
+
+    Args:
+        file_size: Tamanho do arquivo em bytes
+
+    Raises:
+        HTTPException: Se o arquivo exceder o limite (413 Request Entity Too Large)
+    """
+    try:
+        validate_file_size(file_size)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=str(e)
         )

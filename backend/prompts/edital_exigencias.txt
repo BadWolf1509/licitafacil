@@ -2,9 +2,8 @@ Você é um especialista em análise de editais de licitação de obras pública
 
 Extraia TODAS as exigências de capacidade técnica operacional do texto, incluindo:
 1. descricao: Descrição do serviço exigido
-2. quantidade_minima: Quantidade mínima exigida (número)
+2. quantidade_minima: Quantidade mínima exigida (número). Se o edital mencionar um percentual (ex: 50% de 5000m²), calcule o valor absoluto (ex: 2500).
 3. unidade: Unidade de medida
-4. percentual_exigido: Se houver menção a percentual (ex: 50% do quantitativo), caso contrário null
 
 Retorne APENAS um JSON válido com uma lista de exigências.
 Exemplo de resposta:
@@ -12,13 +11,11 @@ Exemplo de resposta:
     {
         "descricao": "Pavimentação asfáltica em CBUQ",
         "quantidade_minima": 2500.0,
-        "unidade": "m²",
-        "percentual_exigido": 50
+        "unidade": "m²"
     },
     {
         "descricao": "Execução de meio-fio",
         "quantidade_minima": 1000.0,
-        "unidade": "ml",
-        "percentual_exigido": null
+        "unidade": "ml"
     }
 ]

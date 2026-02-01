@@ -4,11 +4,9 @@ Serviço de Storage para arquivos.
 Suporta armazenamento local (desenvolvimento) e Supabase Storage (produção).
 A escolha é feita automaticamente com base nas variáveis de ambiente.
 """
-import os
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import BinaryIO, Optional
-from urllib.parse import urljoin
 
 from config import UPLOAD_DIR, SUPABASE_URL, SUPABASE_SERVICE_KEY
 from logging_config import get_logger

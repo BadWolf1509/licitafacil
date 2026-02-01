@@ -63,9 +63,20 @@ const api = {
 
             if (!response.ok) {
                 if (response.status === 401) {
+                    // Se estamos na página de login, mostrar erro real (senha incorreta, etc)
+                    const isLoginPage = window.location.pathname.endsWith('index.html') ||
+                                        window.location.pathname === '/' ||
+                                        window.location.pathname === '';
+
+                    if (isLoginPage && data && data.detail) {
+                        // Erro de autenticação na página de login - mostrar mensagem real
+                        throw new Error(data.detail);
+                    }
+
+                    // Sessão expirada em outra página - redirecionar para login
                     localStorage.removeItem(CONFIG.TOKEN_KEY);
                     localStorage.removeItem(CONFIG.USER_KEY);
-                    if (!window.location.pathname.endsWith('index.html')) {
+                    if (!isLoginPage) {
                         window.location.href = 'index.html';
                     }
                     throw new Error('Sessao expirada. Faca login novamente.');
@@ -151,6 +162,7 @@ const api = {
 
             if (!response.ok) {
                 if (response.status === 401) {
+                    // Sessão expirada - redirecionar para login
                     localStorage.removeItem(CONFIG.TOKEN_KEY);
                     localStorage.removeItem(CONFIG.USER_KEY);
                     if (!window.location.pathname.endsWith('index.html')) {

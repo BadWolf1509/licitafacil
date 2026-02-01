@@ -12,76 +12,17 @@ from fastapi import HTTPException, status
 
 from .router_helpers import safe_delete_file
 
+# Importar exceções do módulo centralizado
+from exceptions import (
+    ProcessingError,
+    ValidationError,
+    DatabaseError,
+    ExternalServiceError,
+    ResourceNotFoundError,
+    PermissionDeniedError,
+)
+
 T = TypeVar("T")
-
-
-# ==============================================================================
-# Exceções Customizadas
-# ==============================================================================
-
-class LicitaFacilError(Exception):
-    """Exceção base para erros do LicitaFácil."""
-    pass
-
-
-class ProcessingError(LicitaFacilError):
-    """
-    Erro durante processamento de documento.
-
-    Usado quando OCR, extração de tabelas ou análise de IA falha.
-    Retorna HTTP 422 (Unprocessable Entity).
-    """
-    pass
-
-
-class ValidationError(LicitaFacilError):
-    """
-    Erro de validação de dados de entrada.
-
-    Usado quando dados fornecidos pelo usuário são inválidos.
-    Retorna HTTP 400 (Bad Request).
-    """
-    pass
-
-
-class DatabaseError(LicitaFacilError):
-    """
-    Erro de acesso ao banco de dados.
-
-    Usado quando operações no banco falham.
-    Retorna HTTP 503 (Service Unavailable).
-    """
-    pass
-
-
-class ExternalServiceError(LicitaFacilError):
-    """
-    Erro em serviço externo (OpenAI, Google, etc).
-
-    Usado quando APIs externas falham.
-    Retorna HTTP 502 (Bad Gateway).
-    """
-    pass
-
-
-class ResourceNotFoundError(LicitaFacilError):
-    """
-    Recurso não encontrado.
-
-    Usado quando um atestado, análise ou outro recurso não existe.
-    Retorna HTTP 404 (Not Found).
-    """
-    pass
-
-
-class PermissionDeniedError(LicitaFacilError):
-    """
-    Permissão negada para acessar recurso.
-
-    Usado quando usuário tenta acessar recurso de outro usuário.
-    Retorna HTTP 403 (Forbidden).
-    """
-    pass
 
 
 # ==============================================================================

@@ -7,7 +7,7 @@ que podem ter falhas transientes (rede, banco, APIs externas).
 
 import time
 from functools import wraps
-from typing import Tuple, Type, Union
+from typing import Any, Callable, Optional, Tuple, Type, Union
 
 from logging_config import get_logger
 
@@ -19,7 +19,7 @@ def retry(
     delay: float = 1.0,
     backoff: float = 2.0,
     exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = (Exception,),
-    on_retry: callable = None
+    on_retry: Optional[Callable[..., Any]] = None
 ):
     """
     Decorator que adiciona retry com backoff exponencial.
@@ -84,7 +84,7 @@ async def async_retry(
     delay: float = 1.0,
     backoff: float = 2.0,
     exceptions: Union[Type[Exception], Tuple[Type[Exception], ...]] = (Exception,),
-    on_retry: callable = None
+    on_retry: Optional[Callable[..., Any]] = None
 ):
     """
     Decorator que adiciona retry com backoff exponencial para funções async.

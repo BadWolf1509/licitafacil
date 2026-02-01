@@ -2,8 +2,9 @@
 
 from .text_utils import sanitize_description
 from .retry import retry
-from .error_handlers import (
-    # Exceções
+
+# Exceções importadas do módulo centralizado
+from exceptions import (
     LicitaFacilError,
     ProcessingError,
     ValidationError,
@@ -11,7 +12,10 @@ from .error_handlers import (
     ExternalServiceError,
     ResourceNotFoundError,
     PermissionDeniedError,
-    # Funções
+)
+
+# Funções utilitárias de tratamento de erros
+from .error_handlers import (
     handle_exception,
     log_exception,
     log_and_raise_http_error,
@@ -23,7 +27,7 @@ __all__ = [
     "sanitize_description",
     # retry
     "retry",
-    # error_handlers - exceções
+    # exceções (de exceptions.py)
     "LicitaFacilError",
     "ProcessingError",
     "ValidationError",
@@ -31,7 +35,7 @@ __all__ = [
     "ExternalServiceError",
     "ResourceNotFoundError",
     "PermissionDeniedError",
-    # error_handlers - funções
+    # funções de error_handlers
     "handle_exception",
     "log_exception",
     "log_and_raise_http_error",
