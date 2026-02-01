@@ -7,8 +7,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // Carregar dados do dashboard se estiver na página
     if (window.location.pathname.includes('dashboard')) {
         carregarDashboard();
+        setupFormAtestadoDashboard();
     }
 });
+
+/**
+ * Configura o formulário de cadastro rápido de atestado no dashboard
+ */
+function setupFormAtestadoDashboard() {
+    const form = document.getElementById('formAtestado');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const button = form.querySelector('button[type="submit"]');
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Cadastrando...';
+
+        const dados = {
+            descricao_servico: document.getElementById('atDescricao').value,
+            quantidade: parseFloat(document.getElementById('atQuantidade').value) || null,
+            unidade: document.getElementById('atUnidade').value || null,
+            contratante: document.getElementById('atContratante').value || null,
+            data_emissao: document.getElementById('atDataEmissao').value || null
+        };
+
+        try {
+            await api.post('/atestados/', dados);
+            ui.showAlert('Atestado cadastrado com sucesso!', 'success');
+            fecharModal('modalAtestado');
+            form.reset();
+            carregarDashboard(); // Atualizar contadores
+        } catch (error) {
+            ui.showAlert(error.message || 'Erro ao cadastrar atestado', 'error');
+        } finally {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    });
+}
 
 /**
  * Verifica se o usuário está autenticado

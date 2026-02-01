@@ -171,3 +171,23 @@ function logout() {
     localStorage.removeItem(CONFIG.USER_KEY);
     window.location.href = 'index.html';
 }
+
+/**
+ * Alterna a visibilidade da senha
+ * @param {string} inputId - ID do input de senha
+ * @param {HTMLElement} button - Botão que foi clicado
+ */
+function togglePassword(inputId, button) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.classList.add('active');
+        button.title = 'Ocultar senha';
+    } else {
+        input.type = 'password';
+        button.classList.remove('active');
+        button.title = 'Mostrar senha';
+    }
+}

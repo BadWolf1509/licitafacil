@@ -70,7 +70,16 @@ const api = {
                     }
                     throw new Error('Sessao expirada. Faca login novamente.');
                 }
-                const message = (data && data.detail) ? data.detail : `Erro na requisicao (${response.status})`;
+                // Formatar mensagem de erro (pode ser string ou array de validacao do Pydantic)
+                let message = `Erro na requisicao (${response.status})`;
+                if (data && data.detail) {
+                    if (Array.isArray(data.detail)) {
+                        // Erro de validacao Pydantic - extrair mensagens
+                        message = data.detail.map(err => err.msg || err.message || String(err)).join('; ');
+                    } else {
+                        message = data.detail;
+                    }
+                }
                 throw new Error(message);
             }
 
@@ -149,7 +158,15 @@ const api = {
                     }
                     throw new Error('Sessao expirada. Faca login novamente.');
                 }
-                const message = (data && data.detail) ? data.detail : `Erro no upload (${response.status})`;
+                // Formatar mensagem de erro (pode ser string ou array de validacao do Pydantic)
+                let message = `Erro no upload (${response.status})`;
+                if (data && data.detail) {
+                    if (Array.isArray(data.detail)) {
+                        message = data.detail.map(err => err.msg || err.message || String(err)).join('; ');
+                    } else {
+                        message = data.detail;
+                    }
+                }
                 throw new Error(message);
             }
 

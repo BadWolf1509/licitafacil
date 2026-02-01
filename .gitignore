@@ -53,3 +53,5 @@ backend/relatorio_*.json
 
 # Vercel
 .vercel
+
+.vercel
