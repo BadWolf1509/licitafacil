@@ -1,40 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "name": "licitafacil",
-  "builds": [
+  "buildCommand": null,
+  "installCommand": "pip install -r api/requirements.txt",
+  "outputDirectory": "frontend",
+  "rewrites": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb"
-      }
-    },
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/(.*\\.(css|js|ico|png|jpg|jpeg|svg|woff|woff2))",
-      "dest": "/frontend/$1"
-    },
-    {
-      "src": "/(.*\\.html)",
-      "dest": "/frontend/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/frontend/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
     }
   ],
   "headers": [
@@ -56,13 +29,11 @@
       ]
     }
   ],
-  "env": {
-    "PYTHONPATH": "backend"
-  },
   "functions": {
     "api/index.py": {
       "memory": 1024,
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "python3.11"
     }
   }
 }

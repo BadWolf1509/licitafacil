@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local development
+*.db
+*.sqlite
+*.sqlite3
+licitafacil.db
+uploads/
+backend/uploads/
+
+# Documentation (não necessário no deploy)
+*.md
+!README.md
+
+# Tests
+tests/
+*_test.py
+test_*.py
+
+# Temporary files
+tmp_*.py
+*.log
+*.tmp
+backend/dump.sql
+
+# Docker (não usado na Vercel)
+Dockerfile
+docker-compose.yml
+nginx.dev.conf
+.dockerignore
+
+# Large unnecessary files
+backend/services/processors/
+backend/services/extraction/
+backend/services/text/
+
+# Keep only essential backend
+!backend/main.py
+!backend/database.py
+!backend/models.py
+!backend/schemas.py
+!backend/auth.py
+!backend/config/
+!backend/routers/
+!backend/utils/
+!backend/services/processing_mode.py
+!backend/services/sync_processor.py
+!backend/services/atestado/
+!backend/services/storage_service.py
