@@ -48,8 +48,8 @@ class Atestado(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
 
     descricao_servico: Mapped[str] = mapped_column(Text, nullable=False)
-    quantidade: Mapped[Decimal] = mapped_column(Numeric(15, 4), nullable=False)
-    unidade: Mapped[str] = mapped_column(String(20), nullable=False)
+    quantidade: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 4), nullable=True)
+    unidade: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     contratante: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     data_emissao: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

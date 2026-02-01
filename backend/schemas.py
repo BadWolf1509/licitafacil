@@ -70,8 +70,8 @@ class ServicoAtestado(BaseModel):
 
 class AtestadoBase(BaseModel):
     descricao_servico: str
-    quantidade: Decimal
-    unidade: str
+    quantidade: Optional[Decimal] = None
+    unidade: Optional[str] = None
     contratante: Optional[str] = None
     data_emissao: Optional[datetime] = None
 

@@ -8,12 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.includes('dashboard')) {
         carregarDashboard();
     }
-
-    // Configurar formulário de atestado se existir
-    const formAtestado = document.getElementById('formAtestado');
-    if (formAtestado) {
-        formAtestado.addEventListener('submit', salvarAtestado);
-    }
 });
 
 /**
@@ -132,35 +126,6 @@ function fecharModal(modalId) {
  */
 function fecharTodosModais() {
     document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
-}
-
-/**
- * Salva um novo atestado
- */
-async function salvarAtestado(e) {
-    e.preventDefault();
-
-    const dados = {
-        descricao_servico: document.getElementById('atDescricao').value,
-        quantidade: parseFloat(document.getElementById('atQuantidade').value),
-        unidade: document.getElementById('atUnidade').value,
-        contratante: document.getElementById('atContratante').value || null,
-        data_emissao: document.getElementById('atDataEmissao').value || null
-    };
-
-    try {
-        await api.post('/atestados/', dados);
-        ui.showAlert('Atestado cadastrado com sucesso!', 'success');
-        fecharModal('modalAtestado');
-        document.getElementById('formAtestado').reset();
-
-        // Recarregar dashboard se estiver nela
-        if (window.location.pathname.includes('dashboard')) {
-            carregarDashboard();
-        }
-    } catch (error) {
-        ui.showAlert(error.message || 'Erro ao cadastrar atestado', 'error');
-    }
 }
 
 /**

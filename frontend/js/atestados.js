@@ -804,8 +804,6 @@ const AtestadosModule = {
             const id = document.getElementById('atId').value;
             const dados = {
                 descricao_servico: document.getElementById('atDescricao').value,
-                quantidade: parseFloat(document.getElementById('atQuantidade').value),
-                unidade: document.getElementById('atUnidade').value,
                 contratante: document.getElementById('atContratante').value || null,
                 data_emissao: document.getElementById('atDataEmissao').value || null
             };
@@ -839,8 +837,6 @@ const AtestadosModule = {
             document.getElementById('modalAtestadoTitle').textContent = 'Editar Atestado';
             document.getElementById('atId').value = atestado.id;
             document.getElementById('atDescricao').value = atestado.descricao_servico || '';
-            document.getElementById('atQuantidade').value = atestado.quantidade || '';
-            document.getElementById('atUnidade').value = atestado.unidade || '';
             document.getElementById('atContratante').value = atestado.contratante || '';
             document.getElementById('atDataEmissao').value = atestado.data_emissao ? atestado.data_emissao.split('T')[0] : '';
             abrirModal('modalAtestado');
