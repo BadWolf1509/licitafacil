@@ -1,26 +1,34 @@
 """
 Serviço de OCR (Reconhecimento Óptico de Caracteres).
-Utiliza EasyOCR para extrair texto de imagens e PDFs escaneados.
+Utiliza Tesseract (leve) como padrão e EasyOCR (pesado) como fallback.
 Inclui pré-processamento de imagem para melhorar qualidade.
-Suporta Tesseract como fallback opcional.
+
+OTIMIZAÇÃO: EasyOCR é carregado sob demanda (lazy loading) para economizar ~500MB de RAM.
 """
 
 from exceptions import OCRError
-import easyocr
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 import io
 from PIL import Image
 import numpy as np
 import cv2
 
-from config import OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK
+from config import OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK, OCR_PREFER_TESSERACT
 
-# Tesseract é opcional - só usa se estiver instalado
+# Type hints sem importar o módulo pesado
+if TYPE_CHECKING:
+    import easyocr
+
+# Tesseract é a opção preferencial (mais leve ~50MB vs ~1GB do EasyOCR)
 try:
     import pytesseract
     TESSERACT_AVAILABLE = True
 except ImportError:
     TESSERACT_AVAILABLE = False
+
+# EasyOCR será carregado sob demanda
+EASYOCR_LOADED = False
+easyocr = None
 
 
 class OCRService:
@@ -161,9 +169,21 @@ class OCRService:
         return processed
 
     @property
-    def reader(self) -> easyocr.Reader:
-        """Inicializa o leitor OCR de forma lazy (sob demanda)."""
+    def reader(self):
+        """Inicializa o leitor EasyOCR de forma lazy (sob demanda)."""
+        global easyocr, EASYOCR_LOADED
+
         if self._reader is None:
+            # Lazy import do EasyOCR (economiza ~500MB até ser necessário)
+            if not EASYOCR_LOADED:
+                from logging_config import get_logger
+                logger = get_logger('services.ocr_service')
+                logger.info("Carregando EasyOCR (primeira vez - pode demorar)...")
+                import easyocr as _easyocr
+                easyocr = _easyocr
+                EASYOCR_LOADED = True
+                logger.info("EasyOCR carregado com sucesso")
+
             # gpu=False para compatibilidade (usar True se tiver GPU CUDA)
             self._reader = easyocr.Reader(
                 self._languages,
@@ -208,18 +228,39 @@ class OCRService:
         except Exception as e:
             raise OCRError(str(e))
 
-    def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False) -> str:
+    def _extract_with_tesseract(self, image_array: np.ndarray) -> Optional[str]:
+        """Tenta extrair texto usando Tesseract (mais leve)."""
+        if not self._tesseract_available:
+            return None
+        try:
+            # Converter para PIL Image se necessário
+            if isinstance(image_array, np.ndarray):
+                pil_image = Image.fromarray(image_array)
+            else:
+                pil_image = image_array
+            text = pytesseract.image_to_string(pil_image, lang='por+eng')
+            return text.strip() if text else None
+        except Exception:
+            return None
+
+    def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False, prefer_tesseract: bool = None) -> str:
         """
         Extrai texto de uma imagem em bytes.
+        Prioriza Tesseract (leve) e usa EasyOCR como fallback.
 
         Args:
             image_bytes: Imagem em bytes (PNG, JPG, etc.)
             use_binarization: Se True, aplica binarização adaptativa
+            prefer_tesseract: Se True, tenta Tesseract primeiro (usa config se None)
 
         Returns:
             Texto extraído
         """
         try:
+            # Usar configuração se não especificado
+            if prefer_tesseract is None:
+                prefer_tesseract = OCR_PREFER_TESSERACT
+
             # Converter bytes para array numpy via PIL
             image = Image.open(io.BytesIO(image_bytes))
             image_array = np.array(image)
@@ -227,6 +268,13 @@ class OCRService:
             # Aplicar pré-processamento (deskewing + opcionalmente binarização)
             processed = self._preprocess_image(image_array, use_binarization=use_binarization)
 
+            # Tentar Tesseract primeiro (mais leve, ~50MB vs ~1GB)
+            if prefer_tesseract and self._tesseract_available:
+                text = self._extract_with_tesseract(processed)
+                if text and len(text) > 10:  # Resultado válido
+                    return text
+
+            # Fallback para EasyOCR (mais preciso, mas pesado)
             results = self.reader.readtext(processed)
             texts = [result[1] for result in results]
             return " ".join(texts)

@@ -1,7 +1,8 @@
 import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
+from typing import Union
 
 from database import get_db
 from models import Usuario, Atestado
@@ -10,22 +11,27 @@ from schemas import (
     Mensagem, JobResponse, PaginatedAtestadoResponse
 )
 from auth import get_current_approved_user
-from services.processing_queue import processing_queue
 from services.atestado_service import ordenar_servicos, salvar_atestado_processado
+from services.processing_mode import is_serverless, get_processing_mode, ProcessingMode
 from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 from utils.http_helpers import get_user_resource_or_404
+from routers.base import AuthenticatedRouter
 
 from logging_config import get_logger
+from utils import handle_exception
+
 logger = get_logger('routers.atestados')
 
 
-# Registrar callback para processamento de atestados
-processing_queue.register_callback("atestado", salvar_atestado_processado)
+# Registrar callback apenas em modo assíncrono
+if not is_serverless():
+    from services.processing_queue import processing_queue
+    processing_queue.register_callback("atestado", salvar_atestado_processado)
 
-router = APIRouter(prefix="/atestados", tags=["Atestados"])
+router = AuthenticatedRouter(prefix="/atestados", tags=["Atestados"])
 
 
 @router.get("/", response_model=PaginatedAtestadoResponse)
@@ -76,15 +82,17 @@ def criar_atestado(
     return novo_atestado
 
 
-@router.post("/upload", response_model=JobResponse)
+@router.post("/upload", response_model=Union[JobResponse, AtestadoResponse])
 async def upload_atestado(
     file: UploadFile = File(...),
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-) -> JobResponse:
+) -> Union[JobResponse, AtestadoResponse]:
     """
     Faz upload de um PDF/imagem de atestado para processamento.
-    O arquivo sera processado em background e o status pode ser consultado na fila.
+
+    Em ambiente serverless (Vercel): processa síncronamente e retorna AtestadoResponse.
+    Em ambiente tradicional: enfileira e retorna JobResponse com job_id.
     """
     # Validar arquivo
     file_ext = validate_upload_or_raise(file.filename, ALLOWED_DOCUMENT_EXTENSIONS)
@@ -96,35 +104,76 @@ async def upload_atestado(
     save_upload_file(file, filepath)
 
     try:
-        job_id = str(uuid.uuid4())
-        processing_queue.add_job(
-            job_id=job_id,
-            user_id=current_user.id,
-            file_path=filepath,
-            job_type="atestado",
-            original_filename=file.filename,
-            callback=salvar_atestado_processado
-        )
-        return JobResponse(
-            mensagem=Messages.UPLOAD_SUCCESS,
-            sucesso=True,
-            job_id=job_id
-        )
+        if is_serverless():
+            # Modo serverless: processar síncronamente
+            return await _process_sync(db, current_user, filepath, file.filename)
+        else:
+            # Modo tradicional: enfileirar
+            return _enqueue_processing(current_user, filepath, file.filename)
+
     except Exception as e:
-        logger.error(f"Erro ao enfileirar processamento de atestado: {e}")
         safe_delete_file(filepath)
+        raise handle_exception(e, logger, "ao processar atestado")
+
+
+async def _process_sync(
+    db: Session,
+    user: Usuario,
+    filepath: str,
+    original_filename: str
+) -> AtestadoResponse:
+    """Processa atestado de forma síncrona (serverless)."""
+    from services.sync_processor import get_sync_processor
+
+    processor = get_sync_processor()
+    result = processor.process_atestado(
+        db=db,
+        user_id=user.id,
+        file_path=filepath,
+        original_filename=original_filename
+    )
+
+    if not result.get("success"):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=Messages.QUEUE_ERROR
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=result.get("error", "Erro ao processar documento")
         )
 
+    # Buscar atestado criado
+    atestado = db.query(Atestado).get(result["atestado_id"])
+    return atestado
 
-@router.post("/{atestado_id}/reprocess", response_model=JobResponse)
+
+def _enqueue_processing(
+    user: Usuario,
+    filepath: str,
+    original_filename: str
+) -> JobResponse:
+    """Enfileira processamento assíncrono (tradicional)."""
+    from services.processing_queue import processing_queue
+
+    job_id = str(uuid.uuid4())
+    processing_queue.add_job(
+        job_id=job_id,
+        user_id=user.id,
+        file_path=filepath,
+        job_type="atestado",
+        original_filename=original_filename,
+        callback=salvar_atestado_processado
+    )
+    return JobResponse(
+        mensagem=Messages.UPLOAD_SUCCESS,
+        sucesso=True,
+        job_id=job_id
+    )
+
+
+@router.post("/{atestado_id}/reprocess", response_model=Union[JobResponse, AtestadoResponse])
 async def reprocessar_atestado(
     atestado_id: int,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db)
-) -> JobResponse:
+) -> Union[JobResponse, AtestadoResponse]:
     """Reprocessa um atestado existente usando o arquivo salvo."""
     atestado = get_user_resource_or_404(
         db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
@@ -137,28 +186,15 @@ async def reprocessar_atestado(
         )
 
     try:
-        job_id = str(uuid.uuid4())
-        # Usar basename do arquivo como nome original (já é UUID no reprocessamento)
         original_name = os.path.basename(atestado.arquivo_path)
-        processing_queue.add_job(
-            job_id=job_id,
-            user_id=current_user.id,
-            file_path=atestado.arquivo_path,
-            job_type="atestado",
-            original_filename=original_name,
-            callback=salvar_atestado_processado
-        )
-        return JobResponse(
-            mensagem="Reprocessamento iniciado.",
-            sucesso=True,
-            job_id=job_id
-        )
+
+        if is_serverless():
+            return await _process_sync(db, current_user, atestado.arquivo_path, original_name)
+        else:
+            return _enqueue_processing(current_user, atestado.arquivo_path, original_name)
+
     except Exception as e:
-        logger.error(f"Erro ao enfileirar reprocessamento de atestado {atestado_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=Messages.QUEUE_ERROR
-        )
+        raise handle_exception(e, logger, f"ao reprocessar atestado {atestado_id}")
 
 
 @router.put("/{atestado_id}", response_model=AtestadoResponse)

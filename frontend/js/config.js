@@ -1,8 +1,22 @@
 // Configurações globais do LicitaFácil
 
+// Detecta URL do backend automaticamente
+// Em desenvolvimento: usa mesma origem
+// Em produção (Vercel): usa BACKEND_URL definida ou proxy via rewrites
+function getApiUrl() {
+    // Se há variável global definida (injetada pelo build ou em env.js)
+    if (typeof window.BACKEND_URL !== 'undefined' && window.BACKEND_URL) {
+        return window.BACKEND_URL;
+    }
+
+    // Se está no Vercel (vercel.app ou domínio customizado com proxy configurado)
+    // O vercel.json faz rewrite de /api/* para o backend
+    return window.location.origin;
+}
+
 const CONFIG = {
-    // URL base da API (alterar em produção)
-    API_URL: window.location.origin,
+    // URL base da API (detectada automaticamente)
+    API_URL: getApiUrl(),
 
     // Prefixo de versão da API
     API_PREFIX: '/api/v1',

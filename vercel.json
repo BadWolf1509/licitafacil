@@ -1,0 +1,68 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "name": "licitafacil",
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/(.*\\.(css|js|ico|png|jpg|jpeg|svg|woff|woff2))",
+      "dest": "/frontend/$1"
+    },
+    {
+      "src": "/(.*\\.html)",
+      "dest": "/frontend/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/frontend/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "backend"
+  },
+  "functions": {
+    "api/index.py": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}

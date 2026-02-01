@@ -21,6 +21,7 @@ from auth import (
     get_current_active_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from repositories import usuario_repository
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -60,8 +61,7 @@ def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
     O usuário ficará pendente de aprovação pelo administrador.
     """
     # Verificar se email já existe
-    db_user = db.query(Usuario).filter(Usuario.email == usuario.email).first()
-    if db_user:
+    if usuario_repository.get_by_email(db, usuario.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email já cadastrado"

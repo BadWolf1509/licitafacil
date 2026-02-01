@@ -29,6 +29,7 @@ from .base import (
     OCR_MAX_WORKERS,
     OCR_PREPROCESS_ENABLED,
     OCR_TESSERACT_FALLBACK,
+    OCR_PREFER_TESSERACT,
     PAID_SERVICES_ENABLED,
     QUEUE_MAX_CONCURRENT,
     QUEUE_POLL_INTERVAL,
@@ -37,6 +38,9 @@ from .base import (
     MAX_PAGE_SIZE,
     is_allowed_extension,
     get_file_extension,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    SUPABASE_SERVICE_KEY,
 )
 
 # Seguranca
@@ -105,6 +109,7 @@ __all__ = [
     "OCR_MAX_WORKERS",
     "OCR_PREPROCESS_ENABLED",
     "OCR_TESSERACT_FALLBACK",
+    "OCR_PREFER_TESSERACT",
     "PAID_SERVICES_ENABLED",
     "QUEUE_MAX_CONCURRENT",
     "QUEUE_POLL_INTERVAL",
@@ -113,6 +118,9 @@ __all__ = [
     "MAX_PAGE_SIZE",
     "is_allowed_extension",
     "get_file_extension",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_KEY",
     # Seguranca
     "SECRET_KEY",
     "JWT_ALGORITHM",

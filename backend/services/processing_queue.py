@@ -37,7 +37,7 @@ class ProcessingQueue:
     - Persistência de jobs (sobrevive a restart)
     """
 
-    def __init__(self, db_path: str = "licitafacil.db"):
+    def __init__(self):
         self._queue: deque = deque()
         self._processing: Dict[str, ProcessingJob] = {}
         self._lock = threading.Lock()
@@ -51,8 +51,8 @@ class ProcessingQueue:
         self._max_concurrent = QUEUE_MAX_CONCURRENT
         self._poll_interval = QUEUE_POLL_INTERVAL
 
-        # Repositório para persistência
-        self._repository = JobRepository(db_path)
+        # Repositório para persistência (usa SQLAlchemy)
+        self._repository = JobRepository()
 
         # Executor para processamento de jobs
         self._executor = JobExecutor(

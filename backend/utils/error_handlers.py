@@ -15,6 +15,118 @@ from .router_helpers import safe_delete_file
 T = TypeVar("T")
 
 
+# ==============================================================================
+# Exceções Customizadas
+# ==============================================================================
+
+class LicitaFacilError(Exception):
+    """Exceção base para erros do LicitaFácil."""
+    pass
+
+
+class ProcessingError(LicitaFacilError):
+    """
+    Erro durante processamento de documento.
+
+    Usado quando OCR, extração de tabelas ou análise de IA falha.
+    Retorna HTTP 422 (Unprocessable Entity).
+    """
+    pass
+
+
+class ValidationError(LicitaFacilError):
+    """
+    Erro de validação de dados de entrada.
+
+    Usado quando dados fornecidos pelo usuário são inválidos.
+    Retorna HTTP 400 (Bad Request).
+    """
+    pass
+
+
+class DatabaseError(LicitaFacilError):
+    """
+    Erro de acesso ao banco de dados.
+
+    Usado quando operações no banco falham.
+    Retorna HTTP 503 (Service Unavailable).
+    """
+    pass
+
+
+class ExternalServiceError(LicitaFacilError):
+    """
+    Erro em serviço externo (OpenAI, Google, etc).
+
+    Usado quando APIs externas falham.
+    Retorna HTTP 502 (Bad Gateway).
+    """
+    pass
+
+
+class ResourceNotFoundError(LicitaFacilError):
+    """
+    Recurso não encontrado.
+
+    Usado quando um atestado, análise ou outro recurso não existe.
+    Retorna HTTP 404 (Not Found).
+    """
+    pass
+
+
+class PermissionDeniedError(LicitaFacilError):
+    """
+    Permissão negada para acessar recurso.
+
+    Usado quando usuário tenta acessar recurso de outro usuário.
+    Retorna HTTP 403 (Forbidden).
+    """
+    pass
+
+
+# ==============================================================================
+# Mapeamento de Exceções para HTTP
+# ==============================================================================
+
+EXCEPTION_STATUS_MAP = {
+    ProcessingError: (status.HTTP_422_UNPROCESSABLE_ENTITY, "Erro no processamento do documento"),
+    ValidationError: (status.HTTP_400_BAD_REQUEST, "Dados inválidos"),
+    DatabaseError: (status.HTTP_503_SERVICE_UNAVAILABLE, "Erro de banco de dados"),
+    ExternalServiceError: (status.HTTP_502_BAD_GATEWAY, "Erro em serviço externo"),
+    ResourceNotFoundError: (status.HTTP_404_NOT_FOUND, "Recurso não encontrado"),
+    PermissionDeniedError: (status.HTTP_403_FORBIDDEN, "Acesso negado"),
+}
+
+
+def handle_exception(exc: Exception, logger: Logger, context: str = "") -> HTTPException:
+    """
+    Converte exceção em HTTPException apropriada.
+
+    Args:
+        exc: Exceção original
+        logger: Logger para registrar o erro
+        context: Contexto adicional para o log
+
+    Returns:
+        HTTPException com status code apropriado
+    """
+    ctx = f" ({context})" if context else ""
+
+    # Verificar se é uma exceção conhecida
+    for exc_type, (status_code, default_detail) in EXCEPTION_STATUS_MAP.items():
+        if isinstance(exc, exc_type):
+            detail = str(exc) if str(exc) else default_detail
+            logger.warning(f"{exc_type.__name__}{ctx}: {detail}")
+            return HTTPException(status_code=status_code, detail=detail)
+
+    # Exceção desconhecida - erro interno
+    logger.exception(f"Erro inesperado{ctx}: {exc}")
+    return HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Erro interno do servidor"
+    )
+
+
 def log_exception(
     logger: Logger,
     context: str,

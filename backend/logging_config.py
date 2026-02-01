@@ -6,9 +6,14 @@ Uso:
     logger = get_logger(__name__)
     logger.info("Mensagem de info")
     logger.error("Mensagem de erro")
+
+Para logging estruturado (JSON):
+    export LOG_FORMAT=json
 """
+import json
 import logging
-from typing import Optional, List, Any
+from datetime import datetime
+from typing import Optional, List, Any, Dict
 
 import os
 import sys
@@ -17,10 +22,69 @@ from pathlib import Path
 DEFAULT_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 
 
+class StructuredFormatter(logging.Formatter):
+    """
+    Formatter que produz logs em formato JSON estruturado.
+
+    Útil para integração com ferramentas de análise de logs
+    como ELK Stack, Datadog, CloudWatch, etc.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Formata o registro de log como JSON."""
+        log_data: Dict[str, Any] = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+        }
+
+        # Adicionar contexto extra se disponível
+        if hasattr(record, 'context'):
+            log_data['context'] = record.context
+
+        # Adicionar informações de exceção se houver
+        if record.exc_info:
+            log_data['exception'] = self.formatException(record.exc_info)
+
+        # Adicionar campos extras do record
+        for key, value in record.__dict__.items():
+            if key not in ('name', 'msg', 'args', 'created', 'filename',
+                           'funcName', 'levelname', 'levelno', 'lineno',
+                           'module', 'msecs', 'pathname', 'process',
+                           'processName', 'relativeCreated', 'stack_info',
+                           'exc_info', 'exc_text', 'message', 'context'):
+                if not key.startswith('_'):
+                    log_data[key] = value
+
+        return json.dumps(log_data, ensure_ascii=False, default=str)
+
+
+class ContextLogger(logging.LoggerAdapter):
+    """
+    Logger adapter que permite adicionar contexto a todas as mensagens.
+
+    Uso:
+        logger = get_context_logger(__name__, user_id=123, job_id="abc")
+        logger.info("Processando...")  # Inclui user_id e job_id automaticamente
+    """
+
+    def process(self, msg, kwargs):
+        """Adiciona contexto extra ao log."""
+        extra = kwargs.get('extra', {})
+        extra.update(self.extra)
+        kwargs['extra'] = extra
+        return msg, kwargs
+
+
 def setup_logging(
     level: Optional[str] = None,
     log_file: Optional[str] = None,
-    format_string: Optional[str] = None
+    format_string: Optional[str] = None,
+    use_json: Optional[bool] = None
 ) -> None:
     """
     Configura o logging para toda a aplicação.
@@ -29,11 +93,28 @@ def setup_logging(
         level: Nível de logging (DEBUG, INFO, WARNING, ERROR)
         log_file: Caminho para arquivo de log (opcional)
         format_string: Formato das mensagens de log
+        use_json: Se True, usa formato JSON estruturado (útil para produção)
+
+    Environment Variables:
+        LOG_LEVEL: Nível de logging (default: INFO)
+        LOG_FILE: Caminho para arquivo de log
+        LOG_FORMAT: "json" para formato JSON, ou string de formato customizado
     """
     effective_level: str = level or os.getenv("LOG_LEVEL", "INFO") or "INFO"
     log_level = getattr(logging, effective_level.upper(), logging.INFO)
 
-    effective_format: str = format_string or os.getenv("LOG_FORMAT", DEFAULT_FORMAT) or DEFAULT_FORMAT
+    # Determinar se deve usar JSON
+    log_format_env = os.getenv("LOG_FORMAT", "")
+    if use_json is None:
+        use_json = log_format_env.lower() == "json"
+
+    effective_format: str = format_string or DEFAULT_FORMAT
+
+    # Criar formatter apropriado
+    if use_json:
+        formatter = StructuredFormatter()
+    else:
+        formatter = logging.Formatter(effective_format)
 
     # Configuração básica
     handlers: List[Any] = []
@@ -41,7 +122,7 @@ def setup_logging(
     # Handler para console
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(log_level)
-    console_handler.setFormatter(logging.Formatter(effective_format))
+    console_handler.setFormatter(formatter)
     handlers.append(console_handler)
 
     # Handler para arquivo (opcional)
@@ -51,7 +132,8 @@ def setup_logging(
         log_path.parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(log_path, encoding='utf-8')
         file_handler.setLevel(log_level)
-        file_handler.setFormatter(logging.Formatter(effective_format))
+        # Arquivo sempre usa JSON para facilitar parsing
+        file_handler.setFormatter(StructuredFormatter() if use_json else formatter)
         handlers.append(file_handler)
 
     # Configurar root logger
@@ -80,6 +162,51 @@ def get_logger(name: str) -> logging.Logger:
         Logger configurado
     """
     return logging.getLogger(name)
+
+
+def get_context_logger(name: str, **context) -> ContextLogger:
+    """
+    Obtém um logger com contexto adicional.
+
+    O contexto é incluído automaticamente em todas as mensagens.
+    Útil para rastrear requisições, jobs, ou usuários.
+
+    Args:
+        name: Nome do módulo (geralmente __name__)
+        **context: Contexto a incluir em todas as mensagens
+
+    Returns:
+        ContextLogger configurado
+
+    Example:
+        logger = get_context_logger(__name__, user_id=123, job_id="abc-123")
+        logger.info("Iniciando processamento")
+        # Output: ... user_id=123, job_id=abc-123, message="Iniciando processamento"
+    """
+    base_logger = logging.getLogger(name)
+    return ContextLogger(base_logger, context)
+
+
+def log_with_context(
+    logger: logging.Logger,
+    level: int,
+    message: str,
+    **context
+) -> None:
+    """
+    Loga uma mensagem com contexto adicional.
+
+    Args:
+        logger: Logger a usar
+        level: Nível de log (logging.INFO, etc.)
+        message: Mensagem de log
+        **context: Contexto adicional a incluir
+
+    Example:
+        log_with_context(logger, logging.INFO, "Processando arquivo",
+                        file_path="/tmp/doc.pdf", user_id=123)
+    """
+    logger.log(level, message, extra={'context': context})
 
 
 # Configurar logging na importação

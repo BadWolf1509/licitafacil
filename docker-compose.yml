@@ -1,0 +1,50 @@
+# =============================================================================
+# Docker Compose para desenvolvimento local
+# =============================================================================
+# Uso: docker-compose up -d
+# =============================================================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: licitafacil-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./licitafacil.db}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://127.0.0.1:8000"]
+      - UPLOAD_DIR=/app/uploads
+      - QUEUE_MAX_CONCURRENT=3
+      - OCR_PREFER_TESSERACT=true
+    volumes:
+      - ./backend:/app/backend:ro
+      - uploads_data:/app/uploads
+      - db_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Opcional: Frontend para desenvolvimento (se não usar Vercel dev)
+  frontend:
+    image: nginx:alpine
+    container_name: licitafacil-frontend
+    ports:
+      - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  uploads_data:
+  db_data:

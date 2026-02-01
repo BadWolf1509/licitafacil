@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -9,8 +9,9 @@ from schemas import UsuarioAdminResponse, Mensagem
 from auth import get_current_admin_user
 from config import Messages
 from repositories import usuario_repository
+from routers.base import AdminRouter
 
-router = APIRouter(prefix="/admin", tags=["Administração"])
+router = AdminRouter(prefix="/admin", tags=["Administração"])
 
 
 @router.get("/usuarios/pendentes", response_model=List[UsuarioAdminResponse])
@@ -28,8 +29,7 @@ def listar_todos_usuarios(
     db: Session = Depends(get_db)
 ):
     """Lista todos os usuários do sistema."""
-    usuarios = db.query(Usuario).order_by(Usuario.created_at.desc()).all()
-    return usuarios
+    return usuario_repository.get_all_ordered(db)
 
 
 @router.post("/usuarios/{user_id}/aprovar", response_model=Mensagem)
@@ -127,17 +127,4 @@ def obter_estatisticas(
     db: Session = Depends(get_db)
 ):
     """Retorna estatísticas gerais do sistema."""
-    total_usuarios = db.query(Usuario).count()
-    usuarios_aprovados = db.query(Usuario).filter(Usuario.is_approved.is_(True)).count()
-    usuarios_pendentes = db.query(Usuario).filter(
-        Usuario.is_approved.is_(False),
-        Usuario.is_active.is_(True)
-    ).count()
-    usuarios_inativos = db.query(Usuario).filter(Usuario.is_active.is_(False)).count()
-
-    return {
-        "total_usuarios": total_usuarios,
-        "usuarios_aprovados": usuarios_aprovados,
-        "usuarios_pendentes": usuarios_pendentes,
-        "usuarios_inativos": usuarios_inativos
-    }
+    return usuario_repository.get_stats(db)

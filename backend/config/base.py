@@ -97,10 +97,13 @@ OCR_PARALLEL_ENABLED = env_bool("OCR_PARALLEL_ENABLED", True)
 OCR_MAX_WORKERS = env_int("OCR_MAX_WORKERS", 4)
 OCR_PREPROCESS_ENABLED = env_bool("OCR_PREPROCESS", True)
 OCR_TESSERACT_FALLBACK = env_bool("OCR_TESSERACT_FALLBACK", True)
+# Preferir Tesseract (leve ~50MB) sobre EasyOCR (pesado ~1GB)
+OCR_PREFER_TESSERACT = env_bool("OCR_PREFER_TESSERACT", True)
 
 # === Serviços externos pagos ===
-# Desliga provedores pagos (OpenAI/Gemini/Document AI) por padrão
-PAID_SERVICES_ENABLED = env_bool("PAID_SERVICES_ENABLED", False)
+# APIs PAGAS PERMANENTEMENTE DESABILITADAS
+# OpenAI, Gemini e Document AI não são mais usados
+PAID_SERVICES_ENABLED = False  # Sempre False - não lê do .env
 
 
 # === Fila de Processamento ===
@@ -110,6 +113,12 @@ QUEUE_POLL_INTERVAL = env_float("QUEUE_POLL_INTERVAL", 1.0)
 
 # === Autenticacao ===
 ACCESS_TOKEN_EXPIRE_MINUTES = env_int("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
+
+
+# === Supabase ===
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 
 
 # === Paginacao ===

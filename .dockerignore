@@ -1,0 +1,56 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local development
+*.db
+*.sqlite
+*.sqlite3
+licitafacil.db
+
+# Uploads (serão gerenciados via volume)
+uploads/
+backend/uploads/
+
+# Documentação
+*.md
+!README.md
+
+# Testes
+tests/
+*_test.py
+test_*.py
+
+# Arquivos temporários
+tmp_*.py
+*.log
+*.tmp
+
+# Node (se houver)
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db

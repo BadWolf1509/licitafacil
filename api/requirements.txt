@@ -1,0 +1,24 @@
+# Dependências para Vercel Serverless Functions
+# Versão otimizada sem EasyOCR (muito pesado para serverless)
+
+fastapi==0.115.0
+uvicorn==0.30.6
+python-multipart==0.0.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+sqlalchemy==2.0.35
+aiosqlite==0.20.0
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# PDF Processing (leves)
+pdfplumber==0.11.4
+PyMuPDF==1.24.10
+
+# OCR leve (Tesseract wrapper)
+pytesseract==0.3.10
+
+# Não incluir EasyOCR - muito pesado para serverless
+# OCR pesado será feito via Supabase Edge Functions ou API externa

@@ -1,7 +1,7 @@
 import os
 import uuid
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -15,11 +15,13 @@ from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_or_raise
 from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
 from utils.http_helpers import get_user_resource_or_404
+from routers.base import AuthenticatedRouter
 from logging_config import get_logger
+from utils import handle_exception
 
 logger = get_logger('routers.analise')
 
-router = APIRouter(prefix="/analises", tags=["Análises"])
+router = AuthenticatedRouter(prefix="/analises", tags=["Análises"])
 
 
 @router.get("/status/servicos")
@@ -114,12 +116,8 @@ async def criar_analise(
         return nova_analise
 
     except Exception as e:
-        logger.error(f"Erro ao processar edital: {e}")
         safe_delete_file(filepath)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=Messages.PROCESSING_ERROR
-        )
+        raise handle_exception(e, logger, "ao processar edital")
 
 
 @router.post("/{analise_id}/processar", response_model=AnaliseResponse)
@@ -178,11 +176,7 @@ async def processar_analise(
         return analise
 
     except Exception as e:
-        logger.error(f"Erro ao reprocessar análise {analise_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=Messages.PROCESSING_ERROR
-        )
+        raise handle_exception(e, logger, f"ao reprocessar análise {analise_id}")
 
 
 @router.delete("/{analise_id}", response_model=Mensagem)

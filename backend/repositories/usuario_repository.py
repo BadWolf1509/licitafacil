@@ -56,6 +56,43 @@ class UsuarioRepository(BaseRepository[Usuario]):
             Usuario.is_active.is_(True)
         ).order_by(Usuario.created_at.desc()).all()
 
+    def get_all_ordered(self, db: Session) -> List[Usuario]:
+        """
+        Busca todos os usuários ordenados por data de criação.
+
+        Args:
+            db: Sessão do banco
+
+        Returns:
+            Lista de usuários
+        """
+        return db.query(Usuario).order_by(Usuario.created_at.desc()).all()
+
+    def get_stats(self, db: Session) -> dict:
+        """
+        Retorna estatísticas de usuários.
+
+        Args:
+            db: Sessão do banco
+
+        Returns:
+            Dicionário com estatísticas
+        """
+        total = db.query(Usuario).count()
+        aprovados = db.query(Usuario).filter(Usuario.is_approved.is_(True)).count()
+        pendentes = db.query(Usuario).filter(
+            Usuario.is_approved.is_(False),
+            Usuario.is_active.is_(True)
+        ).count()
+        inativos = db.query(Usuario).filter(Usuario.is_active.is_(False)).count()
+
+        return {
+            "total_usuarios": total,
+            "usuarios_aprovados": aprovados,
+            "usuarios_pendentes": pendentes,
+            "usuarios_inativos": inativos
+        }
+
     def approve(self, db: Session, usuario: Usuario) -> Usuario:
         """
         Aprova um usuário.

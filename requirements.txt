@@ -6,24 +6,18 @@ python-multipart==0.0.21
 # Banco de dados
 sqlalchemy==2.0.45
 aiosqlite==0.22.1
+psycopg2-binary==2.9.10  # Driver PostgreSQL para Supabase
 
 # Autenticação
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 
-# Extração de PDF
+# Extração de PDF (processamento local)
 pdfplumber==0.11.9
 PyMuPDF==1.26.7
 
-# OCR
+# OCR local
 easyocr==1.7.2
-
-# OpenAI
-openai==2.15.0
-
-# Google Gemini
-google-genai==1.59.0
-google-cloud-documentai==3.8.0
 Pillow==12.1.0
 
 # Utilitários
@@ -31,9 +25,15 @@ python-dotenv==1.2.1
 pydantic[email]==2.12.5
 pydantic-settings==2.12.0
 
-# Azure Document Intelligence (OCR Cloud)
-azure-ai-documentintelligence==1.0.2
-azure-core==1.38.0
-
 # Processamento de imagem (pré-processamento para OCR)
+# opencv-python é instalado pelo easyocr
 # scipy==1.11.4  # Opcional - descomente se necessário (requer build tools)
+
+# =======================
+# REMOVIDO - APIs Pagas não são mais usadas:
+# - openai
+# - google-genai
+# - google-cloud-documentai
+# - azure-ai-documentintelligence
+# - azure-core
+# =======================

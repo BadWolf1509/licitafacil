@@ -34,35 +34,16 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gerenciador de ciclo de vida da aplicação."""
-    import asyncio
-    from services.ocr_service import ocr_service
-
-    # Pré-inicializar OCR em thread separada (não bloqueia o startup)
-    async def init_ocr_background():
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, ocr_service.initialize)
-
-    # Agendar inicialização do OCR em background
-    ocr_task = asyncio.create_task(init_ocr_background())
-    logger.info("Inicializacao do OCR agendada em background")
-
     # Startup: iniciar fila de processamento
     await processing_queue.start()
     logger.info("Fila de processamento iniciada")
+    logger.info("OCR será carregado sob demanda (lazy loading)")
 
     yield
 
     # Shutdown: parar fila de processamento
     await processing_queue.stop()
     logger.info("Fila de processamento parada")
-
-    # Cancelar task do OCR se ainda estiver rodando
-    if not ocr_task.done():
-        ocr_task.cancel()
-        try:
-            await ocr_task
-        except asyncio.CancelledError:
-            pass
 
 
 # Criar aplicação FastAPI
