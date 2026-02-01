@@ -1,11 +1,11 @@
 """
 Provedores de IA para o LicitaFácil.
 
-Este módulo contém implementações concretas da interface BaseAIProvider
-para diferentes provedores de IA (OpenAI, Gemini, etc.).
+Este módulo continha implementações de provedores pagos (OpenAI, Gemini)
+que foram removidos. A funcionalidade agora usa apenas OCR local.
+
+NOTA: Provedores pagos foram permanentemente desabilitados.
+Veja PAID_SERVICES_ENABLED em config/base.py.
 """
 
-from .openai_provider import OpenAIProvider
-from .gemini_provider import GeminiProvider
-
-__all__ = ["OpenAIProvider", "GeminiProvider"]
+__all__ = []

@@ -5,6 +5,7 @@ python-multipart==0.0.21
 
 # Banco de dados
 sqlalchemy==2.0.45
+alembic==1.18.3  # Migrations de banco de dados
 aiosqlite==0.22.1
 psycopg2-binary==2.9.10  # Driver PostgreSQL para Supabase
 

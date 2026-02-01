@@ -7,7 +7,6 @@ from pathlib import Path
 
 from .pdf_extractor import pdf_extractor
 from .pdf_extraction_service import pdf_extraction_service
-from .ai_provider import ai_provider
 from .matching_service import matching_service
 from exceptions import UnsupportedFileError, TextExtractionError, PDFError, OCRError
 from logging_config import get_logger
@@ -76,19 +75,9 @@ class EditalProcessor:
                 for linha in tabela:
                     texto_completo += " | ".join(linha) + "\n"
 
-        # Extrair exigencias com IA
-        if ai_provider.is_configured:
-            pdf_extraction_service._notify_progress(
-                progress_callback, 0, 0, "ia", "Analisando exigencias"
-            )
-            pdf_extraction_service._check_cancel(cancel_check)
-            # Usar provider configurado via ai_provider
-            provider = ai_provider.get_provider_instance()
-            from .ai.extraction_service import AIExtractionService
-            service = AIExtractionService()
-            exigencias = service.extract_edital_requirements(texto_completo, provider=provider)
-        else:
-            exigencias = []
+        # Extrair exigencias com IA (desabilitado - APIs pagas não disponíveis)
+        # ai_provider.is_configured sempre retorna False
+        exigencias: List[Dict[str, Any]] = []
 
         pdf_extraction_service._notify_progress(
             progress_callback, 0, 0, "final", "Finalizando processamento"
