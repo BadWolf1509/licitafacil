@@ -11,10 +11,12 @@ from schemas import (
     UsuarioLogin,
     Token,
     Mensagem,
-    UsuarioUpdate
+    UsuarioUpdate,
+    PasswordChange
 )
 from auth import (
     get_password_hash,
+    verify_password,
     authenticate_user,
     create_access_token,
     get_current_approved_user,
@@ -141,3 +143,24 @@ def atualizar_perfil(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.post("/change-password", response_model=Mensagem)
+def alterar_senha(
+    dados: PasswordChange,
+    current_user: Usuario = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Altera a senha do usuário logado."""
+    # Verificar senha atual
+    if not verify_password(dados.senha_atual, current_user.senha_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha atual incorreta"
+        )
+
+    # Atualizar senha
+    current_user.senha_hash = get_password_hash(dados.senha_nova)
+    db.commit()
+
+    return Mensagem(mensagem="Senha alterada com sucesso", sucesso=True)

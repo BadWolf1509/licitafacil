@@ -1,0 +1,200 @@
+/* LicitaFácil - Estilos da Página de Perfil */
+
+/* Grid de duas colunas para os cards de formulário */
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+/* Header do perfil com avatar */
+.profile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+/* Avatar circular com inicial do nome */
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    min-width: 80px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--secondary);
+    text-transform: uppercase;
+}
+
+/* Informações do perfil */
+.profile-info h1 {
+    margin-bottom: var(--spacing-xs);
+    font-size: 1.5rem;
+}
+
+.profile-info .text-muted {
+    font-size: 0.95rem;
+}
+
+/* Badges de status */
+.profile-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-sm);
+}
+
+/* Meta informações (membro desde, aprovado em) */
+.profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+}
+
+/* Password wrapper para botão de mostrar/ocultar */
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-wrapper .form-input {
+    padding-right: 40px;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.password-toggle:hover {
+    opacity: 1;
+}
+
+.eye-icon {
+    font-size: 1rem;
+}
+
+/* Botões de submit com largura total */
+.profile-grid .btn-primary {
+    width: 100%;
+    margin-top: var(--spacing-sm);
+}
+
+/* Theme Switch Toggle */
+.theme-switch-container {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) 0;
+}
+
+.theme-switch-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.theme-switch-label .theme-label-icon {
+    font-size: 1.25rem;
+}
+
+.theme-switch {
+    position: relative;
+    width: 56px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.theme-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.theme-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--primary-light);
+    border: 2px solid var(--border);
+    transition: var(--transition);
+    border-radius: 28px;
+}
+
+.theme-switch-slider::before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--primary);
+    transition: var(--transition);
+    border-radius: 50%;
+}
+
+.theme-switch input:checked + .theme-switch-slider {
+    background-color: var(--secondary-light);
+    border-color: var(--secondary-lighter);
+}
+
+.theme-switch input:checked + .theme-switch-slider::before {
+    transform: translateX(28px);
+    background-color: var(--primary);
+}
+
+.theme-switch input:focus-visible + .theme-switch-slider {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.theme-switch-text {
+    font-weight: 500;
+    min-width: 50px;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .profile-badges {
+        justify-content: center;
+    }
+
+    .profile-meta {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+        text-align: center;
+    }
+
+    .profile-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .theme-switch-container {
+        justify-content: center;
+    }
+}

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional, List, Generic, TypeVar, Any, Sequence
 from datetime import datetime
 from decimal import Decimal
@@ -25,6 +25,19 @@ class UsuarioLogin(BaseModel):
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = None
     tema_preferido: Optional[str] = None
+
+
+class PasswordChange(BaseModel):
+    """Schema para alteração de senha."""
+    senha_atual: str
+    senha_nova: str = Field(..., min_length=6)
+    confirmar_senha: str
+
+    @model_validator(mode='after')
+    def validar_senhas(self):
+        if self.senha_nova != self.confirmar_senha:
+            raise ValueError('As senhas não coincidem')
+        return self
 
 
 class UsuarioResponse(UsuarioBase):
@@ -113,7 +126,6 @@ class ExigenciaEdital(BaseModel):
     descricao: Optional[str] = None
     quantidade_minima: Optional[Decimal] = None
     unidade: Optional[str] = None
-    percentual_exigido: Optional[float] = None
     permitir_soma: Optional[bool] = None
     exige_unico: Optional[bool] = None
 
@@ -139,6 +151,12 @@ class ResultadoExigencia(BaseModel):
 
 class AnaliseCreate(BaseModel):
     nome_licitacao: str
+
+
+class AnaliseManualCreate(BaseModel):
+    """Schema para criar análise manualmente (sem PDF)."""
+    nome_licitacao: str
+    exigencias: List[ExigenciaEdital]
 
 
 class AnaliseResponse(BaseModel):

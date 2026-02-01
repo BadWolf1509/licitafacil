@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -21,8 +21,8 @@ class Usuario(Base):
     nome: Mapped[str] = mapped_column(String(255), nullable=False)
 
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_approved: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     tema_preferido: Mapped[str] = mapped_column(String(10), default="light")  # light ou dark
 
@@ -39,13 +39,19 @@ class Usuario(Base):
         foreign_keys=[approved_by]
     )
 
+    # Índices compostos para queries frequentes
+    __table_args__ = (
+        Index('ix_usuarios_approved_created', 'is_approved', 'created_at'),
+        Index('ix_usuarios_active_created', 'is_active', 'created_at'),
+    )
+
 
 class Atestado(Base):
     """Modelo de atestado de capacidade tecnica."""
     __tablename__ = "atestados"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False, index=True)
 
     descricao_servico: Mapped[str] = mapped_column(Text, nullable=False)
     quantidade: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 4), nullable=True)
@@ -64,13 +70,18 @@ class Atestado(Base):
     # Relacionamentos
     usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="atestados")
 
+    # Índice composto para listagem ordenada por usuário
+    __table_args__ = (
+        Index('ix_atestados_user_created', 'user_id', 'created_at'),
+    )
+
 
 class Analise(Base):
     """Modelo de analise de licitacao."""
     __tablename__ = "analises"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False, index=True)
 
     nome_licitacao: Mapped[str] = mapped_column(String(255), nullable=False)
     arquivo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -83,19 +94,24 @@ class Analise(Base):
     # Relacionamentos
     usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="analises")
 
+    # Índice composto para listagem ordenada por usuário
+    __table_args__ = (
+        Index('ix_analises_user_created', 'user_id', 'created_at'),
+    )
+
 
 class ProcessingJobModel(Base):
     """Modelo SQLAlchemy para jobs de processamento."""
     __tablename__ = "processing_jobs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     original_filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     job_type: Mapped[str] = mapped_column(String(50), nullable=False, default="atestado")
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", index=True)
 
     created_at: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -114,3 +130,8 @@ class ProcessingJobModel(Base):
     progress_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     pipeline: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Índice composto para queries de jobs por usuário e status
+    __table_args__ = (
+        Index('ix_jobs_user_status', 'user_id', 'status'),
+    )

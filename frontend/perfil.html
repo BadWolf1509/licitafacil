@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Meu Perfil</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/perfil.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+
+        <!-- Botão hamburger (mobile) -->
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <a href="atestados.html">Atestados</a>
+            <a href="analises.html">Análises</a>
+            <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+            <a href="perfil.html" class="active">Perfil</a>
+            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Card de Informações da Conta -->
+        <div class="card mb-3">
+            <div class="profile-header">
+                <div class="profile-avatar" id="profileAvatar">U</div>
+                <div class="profile-info">
+                    <h1 id="profileName">Carregando...</h1>
+                    <p class="text-muted" id="profileEmail">...</p>
+                    <div class="profile-badges" id="profileBadges">
+                        <!-- Badges serão inseridos via JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="profile-meta">
+                <span class="text-muted">Membro desde: <span id="profileCreatedAt">-</span></span>
+                <span class="text-muted" id="profileApprovedAt"></span>
+            </div>
+        </div>
+
+        <!-- Grid de Formulários -->
+        <div class="profile-grid">
+            <!-- Card de Edição de Perfil -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Editar Perfil</h2>
+                </div>
+                <form id="formPerfil">
+                    <div class="form-group">
+                        <label class="form-label">Nome</label>
+                        <input type="text" class="form-input" id="inputNome" required
+                            placeholder="Seu nome completo">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tema da Interface</label>
+                        <div class="theme-switch-container">
+                            <span class="theme-switch-label">
+                                <span class="theme-label-icon" aria-hidden="true">&#9728;</span>
+                                <span>Claro</span>
+                            </span>
+                            <label class="theme-switch">
+                                <input type="checkbox" id="inputTema" onchange="toggleThemeSwitch()">
+                                <span class="theme-switch-slider"></span>
+                            </label>
+                            <span class="theme-switch-label">
+                                <span class="theme-label-icon" aria-hidden="true">&#9790;</span>
+                                <span>Escuro</span>
+                            </span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnSalvarPerfil">
+                        <span id="btnSalvarPerfilText">Salvar Nome</span>
+                        <span id="btnSalvarPerfilSpinner" class="spinner hidden"></span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Card de Alteração de Senha -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Alterar Senha</h2>
+                </div>
+                <form id="formSenha">
+                    <div class="form-group">
+                        <label class="form-label">Senha Atual</label>
+                        <div class="password-wrapper">
+                            <input type="password" class="form-input" id="inputSenhaAtual" required
+                                placeholder="Digite sua senha atual">
+                            <button type="button" class="password-toggle" onclick="togglePassword('inputSenhaAtual', this)">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Nova Senha</label>
+                        <div class="password-wrapper">
+                            <input type="password" class="form-input" id="inputSenhaNova" required
+                                minlength="6" placeholder="Mínimo 6 caracteres">
+                            <button type="button" class="password-toggle" onclick="togglePassword('inputSenhaNova', this)">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirmar Nova Senha</label>
+                        <div class="password-wrapper">
+                            <input type="password" class="form-input" id="inputConfirmarSenha" required
+                                minlength="6" placeholder="Repita a nova senha">
+                            <button type="button" class="password-toggle" onclick="togglePassword('inputConfirmarSenha', this)">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btnAlterarSenha">
+                        <span id="btnAlterarSenhaText">Alterar Senha</span>
+                        <span id="btnAlterarSenhaSpinner" class="spinner hidden"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/perfil.js"></script>
+</body>
+</html>
