@@ -1,8 +1,7 @@
 """
 Script para reparar descrições de atestados que perderam acentos.
 
-Usa o texto_extraido (que preserva acentos) para reconstruir
-as descrições corretamente.
+Usa mapeamento de palavras comuns para restaurar acentos.
 
 Uso:
     python scripts/repair_descriptions.py --dry-run  # Ver mudanças sem aplicar
@@ -24,142 +23,279 @@ from logging_config import get_logger
 logger = get_logger('scripts.repair_descriptions')
 
 
-def extract_description_from_text(texto: str) -> str:
+# Mapeamento de palavras sem acento -> com acento
+# Inclui variações de case e plural
+ACCENT_MAP = {
+    # Palavras comuns em descrições de obras
+    'execucao': 'execução',
+    'construcao': 'construção',
+    'reconstrucao': 'reconstrução',
+    'fundacao': 'fundação',
+    'instalacao': 'instalação',
+    'instalacoes': 'instalações',
+    'manutencao': 'manutenção',
+    'operacao': 'operação',
+    'recuperacao': 'recuperação',
+    'ampliacao': 'ampliação',
+    'pavimentacao': 'pavimentação',
+    'implantacao': 'implantação',
+    'urbanizacao': 'urbanização',
+    'regularizacao': 'regularização',
+    'canalizacao': 'canalização',
+    'drenagem': 'drenagem',
+    'sinalizacao': 'sinalização',
+    'iluminacao': 'iluminação',
+    'irrigacao': 'irrigação',
+    'perfuracao': 'perfuração',
+    'escavacao': 'escavação',
+    'compactacao': 'compactação',
+    'demolicao': 'demolição',
+    'terraplanagem': 'terraplanagem',
+    'concretagem': 'concretagem',
+    'alvenaria': 'alvenaria',
+    'pintura': 'pintura',
+    'impermeabilizacao': 'impermeabilização',
+    'restauracao': 'restauração',
+    'conservacao': 'conservação',
+    'reabilitacao': 'reabilitação',
+    'adequacao': 'adequação',
+    'adaptacao': 'adaptação',
+    'revitalizacao': 'revitalização',
+    'reurbanizacao': 'reurbanização',
+    'duplicacao': 'duplicação',
+    'reestruturacao': 'reestruturação',
+
+    # Localizações e geografia
+    'sao': 'são',
+    'joao': 'joão',
+    'paraiba': 'paraíba',
+    'piaui': 'piauí',
+    'ceara': 'ceará',
+    'maranhao': 'maranhão',
+    'goias': 'goiás',
+    'amapa': 'amapá',
+    # 'para': 'pará',  # NÃO incluir - conflita com preposição "para"
+    'rondonia': 'rondônia',
+    'espirito': 'espírito',
+    'bahia': 'bahia',
+    'municipio': 'município',
+    'municipios': 'municípios',
+    'regiao': 'região',
+    'area': 'área',
+    'areas': 'áreas',
+    'estacao': 'estação',
+    'estacoes': 'estações',
+
+    # Termos técnicos
+    'servico': 'serviço',
+    'servicos': 'serviços',
+    'predio': 'prédio',
+    'predios': 'prédios',
+    'edificio': 'edifício',
+    'edificios': 'edifícios',
+    'agua': 'água',
+    'aguas': 'águas',
+    'esgoto': 'esgoto',
+    'sanitario': 'sanitário',
+    'sanitaria': 'sanitária',
+    'hidraulica': 'hidráulica',
+    'hidraulico': 'hidráulico',
+    'eletrica': 'elétrica',
+    'eletrico': 'elétrico',
+    'mecanica': 'mecânica',
+    'mecanico': 'mecânico',
+    'tecnica': 'técnica',
+    'tecnico': 'técnico',
+    'tecnicos': 'técnicos',
+    'topograficos': 'topográficos',
+    'topografico': 'topográfico',
+    'pluviometrica': 'pluviométrica',
+    'quilometro': 'quilômetro',
+    'quilometros': 'quilômetros',
+    'diametro': 'diâmetro',
+    'perimetro': 'perímetro',
+    'concreto': 'concreto',
+    'asfaltico': 'asfáltico',
+    'asfaltica': 'asfáltica',
+    'graniticas': 'graníticas',
+    'granitico': 'granítico',
+    'ceramica': 'cerâmica',
+    'ceramico': 'cerâmico',
+    'metalica': 'metálica',
+    'metalico': 'metálico',
+    'estrutura': 'estrutura',
+    'estrutural': 'estrutural',
+    'locacao': 'locação',
+    'fornecimento': 'fornecimento',
+    'aquisicao': 'aquisição',
+    'contratacao': 'contratação',
+    'licitacao': 'licitação',
+    'medicao': 'medição',
+    'vistoria': 'vistoria',
+    'fiscalizacao': 'fiscalização',
+    'supervisao': 'supervisão',
+    'gerenciamento': 'gerenciamento',
+    'administracao': 'administração',
+    'mobilizacao': 'mobilização',
+    'desmobilizacao': 'desmobilização',
+
+    # Materiais e componentes
+    'tubo': 'tubo',
+    'tubulacao': 'tubulação',
+    'conexao': 'conexão',
+    'conexoes': 'conexões',
+    'juncao': 'junção',
+    'reducao': 'redução',
+    'valvula': 'válvula',
+    'registro': 'registro',
+    'caixa': 'caixa',
+    'poco': 'poço',
+    'pocos': 'poços',
+    'reservatorio': 'reservatório',
+    'elevatoria': 'elevatória',
+    'elevatorio': 'elevatório',
+    'uniao': 'união',
+    'acoplamento': 'acoplamento',
+    'fixacao': 'fixação',
+    'ancoragem': 'ancoragem',
+    'suporte': 'suporte',
+    'apoio': 'apoio',
+    'protecao': 'proteção',
+    'vedacao': 'vedação',
+    'isolamento': 'isolamento',
+    'revestimento': 'revestimento',
+    'acabamento': 'acabamento',
+    'limpeza': 'limpeza',
+    'remocao': 'remoção',
+    'colocacao': 'colocação',
+    'assentamento': 'assentamento',
+    'aplicacao': 'aplicação',
+    'preparacao': 'preparação',
+    'nivelamento': 'nivelamento',
+
+    # Tipos de vias e infraestrutura
+    'via': 'via',
+    'vias': 'vias',
+    'rodovia': 'rodovia',
+    'avenida': 'avenida',
+    'calcada': 'calçada',
+    'calcadas': 'calçadas',
+    'meio-fio': 'meio-fio',
+    'sarjeta': 'sarjeta',
+    'bueiro': 'bueiro',
+    'galeria': 'galeria',
+    'ponte': 'ponte',
+    'viaduto': 'viaduto',
+    'passarela': 'passarela',
+    'travessia': 'travessia',
+    'acesso': 'acesso',
+    'entrada': 'entrada',
+    'saida': 'saída',
+    'retorno': 'retorno',
+    'rotatoria': 'rotatória',
+    'intersecao': 'interseção',
+    'cruzamento': 'cruzamento',
+
+    # Adjetivos e outros
+    'publico': 'público',
+    'publica': 'pública',
+    'publicos': 'públicos',
+    'publicas': 'públicas',
+    'domestico': 'doméstico',
+    'domestica': 'doméstica',
+    'residencial': 'residencial',
+    'comercial': 'comercial',
+    'industrial': 'industrial',
+    'hospitalar': 'hospitalar',
+    'escolar': 'escolar',
+    'esportivo': 'esportivo',
+    'esportiva': 'esportiva',
+    'provisorio': 'provisório',
+    'provisoria': 'provisória',
+    'definitivo': 'definitivo',
+    'definitiva': 'definitiva',
+    'emergencial': 'emergencial',
+    'corretiva': 'corretiva',
+    'corretivo': 'corretivo',
+    'preventiva': 'preventiva',
+    'preventivo': 'preventivo',
+    'periodica': 'periódica',
+    'periodico': 'periódico',
+    'continuo': 'contínuo',
+    'continua': 'contínua',
+}
+
+
+def restore_accents(text: str) -> str:
     """
-    Extrai a descrição do serviço do texto extraído do PDF.
+    Restaura acentos em um texto usando o mapeamento de palavras.
 
-    Busca padrões comuns em atestados de capacidade técnica.
+    Preserva o case original (maiúsculas/minúsculas).
     """
-    if not texto:
-        return ""
+    if not text:
+        return text
 
-    # Padrões para encontrar descrição do serviço
-    patterns = [
-        # "Descrição do Serviço: ..." ou "Objeto: ..."
-        r'(?:descri[çc][aã]o\s+(?:do\s+)?servi[çc]o|objeto)\s*[:]\s*([^\n]+)',
-        # "Serviço(s) Executado(s): ..."
-        r'servi[çc]os?\s+executados?\s*[:]\s*([^\n]+)',
-        # Após "ATESTAMOS" ou "DECLARAMOS"
-        r'(?:atestamos|declaramos)[^:]*:\s*([^\n]+)',
-    ]
+    result = text
 
-    for pattern in patterns:
-        match = re.search(pattern, texto, re.IGNORECASE)
-        if match:
-            desc = match.group(1).strip()
-            # Limitar tamanho e limpar
-            desc = ' '.join(desc.split())[:500]
-            if len(desc) > 20:  # Descrição válida
-                return desc
+    for unaccented, accented in ACCENT_MAP.items():
+        # Padrão para encontrar a palavra (case insensitive, word boundary)
+        pattern = r'\b' + re.escape(unaccented) + r'\b'
 
-    return ""
+        def replace_preserving_case(match):
+            original = match.group(0)
+            if original.isupper():
+                return accented.upper()
+            elif original[0].isupper():
+                return accented.capitalize()
+            else:
+                return accented
+
+        result = re.sub(pattern, replace_preserving_case, result, flags=re.IGNORECASE)
+
+    return result
 
 
 def has_missing_accents(text: str) -> bool:
     """
     Verifica se o texto parece ter perdido acentos.
-
-    Detecta palavras comuns em português que deveriam ter acentos.
     """
     if not text:
         return False
 
-    # Palavras que frequentemente aparecem sem acento incorretamente
-    accent_patterns = [
-        (r'\bexecucao\b', 'execução'),
-        (r'\bconstrucao\b', 'construção'),
-        (r'\bfundacao\b', 'fundação'),
-        (r'\binstalacao\b', 'instalação'),
-        (r'\bmanutencao\b', 'manutenção'),
-        (r'\boperacao\b', 'operação'),
-        (r'\breforma\b', 'reforma'),  # não tem acento, ok
-        (r'\brecuperacao\b', 'recuperação'),
-        (r'\bampliacao\b', 'ampliação'),
-        (r'\bpavimentacao\b', 'pavimentação'),
-        (r'\bdrenagem\b', 'drenagem'),  # não tem acento, ok
-        (r'\bsao\b', 'são'),
-        (r'\bestacao\b', 'estação'),
-        (r'\bservico\b', 'serviço'),
-        (r'\bpredio\b', 'prédio'),
-        (r'\bagua\b', 'água'),
-        (r'\besgoto\b', 'esgoto'),  # não tem acento, ok
-        (r'\barea\b', 'área'),
-    ]
-
     text_lower = text.lower()
-    for pattern, _ in accent_patterns:
+
+    # Verificar se alguma palavra do mapeamento está presente sem acento
+    for unaccented in ACCENT_MAP.keys():
+        pattern = r'\b' + re.escape(unaccented) + r'\b'
         if re.search(pattern, text_lower):
             return True
 
     return False
 
 
-def find_accented_version(texto_extraido: str, desc_sem_acento: str) -> str:
-    """
-    Busca no texto extraído a versão com acentos da descrição.
-    """
-    if not texto_extraido or not desc_sem_acento:
-        return desc_sem_acento
-
-    # Normalizar para comparação (remover espaços extras)
-    desc_clean = ' '.join(desc_sem_acento.split()).lower()
-
-    # Dividir texto em linhas e parágrafos
-    lines = texto_extraido.split('\n')
-
-    for line in lines:
-        line_clean = ' '.join(line.split()).lower()
-
-        # Verificar se a linha contém a descrição (ignorando acentos)
-        # Usar comparação fuzzy simples
-        if len(line_clean) < 20:
-            continue
-
-        # Remover acentos da linha para comparar
-        import unicodedata
-        line_ascii = unicodedata.normalize('NFKD', line_clean)
-        line_ascii = line_ascii.encode('ASCII', 'ignore').decode('ASCII')
-
-        # Se a versão sem acento bate, usar a versão original (com acento)
-        if desc_clean in line_ascii or line_ascii in desc_clean:
-            # Extrair a parte relevante da linha original
-            return ' '.join(line.split())[:500]
-
-    return desc_sem_acento
-
-
 def repair_atestado(atestado: Atestado, dry_run: bool = True) -> bool:
     """
     Repara a descrição de um atestado se necessário.
-
-    Returns:
-        True se houve alteração, False caso contrário
     """
     if not atestado.descricao_servico:
         return False
 
-    # Verificar se precisa de reparo
     if not has_missing_accents(atestado.descricao_servico):
         return False
 
-    # Tentar encontrar versão com acentos no texto extraído
-    if atestado.texto_extraido:
-        new_desc = find_accented_version(
-            atestado.texto_extraido,
-            atestado.descricao_servico
+    new_desc = restore_accents(atestado.descricao_servico)
+
+    if new_desc != atestado.descricao_servico:
+        logger.info(
+            f"Atestado {atestado.id}: "
+            f"'{atestado.descricao_servico[:60]}...' -> "
+            f"'{new_desc[:60]}...'"
         )
 
-        if new_desc != atestado.descricao_servico:
-            logger.info(
-                f"Atestado {atestado.id}: "
-                f"'{atestado.descricao_servico[:50]}...' -> "
-                f"'{new_desc[:50]}...'"
-            )
+        if not dry_run:
+            atestado.descricao_servico = new_desc
 
-            if not dry_run:
-                atestado.descricao_servico = new_desc
-
-            return True
+        return True
 
     return False
 
@@ -167,30 +303,35 @@ def repair_atestado(atestado: Atestado, dry_run: bool = True) -> bool:
 def repair_servicos_json(atestado: Atestado, dry_run: bool = True) -> int:
     """
     Repara as descrições dentro de servicos_json.
-
-    Returns:
-        Número de serviços reparados
     """
-    if not atestado.servicos_json or not atestado.texto_extraido:
+    if not atestado.servicos_json:
         return 0
 
     count = 0
+    modified = False
+
     for servico in atestado.servicos_json:
         desc = servico.get('descricao', '')
         if not desc or not has_missing_accents(desc):
             continue
 
-        new_desc = find_accented_version(atestado.texto_extraido, desc)
+        new_desc = restore_accents(desc)
         if new_desc != desc:
             logger.info(
                 f"  Serviço {servico.get('item', '?')}: "
-                f"'{desc[:40]}...' -> '{new_desc[:40]}...'"
+                f"'{desc[:50]}...' -> '{new_desc[:50]}...'"
             )
 
             if not dry_run:
                 servico['descricao'] = new_desc
+                modified = True
 
             count += 1
+
+    # Marcar como modificado para o SQLAlchemy detectar
+    if modified and not dry_run:
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(atestado, 'servicos_json')
 
     return count
 
