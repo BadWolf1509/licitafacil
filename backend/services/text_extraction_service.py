@@ -1,9 +1,12 @@
 """
 Servico de extracao de texto de documentos.
 Extrai itens, quantidades e descricoes de texto bruto.
+
+Inclui cache de resultados para evitar reprocessamento de arquivos identicos.
 """
 from typing import Dict, Any, Optional, Set, Callable
 import re
+import os
 
 from .extraction import (
     normalize_description,
@@ -16,10 +19,14 @@ from .extraction import (
 from .pdf_extractor import pdf_extractor
 from .ocr_service import ocr_service
 from .pdf_extraction_service import pdf_extraction_service
+from .cache import get_cache
 from exceptions import PDFError, OCRError, UnsupportedFileError, TextExtractionError
 from logging_config import get_logger
 
 logger = get_logger('services.text_extraction')
+
+# TTL do cache de texto extraido (1 hora)
+TEXT_CACHE_TTL = int(os.getenv("TEXT_CACHE_TTL", "3600"))
 
 
 class TextExtractionService:
@@ -391,21 +398,34 @@ class TextExtractionService:
                 remapped += 1
         return remapped
 
+    def _get_cache_key(self, file_path: str) -> Optional[str]:
+        """Gera chave de cache baseada no hash do arquivo."""
+        try:
+            from utils.file_hash import get_text_extraction_cache_key
+            return get_text_extraction_cache_key(file_path)
+        except Exception as e:
+            logger.debug(f"Erro ao gerar cache key: {e}")
+            return None
+
     def extract_text_from_file(
         self,
         file_path: str,
         file_ext: str,
         progress_callback: Optional[Callable] = None,
-        cancel_check: Optional[Callable] = None
+        cancel_check: Optional[Callable] = None,
+        use_cache: bool = True
     ) -> str:
         """
         Extrai texto do arquivo (PDF ou imagem) usando OCR quando necessário.
+
+        Implementa cache para evitar reprocessamento de arquivos identicos.
 
         Args:
             file_path: Caminho para o arquivo
             file_ext: Extensão do arquivo (ex: ".pdf", ".png")
             progress_callback: Callback para progresso
             cancel_check: Função para verificar cancelamento
+            use_cache: Se True, tenta usar cache (default: True)
 
         Returns:
             Texto extraído do documento
@@ -413,6 +433,17 @@ class TextExtractionService:
         Raises:
             PDFError, OCRError, UnsupportedFileError, TextExtractionError
         """
+        # Tentar obter do cache
+        cache_key = None
+        if use_cache:
+            cache_key = self._get_cache_key(file_path)
+            if cache_key:
+                cache = get_cache()
+                cached_text = cache.get(cache_key)
+                if cached_text is not None:
+                    logger.info(f"Cache hit para extracao de texto: {cache_key}")
+                    return cached_text
+
         texto = ""
 
         if file_ext == ".pdf":
@@ -446,7 +477,29 @@ class TextExtractionService:
         if not texto.strip():
             raise TextExtractionError("documento")
 
+        # Salvar no cache
+        if use_cache and cache_key and texto:
+            cache = get_cache()
+            cache.set(cache_key, texto, TEXT_CACHE_TTL)
+            logger.info(f"Cache set para extracao de texto: {cache_key}")
+
         return texto
+
+    def invalidate_cache(self, file_path: str) -> bool:
+        """
+        Invalida o cache para um arquivo especifico.
+
+        Args:
+            file_path: Caminho do arquivo
+
+        Returns:
+            True se o cache foi invalidado, False caso contrario
+        """
+        cache_key = self._get_cache_key(file_path)
+        if cache_key:
+            cache = get_cache()
+            return cache.delete(cache_key)
+        return False
 
 
 # Singleton

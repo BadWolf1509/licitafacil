@@ -2,7 +2,7 @@
 Repositório para operações de Atestado.
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from models import Atestado
 from .base import BaseRepository
@@ -38,6 +38,7 @@ class AtestadoRepository(BaseRepository[Atestado]):
     ) -> List[Atestado]:
         """
         Busca todos os atestados do usuário com serviços.
+        Usa eager loading para evitar N+1 queries.
 
         Args:
             db: Sessão do banco
@@ -46,7 +47,9 @@ class AtestadoRepository(BaseRepository[Atestado]):
         Returns:
             Lista de atestados
         """
-        return db.query(Atestado).filter(
+        return db.query(Atestado).options(
+            joinedload(Atestado.usuario)
+        ).filter(
             Atestado.user_id == user_id
         ).all()
 

@@ -14,6 +14,9 @@ import numpy as np
 import cv2
 
 from config import OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK, OCR_PREFER_TESSERACT
+from logging_config import get_logger
+
+logger = get_logger('services.ocr_service')
 
 # Type hints sem importar o módulo pesado
 if TYPE_CHECKING:
@@ -48,7 +51,8 @@ class OCRService:
         try:
             pytesseract.get_tesseract_version()
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Tesseract não disponível: {e}")
             return False
 
     @property
@@ -108,7 +112,8 @@ class OCRService:
                 return rotated
 
             return image
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro ao corrigir inclinação da imagem: {e}")
             return image  # Em caso de erro, retornar imagem original
 
     def _adaptive_binarization(self, image: np.ndarray) -> np.ndarray:
@@ -142,7 +147,8 @@ class OCRService:
             )
 
             return binary
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro na binarização adaptativa: {e}")
             return image  # Em caso de erro, retornar imagem original
 
     def _preprocess_image(self, image: np.ndarray, use_binarization: bool = False) -> np.ndarray:
@@ -176,8 +182,6 @@ class OCRService:
         if self._reader is None:
             # Lazy import do EasyOCR (economiza ~500MB até ser necessário)
             if not EASYOCR_LOADED:
-                from logging_config import get_logger
-                logger = get_logger('services.ocr_service')
                 logger.info("Carregando EasyOCR (primeira vez - pode demorar)...")
                 import easyocr as _easyocr
                 easyocr = _easyocr
@@ -199,8 +203,6 @@ class OCRService:
         A inicialização pode demorar 30-60 segundos.
         """
         if self._reader is None:
-            from logging_config import get_logger
-            logger = get_logger('services.ocr_service')
             logger.info("Inicializando EasyOCR reader (pode demorar 30-60s)...")
             _ = self.reader  # Força inicialização lazy
             logger.info("EasyOCR reader inicializado com sucesso")
@@ -240,7 +242,8 @@ class OCRService:
                 pil_image = image_array
             text = pytesseract.image_to_string(pil_image, lang='por+eng')
             return text.strip() if text else None
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro na extração com Tesseract: {e}")
             return None
 
     def extract_text_from_bytes(self, image_bytes: bytes, use_binarization: bool = False, prefer_tesseract: Optional[bool] = None) -> str:

@@ -2,7 +2,7 @@
 Repositório para operações de Analise.
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from models import Analise
 from .base import BaseRepository
@@ -38,6 +38,7 @@ class AnaliseRepository(BaseRepository[Analise]):
     ) -> List[Analise]:
         """
         Busca todas as análises ordenadas por data de criação.
+        Usa eager loading para evitar N+1 queries.
 
         Args:
             db: Sessão do banco
@@ -46,7 +47,9 @@ class AnaliseRepository(BaseRepository[Analise]):
         Returns:
             Lista de análises ordenadas
         """
-        return db.query(Analise).filter(
+        return db.query(Analise).options(
+            joinedload(Analise.usuario)
+        ).filter(
             Analise.user_id == user_id
         ).order_by(Analise.created_at.desc()).all()
 

@@ -173,7 +173,8 @@ class RedisCache:
                 "available": True,
                 "keys": db_info.get("keys", 0) if isinstance(db_info, dict) else 0
             }
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro ao obter estatísticas do Redis: {e}")
             return {"backend": "redis", "available": False}
 
 

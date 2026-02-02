@@ -99,7 +99,8 @@ class PDFConverter:
             buffer = io.BytesIO()
             crop.save(buffer, format="PNG")
             return buffer.getvalue()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro ao recortar imagem: {e}")
             return image_bytes
 
     def resize_image(self, image_bytes: bytes, scale: float = 0.5) -> bytes:
@@ -123,7 +124,8 @@ class PDFConverter:
             buffer = io.BytesIO()
             resized.save(buffer, format="PNG")
             return buffer.getvalue()
-        except Exception:
+        except Exception as e:
+            logger.debug(f"Erro ao redimensionar imagem: {e}")
             return image_bytes
 
 
