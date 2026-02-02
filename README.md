@@ -1,177 +1,233 @@
-# LicitaFacil
+# LicitaFácil
 
-Sistema para extracao de dados de atestados de capacidade tecnica e analise de exigencias de editais, com fila de processamento e pipeline orientado a custo.
+Sistema para extração de dados de atestados de capacidade técnica e análise de exigências de editais de licitação.
 
-## Escopo atual
+## Visão Geral
 
-- Upload e processamento de atestados (PDF e imagem) com extracao de servicos e metadados
-- Analise de editais e matching com atestados
-- Frontend estatico (HTML/CSS/JS) servido pelo FastAPI
-- Fila de processamento com cancelamento e reprocessamento
+O LicitaFácil automatiza o processo de análise de qualificação técnica em licitações:
 
-## Pipeline de atestados (fluxo real)
-
-1. Extracao de texto: pdfplumber + OCR local (EasyOCR, com fallback Tesseract)
-2. Extracao de tabelas em cascata: pdfplumber -> Document AI (opcional)
-3. IA:
-   - Metadados sempre que houver provedor configurado
-   - Servicos apenas quando a tabela for insuficiente ou quando ATTESTADO_LLM_FALLBACK_ONLY=0
-   - Provedor selecionado automaticamente entre Gemini e OpenAI
-4. Pos-processamento: normalizacao, deduplicacao, filtros e backfill de quantidades via texto
-
-## Pipeline de qualidade/custo (/api/v1/pipeline)
-
-Fluxo alternativo para analise de qualidade e processamento fora da fila:
-- native_text: pdfplumber
-- local_ocr: EasyOCR
-- cloud_ocr: Azure Document Intelligence (opcional)
-- vision_ai: OpenAI Vision (quando necessario)
-
-## Matching deterministico (analises)
-
-- Opera por item de servico (servicos_json) com unidade normalizada
-- Similaridade por cobertura do requisito (keywords) com limiar configuravel
-- Gate por atividade e termos obrigatorios (ex: laminad, porcelanat, canaleta, cobre)
-- Seleciona atestados recomendados por soma greedy ate atingir a exigencia
-
-Limites conhecidos:
-- OCR/descricao incompleta pode gerar falso negativo nos termos obrigatorios
-- Editais sem regra explicita de soma usam soma como padrao
+1. **Upload de Atestados** - Extrai serviços, quantidades e metadados de PDFs/imagens
+2. **Análise de Editais** - Identifica exigências técnicas quantitativas
+3. **Matching Automático** - Compara atestados disponíveis com exigências do edital
+4. **Recomendação** - Sugere quais atestados apresentar para cada exigência
 
 ## Tecnologias
 
-Backend:
-- FastAPI, SQLAlchemy, SQLite (WAL)
-- pdfplumber e PyMuPDF
-- EasyOCR + Tesseract fallback
-- OpenAI (gpt-4o / gpt-4o-mini)
-- Google Gemini (google-genai)
-- Google Document AI (tabelas, opcional)
-- Azure Document Intelligence (OCR cloud, opcional)
+### Backend
+- **Framework:** FastAPI + SQLAlchemy
+- **Banco:** SQLite (desenvolvimento) / PostgreSQL (produção)
+- **Migrations:** Alembic
+- **Extração PDF:** pdfplumber + PyMuPDF
+- **OCR:** EasyOCR + Tesseract (fallback)
 
-Frontend:
-- HTML, CSS, JavaScript (arquivos estaticos em /frontend)
+### Frontend
+- HTML5, CSS3, JavaScript (vanilla)
+- Design responsivo com menu hamburger mobile
+- Tema claro/escuro configurável por usuário
 
-## Execucao local
+## Funcionalidades
 
-Pre-requisitos:
-- Python 3.10+
-- pip
+### Atestados
+- Upload de PDF e imagens (PNG, JPG, JPEG, WEBP)
+- Extração automática de tabela de serviços
+- Reprocessamento de documentos
+- Edição manual de serviços extraídos
 
-Passos:
-1. Criar ambiente virtual:
-   `python -m venv venv`
-2. Ativar ambiente virtual:
-   - Windows: `venv\Scripts\activate`
-   - Linux/Mac: `source venv/bin/activate`
-3. Instalar dependencias:
-   `pip install -r requirements.txt`
-4. Configurar variaveis:
-   - Windows: `copy .env.example .env`
-   - Linux/Mac: `cp .env.example .env`
-5. Criar admin inicial:
-   - `cd backend`
-   - `python seed.py`
-6. Iniciar API:
-   - `cd backend`
-   - `uvicorn main:app --reload --host 0.0.0.0 --port 8000`
+### Análises
+- Upload de página de edital com quantitativos
+- Matching determinístico por similaridade de descrição
+- Soma de atestados para atingir exigências
+- Visualização de cobertura por exigência
 
-Acesso:
-- UI: http://localhost:8000/
-- Docs: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+### Usuários
+- Autenticação JWT
+- Aprovação de novos usuários por admin
+- Página de perfil com alteração de senha
+- Preferência de tema (claro/escuro)
 
-## Variaveis de ambiente (principais)
+## Instalação Rápida
 
-Obrigatorias em producao:
-- SECRET_KEY
-- OPENAI_API_KEY ou GOOGLE_API_KEY
+```bash
+# Clonar repositório
+git clone https://github.com/seu-usuario/licitafacil.git
+cd licitafacil
 
-Core:
-- DATABASE_URL (default sqlite:///./licitafacil.db)
-- UPLOAD_DIR
-- AI_PROVIDER (auto, openai, gemini)
-- JWT_ALGORITHM (default HS256)
-- ACCESS_TOKEN_EXPIRE_MINUTES
+# Criar ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 
-Document AI (opcional):
-- DOCUMENT_AI_ENABLED
-- DOCUMENT_AI_FALLBACK_ONLY
-- DOCUMENT_AI_PROJECT_ID
-- DOCUMENT_AI_LOCATION
-- DOCUMENT_AI_PROCESSOR_ID
-- DOCUMENT_AI_PROCESSOR_VERSION
-- GOOGLE_APPLICATION_CREDENTIALS
+# Instalar dependências
+pip install -r requirements.txt
 
-Azure OCR (opcional):
-- AZURE_DOCUMENT_ENDPOINT
-- AZURE_DOCUMENT_KEY
+# Configurar ambiente
+cp .env.example .env
+# Editar .env com suas configurações
 
-OCR e fila:
-- OCR_PARALLEL_ENABLED
-- OCR_TESSERACT_FALLBACK
-- QUEUE_MAX_CONCURRENT
-- QUEUE_POLL_INTERVAL
+# Criar admin inicial
+cd backend
+python seed.py
 
-Admin seed:
-- ADMIN_EMAIL
-- ADMIN_PASSWORD
-- ADMIN_NAME
+# Iniciar servidor
+uvicorn main:app --reload --port 8000
+```
 
-Ajuste fino:
-- Variaveis ATTESTADO_* em .env.example
-- Matching:
-  - MATCH_SIMILARITY_THRESHOLD (default 0.35)
-  - MATCH_MIN_COMMON_WORDS (default 2)
-  - MATCH_MIN_COMMON_WORDS_SHORT (default 1)
+**Acesso:** http://localhost:8000
 
-## Endpoints principais (prefixo /api/v1)
+## Variáveis de Ambiente
 
-Auth:
-- POST /auth/login
-- POST /auth/login-json
-- POST /auth/registrar
-- GET /auth/me
+### Obrigatórias
+```env
+SECRET_KEY=<gere com: openssl rand -hex 32>
+```
 
-Atestados:
-- GET /atestados
-- POST /atestados
-- POST /atestados/upload
-- POST /atestados/{id}/reprocess
-- PATCH /atestados/{id}/servicos
-- DELETE /atestados/{id}
+### Opcionais
+```env
+# Banco de dados (default: SQLite local)
+DATABASE_URL=sqlite:///./licitafacil.db
 
-Analises:
-- GET /analises
-- POST /analises
-- POST /analises/{id}/processar
-- GET /analises/status/servicos
+# Admin inicial
+ADMIN_EMAIL=admin@licitafacil.com.br
+ADMIN_PASSWORD=admin123
+ADMIN_NAME=Administrador
 
-Fila e IA:
-- GET /ai/status
-- GET /ai/queue/status
-- GET /ai/queue/jobs
-- GET /ai/queue/jobs/{id}
-- POST /ai/queue/jobs/{id}/cancel
-- POST /ai/queue/jobs/{id}/retry
-- DELETE /ai/queue/jobs/{id}
+# JWT
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
-Pipeline:
-- GET /pipeline/status
-- POST /pipeline/analyze-quality
-- POST /pipeline/process
-- GET /pipeline/cost-estimate
+# OCR
+OCR_TESSERACT_FALLBACK=true
 
-## Estrutura
+# Uploads
+UPLOAD_DIR=uploads
+MAX_UPLOAD_SIZE=10485760
+```
 
-- backend/ (API e processamento)
-- frontend/ (UI estatica)
-- uploads/ (arquivos do usuario)
-- requirements.txt
-- .env.example
-- INICIAR.md
-- PIPELINE_SETUP.md
+## Estrutura do Projeto
 
-## Licenca
+```
+licitafacil/
+├── backend/
+│   ├── alembic/           # Migrations de banco
+│   ├── config/            # Configurações
+│   ├── docs/              # Documentação técnica
+│   ├── prompts/           # Prompts (legado)
+│   ├── repositories/      # Repositórios de dados
+│   ├── routers/           # Endpoints da API
+│   ├── services/          # Lógica de negócio
+│   │   ├── aditivo/       # Processamento de aditivos
+│   │   ├── atestado/      # Processamento de atestados
+│   │   ├── extraction/    # Módulos de extração
+│   │   ├── processors/    # Processadores de texto
+│   │   └── table_extraction/  # Extração de tabelas
+│   ├── tests/             # Testes unitários (341 testes)
+│   └── utils/             # Utilitários
+├── frontend/
+│   ├── css/               # Estilos
+│   ├── js/                # JavaScript
+│   └── *.html             # Páginas
+├── requirements.txt       # Dependências Python
+└── .env.example           # Exemplo de configuração
+```
 
-Proprietario. Todos os direitos reservados.
+## API Endpoints
+
+### Autenticação (`/api/v1/auth`)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/login` | Login (form-data) |
+| POST | `/login-json` | Login (JSON) |
+| POST | `/registrar` | Novo usuário |
+| GET | `/me` | Dados do usuário logado |
+| PUT | `/me` | Atualizar perfil |
+| POST | `/change-password` | Alterar senha |
+
+### Atestados (`/api/v1/atestados`)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/` | Listar atestados |
+| POST | `/` | Criar manualmente |
+| POST | `/upload` | Upload de documento |
+| GET | `/{id}` | Obter atestado |
+| PUT | `/{id}` | Atualizar atestado |
+| PATCH | `/{id}/servicos` | Atualizar serviços |
+| POST | `/{id}/reprocess` | Reprocessar |
+| DELETE | `/{id}` | Excluir |
+
+### Análises (`/api/v1/analises`)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/` | Listar análises |
+| POST | `/` | Criar análise |
+| GET | `/{id}` | Obter análise |
+| POST | `/{id}/processar` | Processar matching |
+| DELETE | `/{id}` | Excluir |
+
+### Admin (`/api/v1/admin`)
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/usuarios` | Listar usuários |
+| POST | `/usuarios/{id}/aprovar` | Aprovar usuário |
+| POST | `/usuarios/{id}/toggle-status` | Ativar/desativar |
+| POST | `/usuarios/{id}/toggle-admin` | Promover/rebaixar admin |
+
+## Pipeline de Processamento
+
+### Atestados
+```
+PDF/Imagem
+    ↓
+Extração de texto (pdfplumber)
+    ↓
+OCR se necessário (EasyOCR/Tesseract)
+    ↓
+Extração de tabelas
+    ↓
+Detecção de aditivos (prefixos S1-, S2-)
+    ↓
+Normalização e deduplicação
+    ↓
+Serviços extraídos
+```
+
+### Matching
+```
+Exigências do Edital + Atestados do Usuário
+    ↓
+Normalização de unidades e descrições
+    ↓
+Cálculo de similaridade (keywords)
+    ↓
+Soma de quantidades por exigência
+    ↓
+Seleção greedy de atestados
+    ↓
+Resultado: atende/parcial/não_atende
+```
+
+## Deploy
+
+### Desenvolvimento Local
+Veja instruções acima.
+
+### Produção (Vercel + Supabase)
+Consulte [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) para instruções detalhadas.
+
+## Testes
+
+```bash
+cd backend
+pytest -v
+```
+
+**Cobertura:** 341 testes passando
+
+## Credenciais Padrão
+
+- **Email:** admin@licitafacil.com.br
+- **Senha:** admin123
+
+**Altere após o primeiro login!**
+
+## Licença
+
+Proprietário. Todos os direitos reservados.
