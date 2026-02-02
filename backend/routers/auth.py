@@ -24,6 +24,7 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from repositories import usuario_repository
+from utils.password_validator import validate_password, get_password_requirements
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -62,6 +63,14 @@ def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
     Registra um novo usuário no sistema.
     O usuário ficará pendente de aprovação pelo administrador.
     """
+    # Validar complexidade da senha
+    is_valid, errors = validate_password(usuario.senha)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="; ".join(errors)
+        )
+
     # Verificar se email já existe
     if usuario_repository.get_by_email(db, usuario.email):
         raise HTTPException(
@@ -84,6 +93,12 @@ def registrar_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db)):
         mensagem="Cadastro realizado com sucesso! Aguarde a aprovação do administrador.",
         sucesso=True
     )
+
+
+@router.get("/password-requirements")
+def obter_requisitos_senha():
+    """Retorna os requisitos de senha para exibicao no frontend."""
+    return {"requisitos": get_password_requirements()}
 
 
 @router.post("/login", response_model=Token)
@@ -157,6 +172,14 @@ def alterar_senha(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Senha atual incorreta"
+        )
+
+    # Validar complexidade da nova senha
+    is_valid, errors = validate_password(dados.senha_nova)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="; ".join(errors)
         )
 
     # Atualizar senha

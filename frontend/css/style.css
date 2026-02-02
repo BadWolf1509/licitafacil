@@ -180,6 +180,21 @@ body {
     cursor: not-allowed;
 }
 
+/* Estilos de foco para acessibilidade */
+.btn:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.btn:focus:not(:focus-visible) {
+    outline: none;
+}
+
+.btn:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 /* Inputs e Forms */
 .form-group {
     margin-bottom: var(--spacing-lg);
@@ -211,6 +226,24 @@ body {
 
 .form-input::placeholder {
     color: var(--text-secondary);
+}
+
+/* Input Error States */
+.form-input.input-error {
+    border-color: var(--error);
+    background-color: var(--error-bg);
+}
+
+.form-input.input-error:focus {
+    border-color: var(--error);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.input-error-message {
+    display: block;
+    color: var(--error);
+    font-size: 0.875rem;
+    margin-top: var(--spacing-xs);
 }
 
 /* Password Toggle */

@@ -76,17 +76,112 @@ function setupTabs() {
 }
 
 /**
+ * Valida formato de email
+ * @param {string} email - Email a validar
+ * @returns {boolean} - true se válido
+ */
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+/**
+ * Valida complexidade da senha
+ * @param {string} password - Senha a validar
+ * @returns {{valid: boolean, errors: string[]}} - Resultado da validação
+ */
+function validatePassword(password) {
+    const errors = [];
+    const minLength = 8;
+
+    if (!password || password.length < minLength) {
+        errors.push(`Mínimo ${minLength} caracteres`);
+    }
+    if (!/[A-Z]/.test(password)) {
+        errors.push('Pelo menos 1 letra maiúscula');
+    }
+    if (!/[a-z]/.test(password)) {
+        errors.push('Pelo menos 1 letra minúscula');
+    }
+    if (!/[0-9]/.test(password)) {
+        errors.push('Pelo menos 1 número');
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+/**
+ * Formata erros de senha para exibição
+ * @param {string[]} errors - Lista de erros
+ * @returns {string} - Mensagem formatada
+ */
+function formatPasswordErrors(errors) {
+    if (errors.length === 1) {
+        return errors[0];
+    }
+    return errors.join(', ');
+}
+
+/**
+ * Mostra erro de validação em um input
+ * @param {HTMLElement} input - Input element
+ * @param {string} message - Mensagem de erro
+ */
+function showInputError(input, message) {
+    input.classList.add('input-error');
+    let errorEl = input.parentElement.querySelector('.input-error-message');
+    if (!errorEl) {
+        errorEl = document.createElement('span');
+        errorEl.className = 'input-error-message';
+        input.parentElement.appendChild(errorEl);
+    }
+    errorEl.textContent = message;
+}
+
+/**
+ * Limpa erro de validação de um input
+ * @param {HTMLElement} input - Input element
+ */
+function clearInputError(input) {
+    input.classList.remove('input-error');
+    const errorEl = input.parentElement.querySelector('.input-error-message');
+    if (errorEl) {
+        errorEl.remove();
+    }
+}
+
+/**
  * Configura o formulário de login
  */
 function setupLoginForm() {
     const form = document.getElementById('loginForm');
     const button = form.querySelector('button[type="submit"]');
+    const emailInput = document.getElementById('loginEmail');
+
+    // Validação em tempo real do email
+    emailInput.addEventListener('blur', () => {
+        if (emailInput.value && !isValidEmail(emailInput.value)) {
+            showInputError(emailInput, 'Email inválido');
+        } else {
+            clearInputError(emailInput);
+        }
+    });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const email = document.getElementById('loginEmail').value;
         const senha = document.getElementById('loginSenha').value;
+
+        // Validação de email
+        if (!isValidEmail(email)) {
+            showInputError(emailInput, 'Email inválido');
+            ui.showAlert('Por favor, insira um email válido', 'error');
+            return;
+        }
 
         ui.setButtonLoading(button, true, 'loginBtnText', 'loginSpinner');
 
@@ -122,6 +217,52 @@ function setupLoginForm() {
 function setupRegistroForm() {
     const form = document.getElementById('registroForm');
     const button = form.querySelector('button[type="submit"]');
+    const emailInput = document.getElementById('registroEmail');
+    const senhaInput = document.getElementById('registroSenha');
+    const confirmarSenhaInput = document.getElementById('registroConfirmarSenha');
+
+    // Validação em tempo real do email
+    emailInput.addEventListener('blur', () => {
+        if (emailInput.value && !isValidEmail(emailInput.value)) {
+            showInputError(emailInput, 'Email inválido');
+        } else {
+            clearInputError(emailInput);
+        }
+    });
+
+    // Validação em tempo real da senha
+    senhaInput.addEventListener('blur', () => {
+        if (senhaInput.value) {
+            const validation = validatePassword(senhaInput.value);
+            if (!validation.valid) {
+                showInputError(senhaInput, formatPasswordErrors(validation.errors));
+            } else {
+                clearInputError(senhaInput);
+            }
+        } else {
+            clearInputError(senhaInput);
+        }
+    });
+
+    // Validação em tempo real da confirmação de senha
+    confirmarSenhaInput.addEventListener('blur', () => {
+        if (confirmarSenhaInput.value && confirmarSenhaInput.value !== senhaInput.value) {
+            showInputError(confirmarSenhaInput, 'Senhas não coincidem');
+        } else {
+            clearInputError(confirmarSenhaInput);
+        }
+    });
+
+    // Validar confirmação quando senha muda
+    senhaInput.addEventListener('input', () => {
+        if (confirmarSenhaInput.value) {
+            if (confirmarSenhaInput.value !== senhaInput.value) {
+                showInputError(confirmarSenhaInput, 'Senhas não coincidem');
+            } else {
+                clearInputError(confirmarSenhaInput);
+            }
+        }
+    });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -131,14 +272,24 @@ function setupRegistroForm() {
         const senha = document.getElementById('registroSenha').value;
         const confirmarSenha = document.getElementById('registroConfirmarSenha').value;
 
-        // Validações
-        if (senha !== confirmarSenha) {
-            ui.showAlert('As senhas não coincidem', 'error');
+        // Validação de email
+        if (!isValidEmail(email)) {
+            showInputError(emailInput, 'Email inválido');
+            ui.showAlert('Por favor, insira um email válido', 'error');
             return;
         }
 
-        if (senha.length < 6) {
-            ui.showAlert('A senha deve ter no mínimo 6 caracteres', 'error');
+        // Validações de senha
+        const passwordValidation = validatePassword(senha);
+        if (!passwordValidation.valid) {
+            showInputError(senhaInput, formatPasswordErrors(passwordValidation.errors));
+            ui.showAlert('Senha inválida: ' + formatPasswordErrors(passwordValidation.errors), 'error');
+            return;
+        }
+
+        if (senha !== confirmarSenha) {
+            showInputError(confirmarSenhaInput, 'Senhas não coincidem');
+            ui.showAlert('As senhas não coincidem', 'error');
             return;
         }
 
