@@ -64,8 +64,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Editar .env com suas configurações
 
-# Criar admin inicial
+# Executar migrações de banco
 cd backend
+alembic upgrade head
+
+# Criar admin inicial
 python seed.py
 
 # Iniciar servidor
@@ -212,6 +215,36 @@ Veja instruções acima.
 ### Produção (Vercel + Supabase)
 Consulte [DEPLOY_VERCEL.md](DEPLOY_VERCEL.md) para instruções detalhadas.
 
+## Migrações de Banco de Dados
+
+O projeto usa Alembic para gerenciar migrações do banco de dados.
+
+### Executar migrações pendentes
+```bash
+cd backend
+alembic upgrade head
+```
+
+### Verificar status das migrações
+```bash
+alembic current
+alembic history
+```
+
+### Migrações recentes
+- `c3e7f58106ee` - Adiciona campos de bloqueio de conta (failed_login_attempts, locked_until)
+- `d4f8g69217ff` - Adiciona tabela de audit logs para registro de ações administrativas
+
+### Criar nova migração
+```bash
+alembic revision --autogenerate -m "descricao_da_mudanca"
+```
+
+### Reverter última migração
+```bash
+alembic downgrade -1
+```
+
 ## Testes
 
 ```bash
@@ -219,7 +252,7 @@ cd backend
 pytest -v
 ```
 
-**Cobertura:** 341 testes passando
+**Cobertura:** 341+ testes passando
 
 ## Credenciais Padrão
 
