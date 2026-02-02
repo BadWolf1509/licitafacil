@@ -171,6 +171,11 @@ def setup_logging(
         handlers=handlers
     )
 
+    # Adicionar filtro de sanitização ao root logger
+    root_logger = logging.getLogger()
+    if not any(isinstance(f, SanitizingFilter) for f in root_logger.filters):
+        root_logger.addFilter(SanitizingFilter())
+
     # Reduzir verbosidade de bibliotecas externas
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -361,8 +366,54 @@ def timed(
 
 SENSITIVE_KEYS = {
     'password', 'senha', 'secret', 'token', 'api_key', 'apikey',
-    'authorization', 'auth', 'credential', 'private_key'
+    'authorization', 'auth', 'credential', 'private_key', 'secret_key',
+    'access_token', 'refresh_token', 'bearer', 'jwt', 'session_id'
 }
+
+# Padrões regex para sanitização de mensagens de log
+import re
+
+SENSITIVE_PATTERNS = [
+    # JWT tokens (formato: xxx.xxx.xxx)
+    (re.compile(r'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'), '[JWT_TOKEN]'),
+    # Bearer tokens
+    (re.compile(r'[Bb]earer\s+[A-Za-z0-9_-]+'), 'Bearer [TOKEN]'),
+    # Senhas em logs (password=xxx, senha=xxx)
+    (re.compile(r'(password|senha|secret|api_key|token)\s*[=:]\s*\S+', re.IGNORECASE), r'\1=[REDACTED]'),
+    # Emails (opcional - parcialmente mascarado)
+    # (re.compile(r'([a-zA-Z0-9_.+-]+)@([a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)'), r'\1[...]@\2'),
+]
+
+
+class SanitizingFilter(logging.Filter):
+    """
+    Filter que sanitiza automaticamente dados sensíveis em mensagens de log.
+
+    Aplica padrões regex para mascarar tokens, senhas e outros dados sensíveis.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Sanitiza a mensagem antes de ser logada."""
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            sanitized_msg = record.msg
+            for pattern, replacement in SENSITIVE_PATTERNS:
+                sanitized_msg = pattern.sub(replacement, sanitized_msg)
+            record.msg = sanitized_msg
+
+        # Também sanitizar args se existirem
+        if hasattr(record, 'args') and record.args:
+            sanitized_args = []
+            for arg in record.args:
+                if isinstance(arg, str):
+                    sanitized_arg = arg
+                    for pattern, replacement in SENSITIVE_PATTERNS:
+                        sanitized_arg = pattern.sub(replacement, sanitized_arg)
+                    sanitized_args.append(sanitized_arg)
+                else:
+                    sanitized_args.append(arg)
+            record.args = tuple(sanitized_args)
+
+        return True
 
 
 def sanitize_dict(data: Dict[str, Any], mask: str = '***') -> Dict[str, Any]:

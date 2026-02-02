@@ -11,6 +11,8 @@ from database import engine, Base
 from routers import auth, admin, atestados, analise, ai_status
 from services.processing_queue import processing_queue
 from middleware.rate_limit import RateLimitMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION
 from exceptions import (
     LicitaFacilError,
@@ -34,6 +36,26 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gerenciador de ciclo de vida da aplicação."""
+    # Startup: validar configuracao
+    from config.validators import validate_atestado_config, get_config_summary
+    from config import ENVIRONMENT
+
+    logger.info("Validando configuracao...")
+    validation_result = validate_atestado_config()
+
+    if not validation_result.is_valid:
+        for error in validation_result.errors:
+            logger.error(f"Erro de configuracao: {error.config_name}={error.value}: {error.message}")
+        # Em producao, falhar se configuracao invalida
+        if ENVIRONMENT == "production":
+            raise RuntimeError("Configuracao invalida. Corrija os erros acima antes de iniciar.")
+        logger.warning("Continuando com configuracao invalida (ambiente de desenvolvimento)")
+
+    for warning in validation_result.warnings:
+        logger.warning(f"Aviso de configuracao: {warning.config_name}={warning.value}: {warning.message}")
+
+    logger.info(f"Configuracao validada: {get_config_summary()}")
+
     # Startup: iniciar fila de processamento
     await processing_queue.start()
     logger.info("Fila de processamento iniciada")
@@ -56,8 +78,24 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configurar Rate Limiting (deve vir antes do CORS)
+# Configurar middlewares na ordem correta
+# 1. Rate Limiting (primeiro a executar, último a responder)
 app.add_middleware(RateLimitMiddleware)
+
+# 2. Security Headers (adiciona headers de seguranca a todas as respostas)
+from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
+if SECURITY_HEADERS_ENABLED:
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        enable_hsts=True,
+        hsts_max_age=HSTS_MAX_AGE,
+        frame_options=FRAME_OPTIONS,
+        referrer_policy=REFERRER_POLICY
+    )
+    logger.info("Security Headers middleware habilitado")
+
+# 3. Compressao GZip (comprime respostas maiores que 1000 bytes)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # Middleware para Correlation ID (request tracing)
@@ -78,8 +116,18 @@ async def correlation_id_middleware(request: Request, call_next):
 
 # Configurar CORS com origens da configuração
 # Em desenvolvimento: localhost. Em produção: definir CORS_ORIGINS no .env
-cors_origins = CORS_ORIGINS if CORS_ORIGINS else ["*"]
-logger.info(f"CORS configurado para origens: {cors_origins}")
+from config import ENVIRONMENT
+
+if not CORS_ORIGINS:
+    if ENVIRONMENT == "production":
+        logger.error("CORS_ORIGINS não definido em produção! Usando lista vazia.")
+        cors_origins = []
+    else:
+        cors_origins = ["*"]
+        logger.warning("CORS configurado para aceitar todas as origens (desenvolvimento)")
+else:
+    cors_origins = CORS_ORIGINS
+    logger.info(f"CORS configurado para origens: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,

@@ -100,6 +100,12 @@ RATE_LIMIT_ENABLED = env_bool("RATE_LIMIT_ENABLED", True)
 RATE_LIMIT_REQUESTS = env_int("RATE_LIMIT_REQUESTS", 300)
 RATE_LIMIT_WINDOW = env_int("RATE_LIMIT_WINDOW", 60)
 
+# Rate Limiting especifico para autenticacao (mais restritivo)
+# Formato: {path_prefix: (requests, window_seconds)}
+RATE_LIMIT_AUTH_LOGIN = env_int("RATE_LIMIT_AUTH_LOGIN", 5)  # 5 tentativas
+RATE_LIMIT_AUTH_REGISTER = env_int("RATE_LIMIT_AUTH_REGISTER", 3)  # 3 registros
+RATE_LIMIT_AUTH_WINDOW = env_int("RATE_LIMIT_AUTH_WINDOW", 60)  # por minuto
+
 
 # === Ambiente ===
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")

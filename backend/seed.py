@@ -22,10 +22,20 @@ def create_admin():
     # Criar tabelas se não existirem
     Base.metadata.create_all(bind=engine)
 
-    # Obter dados do admin do .env ou usar padrões
+    # Obter dados do admin do .env
     admin_email = os.getenv("ADMIN_EMAIL", "admin@licitafacil.com.br")
-    admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+    admin_password = os.getenv("ADMIN_PASSWORD")
     admin_name = os.getenv("ADMIN_NAME", "Administrador")
+
+    # Validar senha - não aceitar default fraco
+    if not admin_password:
+        print("[ERRO] ADMIN_PASSWORD não definida no .env")
+        print("Defina uma senha forte com pelo menos 8 caracteres.")
+        return
+
+    if len(admin_password) < 8:
+        print("[ERRO] ADMIN_PASSWORD muito curta (mínimo 8 caracteres)")
+        return
 
     db: Session = SessionLocal()
     try:
