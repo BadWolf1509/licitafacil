@@ -1,15 +1,14 @@
 """
-Módulo de processamento de atestados de capacidade técnica.
+Modulo de processamento de atestados de capacidade tecnica.
 
-Este módulo fornece todas as funcionalidades necessárias para
+Este modulo fornece todas as funcionalidades necessarias para
 processar, extrair e persistir dados de atestados.
 
 Componentes:
-- service: Funções de utilidade (parsing, ordenação, conversão)
-- persistence: Persistência no banco de dados
-- processor: Processador simplificado (wrapper)
+- service: Funcoes de utilidade (parsing, ordenacao, conversao)
+- persistence: Persistencia no banco de dados
+- processor: Processador principal de atestados
 - pipeline: Pipeline completo de processamento
-- stages: Classes base para estágios do pipeline (Strategy pattern)
 """
 
 from .service import (
@@ -21,17 +20,6 @@ from .service import (
 from .persistence import salvar_atestado_processado
 from .processor import AtestadoProcessor, atestado_processor
 from .pipeline import AtestadoPipeline
-from .stages import (
-    PipelineContext,
-    PipelineStage,
-    PipelineRunner,
-    TextExtractionStage,
-    TableExtractionStage,
-    AIAnalysisStage,
-    TextEnrichmentStage,
-    PostProcessStage,
-    FinalizationStage,
-)
 
 __all__ = [
     # service
@@ -46,14 +34,4 @@ __all__ = [
     'atestado_processor',
     # pipeline
     'AtestadoPipeline',
-    # stages (Strategy pattern)
-    'PipelineContext',
-    'PipelineStage',
-    'PipelineRunner',
-    'TextExtractionStage',
-    'TableExtractionStage',
-    'AIAnalysisStage',
-    'TextEnrichmentStage',
-    'PostProcessStage',
-    'FinalizationStage',
 ]

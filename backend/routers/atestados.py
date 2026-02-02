@@ -12,7 +12,7 @@ from schemas import (
     Mensagem, JobResponse, PaginatedAtestadoResponse
 )
 from auth import get_current_approved_user
-from services.atestado_service import ordenar_servicos, salvar_atestado_processado
+from services.atestado import ordenar_servicos, salvar_atestado_processado
 from services.processing_mode import is_serverless
 from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query

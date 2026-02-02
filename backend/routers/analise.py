@@ -11,7 +11,7 @@ from repositories.atestado_repository import atestado_repository
 from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse, AnaliseManualCreate
 from auth import get_current_approved_user
 from dependencies import ServiceContainer, get_services
-from services.atestado_service import atestados_to_dict
+from services.atestado import atestados_to_dict
 from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_complete_or_raise

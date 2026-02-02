@@ -1,9 +1,23 @@
 """
 Serviço para operações de atestados.
 
-NOTA: Este módulo foi movido para services.atestado.
+DEPRECATED: Este modulo foi movido para services.atestado.service.
 Este arquivo existe para compatibilidade com imports existentes.
+Sera removido em versao futura.
+
+Use:
+    from services.atestado.service import parse_date, sort_key_item, ordenar_servicos
+    from services.atestado.persistence import salvar_atestado_processado
 """
+import warnings
+
+warnings.warn(
+    "services.atestado_service esta deprecado. "
+    "Use services.atestado.service e services.atestado.persistence em vez disso.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
 from services.atestado.service import (
     parse_date,
     sort_key_item,
