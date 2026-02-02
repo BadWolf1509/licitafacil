@@ -6,7 +6,7 @@ import sys
 import pytest
 from datetime import date
 from typing import Generator
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 
@@ -37,13 +37,18 @@ def test_engine():
 
 @pytest.fixture(scope="function")
 def db_session(test_engine) -> Generator[Session, None, None]:
-    """Sessão de banco de dados para cada teste."""
+    """Sessão de banco de dados para cada teste com cleanup."""
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
     session = TestingSessionLocal()
     try:
         yield session
     finally:
         session.rollback()
+        # Limpar dados de teste
+        session.execute(Usuario.__table__.delete())
+        session.execute(Atestado.__table__.delete())
+        session.execute(Analise.__table__.delete())
+        session.commit()
         session.close()
 
 
@@ -55,8 +60,7 @@ def test_user(db_session: Session) -> Usuario:
     user = Usuario(
         email="teste@exemplo.com",
         nome="Usuário Teste",
-        empresa="Empresa Teste LTDA",
-        hashed_password=get_password_hash("senha123"),
+        senha_hash=get_password_hash("senha123"),
         is_active=True,
         is_approved=True,
         is_admin=False
@@ -73,8 +77,7 @@ def admin_user(db_session: Session) -> Usuario:
     user = Usuario(
         email="admin@exemplo.com",
         nome="Admin Teste",
-        empresa="Admin Corp",
-        hashed_password=get_password_hash("admin123"),
+        senha_hash=get_password_hash("admin123"),
         is_active=True,
         is_approved=True,
         is_admin=True
@@ -91,8 +94,7 @@ def inactive_user(db_session: Session) -> Usuario:
     user = Usuario(
         email="inativo@exemplo.com",
         nome="Usuário Inativo",
-        empresa="Empresa Inativa",
-        hashed_password=get_password_hash("senha123"),
+        senha_hash=get_password_hash("senha123"),
         is_active=False,
         is_approved=False,
         is_admin=False
