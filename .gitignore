@@ -56,3 +56,4 @@ backend/relatorio_*.json
 
 .vercel
 backend/dump.sql
+frontend/node_modules/

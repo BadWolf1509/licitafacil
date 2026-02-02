@@ -1,0 +1,41 @@
+{
+  "name": "licitafacil-frontend",
+  "version": "1.0.0",
+  "description": "Frontend do LicitaFacil - Sistema de Analise de Capacidade Tecnica",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "roots": [
+      "<rootDir>/tests"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/js/$1"
+    },
+    "collectCoverageFrom": [
+      "js/**/*.js",
+      "!js/atestados/**/*.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 50,
+        "functions": 50,
+        "lines": 50,
+        "statements": 50
+      }
+    }
+  }
+}
