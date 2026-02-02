@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import List
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -10,8 +10,20 @@ from auth import get_current_admin_user
 from config import Messages
 from repositories import usuario_repository
 from routers.base import AdminRouter
+from services.audit_service import audit_service, AuditAction
 
 router = AdminRouter(prefix="/admin", tags=["Administração"])
+
+
+def _get_client_ip(request: Request) -> str:
+    """Extrai IP do cliente, considerando proxies."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    return request.client.host if request.client else "unknown"
 
 
 @router.get("/usuarios/pendentes", response_model=List[UsuarioAdminResponse])
@@ -35,6 +47,7 @@ def listar_todos_usuarios(
 @router.post("/usuarios/{user_id}/aprovar", response_model=Mensagem)
 def aprovar_usuario(
     user_id: int,
+    request: Request,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -57,6 +70,17 @@ def aprovar_usuario(
     usuario.approved_by = current_user.id
     db.commit()
 
+    # Registrar auditoria
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action=AuditAction.USER_APPROVED,
+        resource_type="usuario",
+        resource_id=usuario.id,
+        details={"email": usuario.email, "nome": usuario.nome},
+        ip_address=_get_client_ip(request)
+    )
+
     return Mensagem(
         mensagem=f"Usuário {usuario.nome} aprovado com sucesso!",
         sucesso=True
@@ -66,6 +90,7 @@ def aprovar_usuario(
 @router.post("/usuarios/{user_id}/rejeitar", response_model=Mensagem)
 def rejeitar_usuario(
     user_id: int,
+    request: Request,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -86,6 +111,17 @@ def rejeitar_usuario(
     usuario.is_active = False
     db.commit()
 
+    # Registrar auditoria
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action=AuditAction.USER_DEACTIVATED,
+        resource_type="usuario",
+        resource_id=usuario.id,
+        details={"email": usuario.email, "nome": usuario.nome},
+        ip_address=_get_client_ip(request)
+    )
+
     return Mensagem(
         mensagem=f"Usuário {usuario.nome} desativado com sucesso!",
         sucesso=True
@@ -95,6 +131,7 @@ def rejeitar_usuario(
 @router.post("/usuarios/{user_id}/reativar", response_model=Mensagem)
 def reativar_usuario(
     user_id: int,
+    request: Request,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -115,6 +152,17 @@ def reativar_usuario(
     usuario.is_active = True
     db.commit()
 
+    # Registrar auditoria
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action=AuditAction.USER_REACTIVATED,
+        resource_type="usuario",
+        resource_id=usuario.id,
+        details={"email": usuario.email, "nome": usuario.nome},
+        ip_address=_get_client_ip(request)
+    )
+
     return Mensagem(
         mensagem=f"Usuário {usuario.nome} reativado com sucesso!",
         sucesso=True
@@ -124,6 +172,7 @@ def reativar_usuario(
 @router.delete("/usuarios/{user_id}", response_model=Mensagem)
 def excluir_usuario(
     user_id: int,
+    request: Request,
     current_user: Usuario = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -148,8 +197,22 @@ def excluir_usuario(
         )
 
     nome = usuario.nome
+    email = usuario.email
+    deleted_user_id = usuario.id
+
     db.delete(usuario)
     db.commit()
+
+    # Registrar auditoria
+    audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action=AuditAction.USER_DELETED,
+        resource_type="usuario",
+        resource_id=deleted_user_id,
+        details={"email": email, "nome": nome},
+        ip_address=_get_client_ip(request)
+    )
 
     return Mensagem(
         mensagem=f"Usuário {nome} excluído permanentemente!",
