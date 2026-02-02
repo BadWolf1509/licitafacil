@@ -11,9 +11,72 @@ from database import get_db
 from models import Usuario
 from schemas import TokenData
 from config import SECRET_KEY, JWT_ALGORITHM as ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from config.security import MAX_FAILED_LOGIN_ATTEMPTS, ACCOUNT_LOCKOUT_MINUTES
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+
+
+# === Funcoes de Bloqueio de Conta ===
+
+def is_account_locked(user: Usuario) -> bool:
+    """
+    Verifica se a conta do usuario esta bloqueada.
+
+    Args:
+        user: Usuario a verificar
+
+    Returns:
+        True se a conta esta bloqueada, False caso contrario
+    """
+    if not user.locked_until:
+        return False
+    return datetime.now(timezone.utc) < user.locked_until
+
+
+def get_lockout_remaining_seconds(user: Usuario) -> int:
+    """
+    Retorna o tempo restante de bloqueio em segundos.
+
+    Args:
+        user: Usuario bloqueado
+
+    Returns:
+        Segundos restantes ou 0 se nao esta bloqueado
+    """
+    if not user.locked_until:
+        return 0
+    remaining = user.locked_until - datetime.now(timezone.utc)
+    return max(0, int(remaining.total_seconds()))
+
+
+def record_failed_login(db: Session, user: Usuario) -> None:
+    """
+    Registra uma tentativa de login falha.
+    Bloqueia a conta se atingir o limite de tentativas.
+
+    Args:
+        db: Sessao do banco de dados
+        user: Usuario que falhou no login
+    """
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+        user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=ACCOUNT_LOCKOUT_MINUTES)
+    db.commit()
+
+
+def reset_failed_attempts(db: Session, user: Usuario) -> None:
+    """
+    Reseta o contador de tentativas falhas apos login bem sucedido.
+
+    Args:
+        db: Sessao do banco de dados
+        user: Usuario que fez login com sucesso
+    """
+    if user.failed_login_attempts > 0 or user.locked_until is not None:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        db.commit()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -50,12 +113,36 @@ def get_user_by_email(db: Session, email: str) -> Optional[Usuario]:
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[Usuario]:
-    """Autentica usuário verificando email e senha."""
+    """
+    Autentica usuario verificando email e senha.
+    Implementa bloqueio de conta apos tentativas falhas.
+
+    Returns:
+        Usuario se autenticado com sucesso, None caso contrario
+
+    Raises:
+        HTTPException: Se a conta estiver bloqueada
+    """
     user = get_user_by_email(db, email)
     if not user:
         return None
+
+    # Verificar se a conta esta bloqueada
+    if is_account_locked(user):
+        remaining = get_lockout_remaining_seconds(user)
+        minutes = remaining // 60
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=f"Conta bloqueada por muitas tentativas falhas. Tente novamente em {minutes + 1} minuto(s)."
+        )
+
+    # Verificar senha
     if not verify_password(password, user.senha_hash):
+        record_failed_login(db, user)
         return None
+
+    # Login bem sucedido - resetar contador
+    reset_failed_attempts(db, user)
     return user
 
 

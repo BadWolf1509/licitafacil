@@ -26,6 +26,10 @@ class Usuario(Base):
 
     tema_preferido: Mapped[str] = mapped_column(String(10), default="light")  # light ou dark
 
+    # Campos para bloqueio de conta apos tentativas falhas
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     approved_by: Mapped[Optional[int]] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
@@ -134,4 +138,36 @@ class ProcessingJobModel(Base):
     # Índice composto para queries de jobs por usuário e status
     __table_args__ = (
         Index('ix_jobs_user_status', 'user_id', 'status'),
+    )
+
+
+class AuditLog(Base):
+    """Modelo de log de auditoria para acoes administrativas."""
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
+    # Acao realizada (ex: user_approved, user_rejected, atestado_deleted)
+    action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+
+    # Tipo de recurso afetado (ex: usuario, atestado, analise)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+
+    # ID do recurso afetado (opcional)
+    resource_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    # Detalhes adicionais em JSON
+    details: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
+    # IP do cliente
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # Indices para consultas frequentes
+    __table_args__ = (
+        Index('ix_audit_user_created', 'user_id', 'created_at'),
+        Index('ix_audit_action_created', 'action', 'created_at'),
     )
