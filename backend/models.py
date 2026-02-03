@@ -20,20 +20,13 @@ class Usuario(Base):
     nome: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Supabase Auth ID (UUID) - chave estrangeira para auth.users
-    supabase_id: Mapped[Optional[str]] = mapped_column(String(36), unique=True, index=True, nullable=True)
-
-    # Senha hash (mantido para período de migração, será removido após migração completa)
-    senha_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    supabase_id: Mapped[str] = mapped_column(String(36), unique=True, index=True, nullable=False)
 
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     tema_preferido: Mapped[str] = mapped_column(String(10), default="light")  # light ou dark
-
-    # Campos para bloqueio de conta apos tentativas falhas
-    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

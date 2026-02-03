@@ -1,12 +1,16 @@
 """
 Fixtures compartilhadas para testes do LicitaFacil.
+
+Usa mocking para autenticação já que o Supabase não está disponível em testes.
 """
 import os
 import sys
+import uuid
 import pytest
 from datetime import date
 from typing import Generator
-from sqlalchemy import create_engine, text
+from unittest.mock import patch, MagicMock
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 
@@ -15,7 +19,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base
 from models import Usuario, Atestado, Analise
-from auth import get_password_hash
 
 
 # === Configuração do Banco de Dados de Teste ===
@@ -54,13 +57,18 @@ def db_session(test_engine) -> Generator[Session, None, None]:
 
 # === Fixtures de Usuário ===
 
+def generate_supabase_id() -> str:
+    """Gera um UUID simulando supabase_id."""
+    return str(uuid.uuid4())
+
+
 @pytest.fixture
 def test_user(db_session: Session) -> Usuario:
     """Cria um usuário de teste."""
     user = Usuario(
         email="teste@exemplo.com",
         nome="Usuário Teste",
-        senha_hash=get_password_hash("senha123"),
+        supabase_id=generate_supabase_id(),
         is_active=True,
         is_approved=True,
         is_admin=False
@@ -77,7 +85,7 @@ def admin_user(db_session: Session) -> Usuario:
     user = Usuario(
         email="admin@exemplo.com",
         nome="Admin Teste",
-        senha_hash=get_password_hash("admin123"),
+        supabase_id=generate_supabase_id(),
         is_active=True,
         is_approved=True,
         is_admin=True
@@ -94,7 +102,7 @@ def inactive_user(db_session: Session) -> Usuario:
     user = Usuario(
         email="inativo@exemplo.com",
         nome="Usuário Inativo",
-        senha_hash=get_password_hash("senha123"),
+        supabase_id=generate_supabase_id(),
         is_active=False,
         is_approved=False,
         is_admin=False
@@ -158,19 +166,24 @@ def sample_analise(db_session: Session, test_user: Usuario) -> Analise:
     """Cria uma analise de teste."""
     analise = Analise(
         user_id=test_user.id,
-        edital_arquivo="uploads/edital_teste.pdf",
-        atestados_usados="[1, 2, 3]",
-        resultado_analise={
-            "exigencias": [
-                {
-                    "descricao": "Pavimentacao asfaltica",
-                    "quantidade_exigida": 5000.0,
-                    "unidade": "m2",
-                    "status": "atende"
-                }
-            ],
-            "resumo": "Atende todas as exigencias"
-        }
+        nome_licitacao="Edital de Teste",
+        arquivo_path="uploads/edital_teste.pdf",
+        exigencias_json=[
+            {
+                "descricao": "Pavimentacao asfaltica",
+                "quantidade_minima": 5000.0,
+                "unidade": "m2"
+            }
+        ],
+        resultado_json=[
+            {
+                "exigencia": {"descricao": "Pavimentacao asfaltica", "quantidade_minima": 5000.0, "unidade": "m2"},
+                "status": "atende",
+                "atestados_recomendados": [],
+                "soma_quantidades": 5500.0,
+                "percentual_total": 110.0
+            }
+        ]
     )
     db_session.add(analise)
     db_session.commit()
@@ -204,22 +217,40 @@ def client(test_engine) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture
-def auth_headers(client: TestClient, test_user: Usuario) -> dict:
-    """Headers de autenticacao para um usuario de teste."""
-    response = client.post(
-        "/auth/login",
-        data={"username": "teste@exemplo.com", "password": "senha123"}
-    )
-    token = response.json().get("access_token")
-    return {"Authorization": f"Bearer {token}"}
+def mock_supabase_verify():
+    """Mock para verificação de token Supabase."""
+    with patch('services.supabase_auth.verify_supabase_token') as mock:
+        yield mock
+
+
+def create_mock_auth_headers(user: Usuario, mock_verify: MagicMock) -> dict:
+    """
+    Cria headers de autenticação mockando a verificação Supabase.
+
+    Args:
+        user: Usuário para autenticar
+        mock_verify: Mock da função verify_supabase_token
+
+    Returns:
+        Headers dict com Authorization
+    """
+    # Configura o mock para retornar dados do usuário
+    mock_verify.return_value = {
+        "id": user.supabase_id,
+        "email": user.email
+    }
+
+    # Token fake (será ignorado pois mock retorna diretamente)
+    return {"Authorization": f"Bearer mock_token_{user.id}"}
 
 
 @pytest.fixture
-def admin_auth_headers(client: TestClient, admin_user: Usuario) -> dict:
+def auth_headers(test_user: Usuario, mock_supabase_verify: MagicMock) -> dict:
+    """Headers de autenticacao para um usuario de teste."""
+    return create_mock_auth_headers(test_user, mock_supabase_verify)
+
+
+@pytest.fixture
+def admin_auth_headers(admin_user: Usuario, mock_supabase_verify: MagicMock) -> dict:
     """Headers de autenticacao para um usuario admin."""
-    response = client.post(
-        "/auth/login",
-        data={"username": "admin@exemplo.com", "password": "admin123"}
-    )
-    token = response.json().get("access_token")
-    return {"Authorization": f"Bearer {token}"}
+    return create_mock_auth_headers(admin_user, mock_supabase_verify)

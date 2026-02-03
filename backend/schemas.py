@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Generic, TypeVar, Any, Sequence
 from datetime import datetime
 from decimal import Decimal
@@ -27,19 +27,6 @@ class UsuarioUpdate(BaseModel):
     tema_preferido: Optional[str] = None
 
 
-class PasswordChange(BaseModel):
-    """Schema para alteração de senha."""
-    senha_atual: str
-    senha_nova: str = Field(..., min_length=6)
-    confirmar_senha: str
-
-    @model_validator(mode='after')
-    def validar_senhas(self):
-        if self.senha_nova != self.confirmar_senha:
-            raise ValueError('As senhas não coincidem')
-        return self
-
-
 class UsuarioResponse(UsuarioBase):
     id: int
     is_admin: bool
@@ -63,11 +50,6 @@ class UsuarioAdminResponse(UsuarioResponse):
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
-class TokenData(BaseModel):
-    email: Optional[str] = None
-    user_id: Optional[int] = None
 
 
 # ============== ATESTADO ==============

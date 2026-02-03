@@ -2,19 +2,25 @@
 Testes para o router de administração.
 
 Testa endpoints de gerenciamento de usuários e estatísticas.
+Usa mocking para autenticação Supabase.
 """
 import uuid
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from models import Usuario
-from auth import get_password_hash
 
 
 def unique_email(prefix: str = "test") -> str:
     """Gera email único para evitar conflitos."""
     return f"{prefix}_{uuid.uuid4().hex[:8]}@teste.com"
+
+
+def generate_supabase_id() -> str:
+    """Gera um UUID simulando supabase_id."""
+    return str(uuid.uuid4())
 
 
 class TestAdminEndpointsRequireAuth:
@@ -61,12 +67,13 @@ class TestAdminEndpointsRequireAdminRole:
 
     def test_listar_usuarios_requires_admin(self, client: TestClient, db_session: Session):
         """Verifica que listar usuários requer role admin."""
-        # Criar usuário não-admin com email único
+        # Criar usuário não-admin
         email = unique_email("nonadmin")
+        supabase_id = generate_supabase_id()
         user = Usuario(
             email=email,
             nome="Usuário Comum",
-            senha_hash=get_password_hash("senha123"),
+            supabase_id=supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=False
@@ -75,22 +82,14 @@ class TestAdminEndpointsRequireAdminRole:
         db_session.commit()
 
         try:
-            # Login
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": email, "password": "senha123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Tentar acessar admin
                 response = client.get("/api/v1/admin/usuarios", headers=headers)
                 assert response.status_code == 403
-            else:
-                # Rate limit - skip test
-                pytest.skip("Rate limit atingido")
         finally:
             # Cleanup
             db_session.delete(user)
@@ -104,10 +103,11 @@ class TestAdminOperations:
         """Verifica erro ao aprovar usuário inexistente."""
         # Criar admin
         email = unique_email("admin")
+        supabase_id = generate_supabase_id()
         admin = Usuario(
             email=email,
             nome="Admin Teste",
-            senha_hash=get_password_hash("admin123"),
+            supabase_id=supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=True
@@ -116,15 +116,10 @@ class TestAdminOperations:
         db_session.commit()
 
         try:
-            # Login como admin
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": email, "password": "admin123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Tentar aprovar usuário inexistente
                 response = client.post(
@@ -132,8 +127,6 @@ class TestAdminOperations:
                     headers=headers
                 )
                 assert response.status_code in [404, 429]
-            else:
-                pytest.skip("Rate limit atingido")
         finally:
             db_session.delete(admin)
             db_session.commit()
@@ -142,10 +135,11 @@ class TestAdminOperations:
         """Verifica que admin pode listar usuários."""
         # Criar admin
         email = unique_email("admin")
+        supabase_id = generate_supabase_id()
         admin = Usuario(
             email=email,
             nome="Admin Teste",
-            senha_hash=get_password_hash("admin123"),
+            supabase_id=supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=True
@@ -154,15 +148,10 @@ class TestAdminOperations:
         db_session.commit()
 
         try:
-            # Login
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": email, "password": "admin123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Listar usuários
                 response = client.get("/api/v1/admin/usuarios", headers=headers)
@@ -171,8 +160,6 @@ class TestAdminOperations:
                 if response.status_code == 200:
                     data = response.json()
                     assert isinstance(data, list)
-            else:
-                pytest.skip("Rate limit atingido")
         finally:
             db_session.delete(admin)
             db_session.commit()
@@ -181,10 +168,11 @@ class TestAdminOperations:
         """Verifica que admin pode ver estatísticas."""
         # Criar admin
         email = unique_email("admin")
+        supabase_id = generate_supabase_id()
         admin = Usuario(
             email=email,
             nome="Admin Teste",
-            senha_hash=get_password_hash("admin123"),
+            supabase_id=supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=True
@@ -193,15 +181,10 @@ class TestAdminOperations:
         db_session.commit()
 
         try:
-            # Login
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": email, "password": "admin123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Ver estatísticas
                 response = client.get("/api/v1/admin/estatisticas", headers=headers)
@@ -210,8 +193,6 @@ class TestAdminOperations:
                 if response.status_code == 200:
                     data = response.json()
                     assert isinstance(data, dict)
-            else:
-                pytest.skip("Rate limit atingido")
         finally:
             db_session.delete(admin)
             db_session.commit()
@@ -224,10 +205,11 @@ class TestApprovalWorkflow:
         """Testa aprovação de usuário pendente."""
         # Criar admin
         admin_email = unique_email("admin")
+        admin_supabase_id = generate_supabase_id()
         admin = Usuario(
             email=admin_email,
             nome="Admin",
-            senha_hash=get_password_hash("admin123"),
+            supabase_id=admin_supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=True
@@ -239,7 +221,7 @@ class TestApprovalWorkflow:
         pending_user = Usuario(
             email=pending_email,
             nome="Pendente",
-            senha_hash=get_password_hash("senha123"),
+            supabase_id=generate_supabase_id(),
             is_active=True,
             is_approved=False,
             is_admin=False
@@ -249,15 +231,10 @@ class TestApprovalWorkflow:
         db_session.refresh(pending_user)
 
         try:
-            # Login como admin
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": admin_email, "password": "admin123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase para admin
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": admin_supabase_id, "email": admin_email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Aprovar usuário
                 response = client.post(
@@ -268,8 +245,6 @@ class TestApprovalWorkflow:
                 if response.status_code == 200:
                     data = response.json()
                     assert data["sucesso"] is True
-            else:
-                pytest.skip("Rate limit atingido")
         finally:
             db_session.delete(pending_user)
             db_session.delete(admin)
@@ -279,10 +254,11 @@ class TestApprovalWorkflow:
         """Verifica que não pode aprovar usuário já aprovado."""
         # Criar admin
         admin_email = unique_email("admin")
+        admin_supabase_id = generate_supabase_id()
         admin = Usuario(
             email=admin_email,
             nome="Admin",
-            senha_hash=get_password_hash("admin123"),
+            supabase_id=admin_supabase_id,
             is_active=True,
             is_approved=True,
             is_admin=True
@@ -294,7 +270,7 @@ class TestApprovalWorkflow:
         approved_user = Usuario(
             email=approved_email,
             nome="Aprovado",
-            senha_hash=get_password_hash("senha123"),
+            supabase_id=generate_supabase_id(),
             is_active=True,
             is_approved=True,  # Já aprovado
             is_admin=False
@@ -304,15 +280,10 @@ class TestApprovalWorkflow:
         db_session.refresh(approved_user)
 
         try:
-            # Login como admin
-            response = client.post(
-                "/api/v1/auth/login",
-                data={"username": admin_email, "password": "admin123"}
-            )
-
-            if response.status_code == 200:
-                token = response.json().get("access_token")
-                headers = {"Authorization": f"Bearer {token}"}
+            # Mock do token Supabase para admin
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": admin_supabase_id, "email": admin_email}
+                headers = {"Authorization": "Bearer mock_token"}
 
                 # Tentar aprovar novamente
                 response = client.post(
@@ -320,8 +291,6 @@ class TestApprovalWorkflow:
                     headers=headers
                 )
                 assert response.status_code in [400, 429]
-            else:
-                pytest.skip("Rate limit atingido")
         finally:
             db_session.delete(approved_user)
             db_session.delete(admin)

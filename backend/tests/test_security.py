@@ -14,7 +14,7 @@ class TestCORSSecurity:
     def test_cors_headers_present(self, client: TestClient):
         """Verifica que headers CORS estão presentes."""
         response = client.options(
-            "/api/v1/auth/login",
+            "/api/v1/auth/config",
             headers={"Origin": "http://localhost:8000"}
         )
         # Em desenvolvimento, CORS deve estar configurado
@@ -47,18 +47,18 @@ class TestAuthenticationSecurity:
 
     def test_login_requires_credentials(self, client: TestClient):
         """Verifica que login exige credenciais."""
-        response = client.post("/api/v1/auth/login")
-        # 429 pode ocorrer se rate limit for atingido
+        response = client.post("/api/v1/auth/supabase-login")
+        # 422 = validation error, 429 = rate limit
         assert response.status_code in [422, 429]
 
     def test_login_rejects_invalid_credentials(self, client: TestClient):
         """Verifica que login rejeita credenciais inválidas."""
         response = client.post(
-            "/api/v1/auth/login",
-            data={"username": "invalid@test.com", "password": "wrongpassword"}
+            "/api/v1/auth/supabase-login",
+            json={"email": "invalid@test.com", "senha": "wrongpassword"}
         )
-        # 429 pode ocorrer se rate limit for atingido
-        assert response.status_code in [401, 429]
+        # 401 = unauthorized, 429 = rate limit, 503 = Supabase not configured
+        assert response.status_code in [401, 429, 503]
 
     def test_protected_endpoint_requires_auth(self, client: TestClient):
         """Verifica que endpoints protegidos exigem autenticação."""
@@ -304,18 +304,13 @@ class TestPasswordPolicyConfig:
         assert isinstance(PASSWORD_REQUIRE_SPECIAL, bool)
 
 
-class TestAccountLockoutConfig:
-    """Testes de configuracao de bloqueio de conta."""
+class TestSupabaseAuthConfig:
+    """Testes de configuracao de autenticacao Supabase."""
 
-    def test_account_lockout_config_exists(self):
-        """Verifica que configuracoes de bloqueio de conta existem."""
-        from config.security import (
-            MAX_FAILED_LOGIN_ATTEMPTS,
-            ACCOUNT_LOCKOUT_MINUTES
-        )
-
-        assert MAX_FAILED_LOGIN_ATTEMPTS > 0
-        assert ACCOUNT_LOCKOUT_MINUTES > 0
-        # Valores razoaveis
-        assert MAX_FAILED_LOGIN_ATTEMPTS <= 10
-        assert ACCOUNT_LOCKOUT_MINUTES >= 5
+    def test_supabase_config_endpoint_exists(self, client: TestClient):
+        """Verifica que endpoint de configuracao de auth existe."""
+        response = client.get("/api/v1/auth/config")
+        assert response.status_code == 200
+        data = response.json()
+        assert "mode" in data
+        assert "supabase_enabled" in data
