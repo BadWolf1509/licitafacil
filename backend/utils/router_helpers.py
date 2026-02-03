@@ -12,7 +12,6 @@ from typing import Optional
 from fastapi import UploadFile
 
 from config import UPLOAD_DIR
-from config.base import IS_SERVERLESS
 from services.storage_service import get_storage
 from logging_config import get_logger
 

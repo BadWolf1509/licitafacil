@@ -24,14 +24,14 @@ from pathlib import Path
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # noqa: E402
 load_dotenv()
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
-from models import Usuario
+from config import SUPABASE_URL, SUPABASE_SERVICE_KEY  # noqa: E402
+from models import Usuario  # noqa: E402
 
 
 def get_database_url():
@@ -42,7 +42,7 @@ def get_database_url():
     return url
 
 
-def create_supabase_user(email: str, password_placeholder: str) -> dict:
+def create_supabase_user(email: str, password_placeholder: str) -> dict | None:
     """
     Cria usuário no Supabase Auth.
 
@@ -50,7 +50,7 @@ def create_supabase_user(email: str, password_placeholder: str) -> dict:
     criamos o usuário com uma senha temporária.
     O usuário deverá usar "Esqueci minha senha" para redefinir.
     """
-    from supabase import create_client
+    from supabase import create_client  # type: ignore[attr-defined]
 
     client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -114,7 +114,7 @@ def migrate_users(dry_run: bool = True, remove_passwords: bool = False):
         ).all()
 
         print(f"\n{'='*60}")
-        print(f"MIGRAÇÃO DE USUÁRIOS PARA SUPABASE AUTH")
+        print("MIGRAÇÃO DE USUÁRIOS PARA SUPABASE AUTH")
         print(f"{'='*60}")
         print(f"Modo: {'DRY RUN (simulação)' if dry_run else 'EXECUÇÃO REAL'}")
         print(f"Remover senhas locais: {'Sim' if remove_passwords else 'Não'}")
@@ -132,7 +132,7 @@ def migrate_users(dry_run: bool = True, remove_passwords: bool = False):
             print(f"[{user.id}] {user.email}...")
 
             if dry_run:
-                print(f"    -> [DRY RUN] Seria criado no Supabase")
+                print("    -> [DRY RUN] Seria criado no Supabase")
                 migrated += 1
                 continue
 
@@ -156,7 +156,7 @@ def migrate_users(dry_run: bool = True, remove_passwords: bool = False):
                     session.commit()
                     migrated += 1
                 else:
-                    print(f"    -> ERRO: Falha ao criar no Supabase")
+                    print("    -> ERRO: Falha ao criar no Supabase")
                     errors += 1
 
             except Exception as e:
@@ -165,7 +165,7 @@ def migrate_users(dry_run: bool = True, remove_passwords: bool = False):
                 session.rollback()
 
         print(f"\n{'='*60}")
-        print(f"RESULTADO:")
+        print("RESULTADO:")
         print(f"  Migrados com sucesso: {migrated}")
         print(f"  Erros: {errors}")
         print(f"{'='*60}")

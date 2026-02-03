@@ -7,7 +7,7 @@ import asyncio
 import signal
 import threading
 from functools import wraps
-from typing import TypeVar, Callable, Any, Optional
+from typing import TypeVar, Callable
 from contextlib import contextmanager
 
 from logging_config import get_logger
@@ -76,7 +76,7 @@ def with_timeout_sync(timeout_seconds: int, operation_name: str = "Operation"):
             if exception[0] is not None:
                 raise exception[0]
 
-            return result[0]
+            return result[0]  # type: ignore[return-value]
         return wrapper
     return decorator
 
@@ -99,7 +99,7 @@ def with_timeout_async(timeout_seconds: int, operation_name: str = "Operation"):
         async def wrapper(*args, **kwargs) -> T:
             try:
                 return await asyncio.wait_for(
-                    func(*args, **kwargs),
+                    func(*args, **kwargs),  # type: ignore[arg-type]
                     timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
@@ -111,7 +111,7 @@ def with_timeout_async(timeout_seconds: int, operation_name: str = "Operation"):
                     timeout_seconds=timeout_seconds,
                     operation=operation_name
                 )
-        return wrapper
+        return wrapper  # type: ignore[return-value]
     return decorator
 
 
@@ -142,11 +142,11 @@ def timeout_context(timeout_seconds: int, operation_name: str = "Operation"):
     # Signal so funciona em Unix
     if hasattr(signal, 'SIGALRM'):
         old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(timeout_seconds)
+        signal.alarm(timeout_seconds)  # type: ignore[attr-defined]
         try:
             yield
         finally:
-            signal.alarm(0)
+            signal.alarm(0)  # type: ignore[attr-defined]
             signal.signal(signal.SIGALRM, old_handler)
     else:
         # Windows: timeout nao disponivel via signal
@@ -205,4 +205,4 @@ def run_with_timeout(
     if exception[0] is not None:
         raise exception[0]
 
-    return result[0]
+    return result[0]  # type: ignore[return-value]

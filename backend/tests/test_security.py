@@ -3,7 +3,6 @@ Testes de segurança para o LicitaFácil.
 
 Verifica CORS, autenticação, rate limiting e validação de uploads.
 """
-import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
@@ -23,7 +22,6 @@ class TestCORSSecurity:
 
     def test_cors_production_rejects_wildcard(self):
         """Verifica que produção não aceita wildcard CORS."""
-        from config import ENVIRONMENT, CORS_ORIGINS
         from config.base import get_cors_origins
 
         # Simular ambiente de produção sem CORS_ORIGINS definido

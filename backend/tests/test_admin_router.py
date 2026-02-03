@@ -5,7 +5,6 @@ Testa endpoints de gerenciamento de usuários e estatísticas.
 Usa mocking para autenticação Supabase.
 """
 import uuid
-import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session

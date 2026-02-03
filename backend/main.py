@@ -16,7 +16,8 @@ from services.processing_queue import processing_queue
 from middleware.rate_limit import RateLimitMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION
+from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION, ENVIRONMENT
+from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
 from exceptions import (
     LicitaFacilError,
     DatabaseError,
@@ -86,7 +87,6 @@ app = FastAPI(
 app.add_middleware(RateLimitMiddleware)
 
 # 2. Security Headers (adiciona headers de seguranca a todas as respostas)
-from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
 if SECURITY_HEADERS_ENABLED:
     app.add_middleware(
         SecurityHeadersMiddleware,
@@ -119,8 +119,6 @@ async def correlation_id_middleware(request: Request, call_next):
 
 # Configurar CORS com origens da configuração
 # Em desenvolvimento: localhost. Em produção: definir CORS_ORIGINS no .env
-from config import ENVIRONMENT
-
 if not CORS_ORIGINS:
     if ENVIRONMENT == "production":
         logger.error("CORS_ORIGINS não definido em produção! Usando lista vazia.")

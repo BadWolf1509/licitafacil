@@ -2,7 +2,6 @@
 Testes para o módulo de logging.
 """
 import logging
-import pytest
 
 from logging_config import (
     sanitize_dict,

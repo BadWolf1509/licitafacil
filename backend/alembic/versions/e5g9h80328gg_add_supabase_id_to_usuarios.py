@@ -9,7 +9,7 @@ Também torna senha_hash nullable para permitir migração gradual.
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 
 

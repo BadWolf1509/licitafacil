@@ -1,8 +1,6 @@
 """
 Testes para o middleware de Rate Limiting.
 """
-import pytest
-from unittest.mock import patch
 
 from middleware.rate_limit import RateLimitMiddleware, PATH_SPECIFIC_LIMITS
 

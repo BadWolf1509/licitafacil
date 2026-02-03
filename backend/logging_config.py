@@ -23,6 +23,7 @@ Para medir tempo de operações:
 """
 import json
 import logging
+import re
 import time
 import uuid
 from contextvars import ContextVar
@@ -371,8 +372,6 @@ SENSITIVE_KEYS = {
 }
 
 # Padrões regex para sanitização de mensagens de log
-import re
-
 SENSITIVE_PATTERNS = [
     # JWT tokens (formato: xxx.xxx.xxx)
     (re.compile(r'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+'), '[JWT_TOKEN]'),
@@ -402,7 +401,7 @@ class SanitizingFilter(logging.Filter):
 
         # Também sanitizar args se existirem
         if hasattr(record, 'args') and record.args:
-            sanitized_args = []
+            sanitized_args: List[Any] = []
             for arg in record.args:
                 if isinstance(arg, str):
                     sanitized_arg = arg

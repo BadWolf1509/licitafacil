@@ -5,6 +5,8 @@ Autenticação gerenciada pelo Supabase Auth.
 O frontend usa supabase-js para login/registro.
 Este router fornece endpoints auxiliares e sincronização.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -66,7 +68,7 @@ def obter_requisitos_senha():
 
 @router.get("/debug-token")
 def debug_token_validation(
-    token: str = None,
+    token: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -90,7 +92,7 @@ def debug_token_validation(
 
             # Tentar obter cliente
             try:
-                client = _get_supabase_client()
+                _get_supabase_client()  # Verifica se cliente pode ser criado
                 result["client_created"] = True
             except Exception as e:
                 result["client_created"] = False
@@ -106,7 +108,8 @@ def debug_token_validation(
 
                 # Verificar se usuário existe localmente
                 from auth import get_user_by_supabase_id
-                local_user = get_user_by_supabase_id(db, user_data.get("id"))
+                supabase_id = user_data.get("id")
+                local_user = get_user_by_supabase_id(db, supabase_id) if supabase_id else None
                 result["local_user_found"] = local_user is not None
                 if local_user:
                     result["local_user_email"] = local_user.email
