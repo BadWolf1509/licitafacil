@@ -2,6 +2,10 @@
 // Suporta Supabase Auth (recomendado) e Legacy Auth (fallback)
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Carregar configuração de autenticação do backend em TODAS as páginas
+    // Necessário para inicializar o cliente Supabase (usado pelo Realtime)
+    await loadAuthConfig();
+
     // Só executar configuração de login na página de login (index.html)
     const path = window.location.pathname.toLowerCase();
     const isLoginPage = path.endsWith('index.html') ||
@@ -10,9 +14,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         (!path.includes('.html') && path.endsWith('/'));
 
     if (isLoginPage && document.getElementById('loginForm')) {
-        // Carregar configuração de autenticação do backend
-        await loadAuthConfig();
-
         // Verificar se já está logado
         await checkAuth();
 
