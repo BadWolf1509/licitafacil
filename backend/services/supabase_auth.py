@@ -4,7 +4,6 @@ Serviço de autenticação usando Supabase Auth.
 Fornece validação de tokens JWT do Supabase e gerenciamento de usuários.
 """
 from typing import Optional, Dict, Any
-from functools import lru_cache
 
 from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
 from logging_config import get_logger
@@ -198,7 +197,7 @@ def sign_in_with_password(email: str, password: str) -> Optional[Dict[str, Any]]
     """
     try:
         # Para login server-side, precisamos usar a anon key
-        from supabase import create_client
+        from supabase import create_client  # type: ignore[attr-defined]
         anon_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
         response = anon_client.auth.sign_in_with_password({
@@ -206,7 +205,7 @@ def sign_in_with_password(email: str, password: str) -> Optional[Dict[str, Any]]
             "password": password
         })
 
-        if response and response.session:
+        if response and response.session and response.user:
             return {
                 "access_token": response.session.access_token,
                 "refresh_token": response.session.refresh_token,
@@ -235,7 +234,7 @@ def refresh_session(refresh_token: str) -> Optional[Dict[str, Any]]:
         Nova sessão ou None se falhar
     """
     try:
-        from supabase import create_client
+        from supabase import create_client  # type: ignore[attr-defined]
         anon_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
         response = anon_client.auth.refresh_session(refresh_token)

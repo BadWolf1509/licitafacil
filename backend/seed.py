@@ -9,9 +9,18 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
+from passlib.context import CryptContext
+
 from database import engine, SessionLocal, Base
 from models import Usuario
-from auth import get_password_hash
+
+# Contexto de criptografia para senhas
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def get_password_hash(password: str) -> str:
+    """Gera hash de senha usando bcrypt."""
+    return pwd_context.hash(password)
 
 # Carregar variáveis de ambiente
 load_dotenv()

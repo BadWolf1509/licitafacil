@@ -89,6 +89,14 @@ class UsuarioRepository(BaseRepository[Usuario]):
             func.sum(case((Usuario.is_active.is_(False), 1), else_=0)).label("inativos"),
         ).first()
 
+        if result is None:
+            return {
+                "total_usuarios": 0,
+                "usuarios_aprovados": 0,
+                "usuarios_pendentes": 0,
+                "usuarios_inativos": 0
+            }
+
         return {
             "total_usuarios": result.total or 0,
             "usuarios_aprovados": int(result.aprovados or 0),
