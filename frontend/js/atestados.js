@@ -1530,5 +1530,8 @@ const AtestadosModule = {
     }
 };
 
-// Inicializar quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => AtestadosModule.init());
+// Inicializar quando DOM estiver pronto (aguarda config carregar)
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadAuthConfig();
+    AtestadosModule.init();
+});

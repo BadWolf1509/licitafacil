@@ -1,6 +1,9 @@
 /* JavaScript especifico do painel administrativo */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Aguardar config carregar antes de fazer chamadas API
+    await loadAuthConfig();
+
     verificarAdmin();
     setupTabs();
     carregarEstatisticas();
@@ -18,6 +21,8 @@ async function verificarAdmin() {
             }, 2000);
         }
     } catch (error) {
+        // Limpar sessão completamente antes de redirecionar
+        await clearSessionData();
         window.location.href = 'index.html';
     }
 }

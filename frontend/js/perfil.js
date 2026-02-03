@@ -1,7 +1,9 @@
 // LicitaFácil - Página de Perfil
 
-document.addEventListener('DOMContentLoaded', () => {
-    verificarAutenticacao();
+document.addEventListener('DOMContentLoaded', async () => {
+    // Aguardar configuração de autenticação (app.js já verifica auth)
+    await loadAuthConfig();
+
     carregarPerfil();
     setupFormPerfil();
     setupFormSenha();
