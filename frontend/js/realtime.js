@@ -15,22 +15,48 @@ const realtimeState = {
 
 /**
  * Verifica se Realtime esta disponivel
- * @returns {boolean}
+ * Requer que o usuario esteja autenticado via Supabase Auth (nao legacy JWT)
+ * @returns {Promise<boolean>}
  */
-function isRealtimeAvailable() {
-    return typeof isSupabaseAvailable === 'function' &&
-           isSupabaseAvailable() &&
-           typeof getSupabaseClient === 'function' &&
-           getSupabaseClient() !== null;
+async function isRealtimeAvailable() {
+    // Verificar se Supabase esta inicializado
+    if (typeof isSupabaseAvailable !== 'function' || !isSupabaseAvailable()) {
+        return false;
+    }
+
+    if (typeof getSupabaseClient !== 'function') {
+        return false;
+    }
+
+    const client = getSupabaseClient();
+    if (!client) {
+        return false;
+    }
+
+    // IMPORTANTE: Verificar se ha sessao Supabase autenticada
+    // Realtime com RLS requer autenticacao Supabase, nao funciona com JWT legado
+    try {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session) {
+            // Usuario logado via JWT legado, Realtime nao vai funcionar
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.warn('[REALTIME] Error checking Supabase session:', error);
+        return false;
+    }
 }
 
 /**
  * Inicializa o canal Realtime para jobs
- * @returns {boolean} - true se conectado com sucesso
+ * @returns {Promise<boolean>} - true se conectado com sucesso
  */
-function initRealtimeChannel() {
-    if (!isRealtimeAvailable()) {
-        console.log('[REALTIME] Supabase not available, using polling fallback');
+async function initRealtimeChannel() {
+    const available = await isRealtimeAvailable();
+    if (!available) {
+        // Nao logar como erro - e esperado quando usuario usa auth legado
+        console.log('[REALTIME] Supabase Auth session not available, using polling fallback');
         return false;
     }
 
@@ -77,7 +103,7 @@ function initRealtimeChannel() {
 /**
  * Tenta reconectar ao canal
  */
-function attemptReconnect() {
+async function attemptReconnect() {
     if (realtimeState.reconnectAttempts >= realtimeState.maxReconnectAttempts) {
         console.log('[REALTIME] Max reconnect attempts reached, falling back to polling');
         return;
@@ -88,12 +114,12 @@ function attemptReconnect() {
 
     console.log(`[REALTIME] Reconnecting in ${delay}ms (attempt ${realtimeState.reconnectAttempts})`);
 
-    setTimeout(() => {
+    setTimeout(async () => {
         if (realtimeState.channel) {
             realtimeState.channel.unsubscribe();
             realtimeState.channel = null;
         }
-        initRealtimeChannel();
+        await initRealtimeChannel();
     }, delay);
 }
 
@@ -135,12 +161,12 @@ function handleJobChange(payload) {
  * Registra callback para mudancas de um job especifico
  * @param {string} jobId - ID do job (ou '*' para todos)
  * @param {function} callback - Funcao a ser chamada quando job mudar
- * @returns {function} - Funcao para cancelar a subscription
+ * @returns {Promise<function>} - Funcao para cancelar a subscription
  */
-function subscribeToJob(jobId, callback) {
+async function subscribeToJob(jobId, callback) {
     // Inicializar canal se necessario
     if (!realtimeState.channel) {
-        initRealtimeChannel();
+        await initRealtimeChannel();
     }
 
     realtimeState.subscriptions.set(jobId, callback);
@@ -208,13 +234,14 @@ if (typeof window !== 'undefined') {
 // Auto-inicializar quando config estiver carregado
 document.addEventListener('DOMContentLoaded', () => {
     // Aguardar config carregar e entao inicializar
-    const checkAndInit = () => {
-        if (isRealtimeAvailable()) {
+    const checkAndInit = async () => {
+        const available = await isRealtimeAvailable();
+        if (available) {
             console.log('[REALTIME] Initializing...');
-            initRealtimeChannel();
+            await initRealtimeChannel();
         } else {
-            console.log('[REALTIME] Supabase not ready, will retry...');
-            setTimeout(checkAndInit, 1000);
+            // Nao tentar reconectar infinitamente - usuario pode estar usando auth legado
+            console.log('[REALTIME] Supabase Auth not available, polling will be used as fallback');
         }
     };
 

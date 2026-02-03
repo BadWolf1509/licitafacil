@@ -217,7 +217,7 @@ const AtestadosModule = {
         if (typeof window.RealtimeModule !== 'undefined' && window.RealtimeModule.isConnected()) {
             console.log(`[MONITOR] Using Realtime for job ${jobId}`);
 
-            const unsubscribe = window.RealtimeModule.subscribe(jobId, ({ job }) => {
+            const unsubscribe = await window.RealtimeModule.subscribe(jobId, ({ job }) => {
                 if (job && job.id === jobId) {
                     handleJobUpdate(job);
                 }
