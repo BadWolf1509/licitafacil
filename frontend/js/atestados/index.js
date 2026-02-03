@@ -140,19 +140,15 @@ const AtestadosModule = {
     },
 
     dismissJob(jobId) {
-        if (state.jobTimers.has(jobId)) {
-            clearInterval(state.jobTimers.get(jobId));
-            state.jobTimers.delete(jobId);
-        }
+        this.stopMonitoringJob(jobId);
         state.notifiedJobs.delete(jobId);
         this.removeJob(jobId);
     },
 
     cleanupOrphanedResources() {
-        state.jobTimers.forEach((timer, jobId) => {
+        state.jobTimers.forEach((monitor, jobId) => {
             if (!state.jobsEmProcessamento.has(jobId)) {
-                clearInterval(timer);
-                state.jobTimers.delete(jobId);
+                this.stopMonitoringJob(jobId);
             }
         });
         state.notifiedJobs.forEach(jobId => {
@@ -184,36 +180,71 @@ const AtestadosModule = {
     async monitorarJob(jobId) {
         if (state.jobTimers.has(jobId)) return;
         const self = this;
+
+        // Handler para processar atualizacoes de job (usado por Realtime e Polling)
+        const handleJobUpdate = (job) => {
+            if (!job) return;
+            job.last_polled_at = new Date().toISOString();
+            job.poll_error = null;
+
+            if (job.status === 'completed') {
+                self.markJobCompleted(job);
+                self.removeJob(jobId);
+                self.stopMonitoringJob(jobId);
+                ui.showAlert('Atestado processado com sucesso!', 'success');
+                self.carregarAtestados();
+                return true; // Job finalizado
+            }
+
+            if (job.status === 'failed' || job.status === 'cancelled') {
+                self.upsertJob(job);
+                self.stopMonitoringJob(jobId);
+                if (!state.notifiedJobs.has(job.id)) {
+                    const msg = job.status === 'cancelled'
+                        ? 'Processamento cancelado.'
+                        : (formatJobError(job) || 'Falha no processamento do atestado');
+                    ui.showAlert(msg, job.status === 'cancelled' ? 'warning' : 'error');
+                    state.notifiedJobs.add(job.id);
+                }
+                return true; // Job finalizado
+            }
+
+            self.upsertJob(job);
+            return false; // Job ainda em progresso
+        };
+
+        // Tentar usar Realtime se disponivel
+        if (typeof window.RealtimeModule !== 'undefined' && window.RealtimeModule.isConnected()) {
+            console.log(`[MONITOR] Using Realtime for job ${jobId}`);
+
+            const unsubscribe = window.RealtimeModule.subscribe(jobId, ({ job }) => {
+                if (job && job.id === jobId) {
+                    handleJobUpdate(job);
+                }
+            });
+
+            // Armazenar funcao de unsubscribe no lugar do timer
+            state.jobTimers.set(jobId, { type: 'realtime', unsubscribe });
+
+            // Fazer poll inicial para ter estado atual
+            try {
+                const data = await api.get(`/ai/queue/jobs/${jobId}`);
+                if (data.job) {
+                    handleJobUpdate(data.job);
+                }
+            } catch (error) {
+                console.error('Erro no poll inicial:', error);
+            }
+
+            return;
+        }
+
+        // Fallback para polling tradicional
+        console.log(`[MONITOR] Using polling for job ${jobId}`);
         const poll = async () => {
             try {
                 const data = await api.get(`/ai/queue/jobs/${jobId}`);
-                const job = data.job;
-                if (!job) return;
-                job.last_polled_at = new Date().toISOString();
-                job.poll_error = null;
-                if (job.status === 'completed') {
-                    self.markJobCompleted(job);
-                    self.removeJob(jobId);
-                    clearInterval(state.jobTimers.get(jobId));
-                    state.jobTimers.delete(jobId);
-                    ui.showAlert('Atestado processado com sucesso!', 'success');
-                    self.carregarAtestados();
-                    return;
-                }
-                if (job.status === 'failed' || job.status === 'cancelled') {
-                    self.upsertJob(job);
-                    clearInterval(state.jobTimers.get(jobId));
-                    state.jobTimers.delete(jobId);
-                    if (!state.notifiedJobs.has(job.id)) {
-                        const msg = job.status === 'cancelled'
-                            ? 'Processamento cancelado.'
-                            : (formatJobError(job) || 'Falha no processamento do atestado');
-                        ui.showAlert(msg, job.status === 'cancelled' ? 'warning' : 'error');
-                        state.notifiedJobs.add(job.id);
-                    }
-                    return;
-                }
-                self.upsertJob(job);
+                handleJobUpdate(data.job);
             } catch (error) {
                 console.error('Erro ao consultar job:', error);
                 const existing = state.jobsEmProcessamento.get(jobId);
@@ -226,8 +257,26 @@ const AtestadosModule = {
                 }
             }
         };
-        state.jobTimers.set(jobId, setInterval(poll, 3000));
+
+        const timerId = setInterval(poll, 3000);
+        state.jobTimers.set(jobId, { type: 'polling', timerId });
         await poll();
+    },
+
+    stopMonitoringJob(jobId) {
+        const monitor = state.jobTimers.get(jobId);
+        if (!monitor) return;
+
+        if (monitor.type === 'realtime' && monitor.unsubscribe) {
+            monitor.unsubscribe();
+        } else if (monitor.type === 'polling' && monitor.timerId) {
+            clearInterval(monitor.timerId);
+        } else if (typeof monitor === 'number') {
+            // Compatibilidade com formato antigo (apenas timerId)
+            clearInterval(monitor);
+        }
+
+        state.jobTimers.delete(jobId);
     },
 
     async carregarJobsEmProcessamento() {
