@@ -1,6 +1,7 @@
 // LicitaFácil - Autenticação
+// Suporta Supabase Auth (recomendado) e Legacy Auth (fallback)
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Só executar configuração de login na página de login (index.html)
     const path = window.location.pathname.toLowerCase();
     const isLoginPage = path.endsWith('index.html') ||
@@ -9,8 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         (!path.includes('.html') && path.endsWith('/'));
 
     if (isLoginPage && document.getElementById('loginForm')) {
+        // Carregar configuração de autenticação do backend
+        await loadAuthConfig();
+
         // Verificar se já está logado
-        checkAuth();
+        await checkAuth();
 
         // Configurar tabs
         setupTabs();
@@ -24,25 +28,43 @@ document.addEventListener('DOMContentLoaded', () => {
 /**
  * Verifica se o usuário já está autenticado
  */
-function checkAuth() {
-    const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-    if (token) {
-        // Verificar se o token é válido
-        api.get('/auth/status')
-            .then(data => {
-                // Token válido, redirecionar para dashboard
-                if (data.aprovado) {
-                    window.location.href = 'dashboard.html';
-                } else {
-                    // Usuário não aprovado
-                    ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
-                    localStorage.removeItem(CONFIG.TOKEN_KEY);
-                }
-            })
-            .catch(() => {
-                // Token inválido, limpar
-                localStorage.removeItem(CONFIG.TOKEN_KEY);
-            });
+async function checkAuth() {
+    let hasValidSession = false;
+
+    // Verificar sessão Supabase primeiro
+    if (isSupabaseAvailable()) {
+        try {
+            const { data: { session } } = await getSupabaseClient().auth.getSession();
+            if (session) {
+                hasValidSession = true;
+            }
+        } catch (error) {
+            console.warn('[AUTH] Error checking Supabase session:', error);
+        }
+    }
+
+    // Fallback para token legacy
+    if (!hasValidSession) {
+        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        if (token) {
+            hasValidSession = true;
+        }
+    }
+
+    if (hasValidSession) {
+        // Verificar se o token é válido no backend
+        try {
+            const data = await api.get('/auth/status');
+            if (data.aprovado) {
+                window.location.href = 'dashboard.html';
+            } else {
+                ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
+                await logout(false); // Limpar sessão sem redirecionar
+            }
+        } catch (error) {
+            console.warn('[AUTH] Session invalid:', error);
+            await logout(false);
+        }
     }
 }
 
@@ -154,6 +176,33 @@ function clearInputError(input) {
 }
 
 /**
+ * Realiza login usando Supabase Auth
+ */
+async function loginWithSupabase(email, password) {
+    const client = getSupabaseClient();
+
+    const { data, error } = await client.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+
+    if (error) {
+        throw new Error(error.message || 'Email ou senha incorretos');
+    }
+
+    return data;
+}
+
+/**
+ * Realiza login usando autenticação legacy
+ */
+async function loginWithLegacy(email, password) {
+    const data = await api.post('/auth/login-json', { email, senha: password });
+    localStorage.setItem(CONFIG.TOKEN_KEY, data.access_token);
+    return data;
+}
+
+/**
  * Configura o formulário de login
  */
 function setupLoginForm() {
@@ -186,10 +235,20 @@ function setupLoginForm() {
         ui.setButtonLoading(button, true, 'loginBtnText', 'loginSpinner');
 
         try {
-            const data = await api.post('/auth/login-json', { email, senha });
-
-            // Salvar token
-            localStorage.setItem(CONFIG.TOKEN_KEY, data.access_token);
+            // Tentar login com Supabase se disponível
+            if (isSupabaseAvailable()) {
+                try {
+                    await loginWithSupabase(email, senha);
+                    console.log('[AUTH] Login via Supabase successful');
+                } catch (supabaseError) {
+                    console.warn('[AUTH] Supabase login failed, trying legacy:', supabaseError.message);
+                    // Fallback para login legacy
+                    await loginWithLegacy(email, senha);
+                }
+            } else {
+                // Login legacy
+                await loginWithLegacy(email, senha);
+            }
 
             // Verificar status do usuário
             const status = await api.get('/auth/status');
@@ -201,7 +260,7 @@ function setupLoginForm() {
                 }, 1000);
             } else {
                 ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
-                localStorage.removeItem(CONFIG.TOKEN_KEY);
+                await logout(false);
             }
         } catch (error) {
             ui.showAlert(error.message || 'Erro ao fazer login', 'error');
@@ -296,6 +355,8 @@ function setupRegistroForm() {
         ui.setButtonLoading(button, true, 'registroBtnText', 'registroSpinner');
 
         try {
+            // O registro é sempre feito via API backend
+            // O backend cria o usuário no Supabase e localmente
             const data = await api.post('/auth/registrar', { nome, email, senha });
 
             ui.showAlert(data.mensagem || 'Cadastro realizado com sucesso!', 'success');
@@ -316,11 +377,25 @@ function setupRegistroForm() {
 
 /**
  * Faz logout do usuário
+ * @param {boolean} redirect - Se deve redirecionar para login
  */
-function logout() {
+async function logout(redirect = true) {
+    // Limpar sessão Supabase
+    if (isSupabaseAvailable()) {
+        try {
+            await getSupabaseClient().auth.signOut();
+        } catch (error) {
+            console.warn('[AUTH] Error signing out from Supabase:', error);
+        }
+    }
+
+    // Limpar tokens locais
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.USER_KEY);
-    window.location.href = 'index.html';
+
+    if (redirect) {
+        window.location.href = 'index.html';
+    }
 }
 
 /**

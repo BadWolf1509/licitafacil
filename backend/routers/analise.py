@@ -1,5 +1,6 @@
 import os
 import uuid
+import tempfile
 from decimal import Decimal
 from typing import Dict, Any
 from fastapi import Depends, HTTPException, status, UploadFile, File, Form
@@ -15,7 +16,12 @@ from services.atestado import atestados_to_dict
 from config import Messages, ALLOWED_PDF_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_complete_or_raise
-from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
+from utils.router_helpers import (
+    safe_delete_file,
+    save_upload_file_to_storage,
+    file_exists_in_storage,
+    save_temp_file_from_storage
+)
 from utils.http_helpers import get_user_resource_or_404
 from routers.base import AuthenticatedRouter
 from logging_config import get_logger
@@ -88,15 +94,34 @@ async def criar_analise(
     # Validar arquivo (extensão, tamanho e MIME type)
     file_ext = await validate_upload_complete_or_raise(file, ALLOWED_PDF_EXTENSIONS)
 
-    # Criar diretório do usuário e salvar arquivo
-    user_upload_dir = get_user_upload_dir(current_user.id, "editais")
+    # Gerar nome único para o arquivo
     filename = f"{uuid.uuid4()}{file_ext}"
-    filepath = str(user_upload_dir / filename)
-    save_upload_file(file, filepath)
 
+    # Salvar arquivo no Storage (Supabase ou local)
+    storage_path = save_upload_file_to_storage(
+        file=file,
+        user_id=current_user.id,
+        subfolder="editais",
+        filename=filename,
+        content_type="application/pdf"
+    )
+
+    # Criar arquivo temporário para processamento
+    temp_file = None
     try:
+        # Baixar arquivo do storage para arquivo temporário
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        if not save_temp_file_from_storage(storage_path, temp_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao preparar arquivo para processamento"
+            )
+
         # Processar edital (extrair texto e exigências)
-        resultado_edital = services.document_processor.process_edital(filepath)
+        resultado_edital = services.document_processor.process_edital(temp_path)
         exigencias = resultado_edital.get("exigencias", [])
 
         # Buscar atestados do usuário usando repository
@@ -112,11 +137,11 @@ async def criar_analise(
                 exigencias, atestados_dict
             )
 
-        # Criar análise
+        # Criar análise (salva o path do storage, não o path local)
         nova_analise = Analise(
             user_id=current_user.id,
             nome_licitacao=nome_licitacao,
-            arquivo_path=filepath,
+            arquivo_path=storage_path,  # Caminho no storage
             exigencias_json=exigencias,
             resultado_json=resultado_matching
         )
@@ -127,8 +152,17 @@ async def criar_analise(
         return nova_analise
 
     except Exception as e:
-        safe_delete_file(filepath)
+        # Em caso de erro, remover arquivo do storage
+        safe_delete_file(storage_path)
         raise handle_exception(e, logger, "ao processar edital")
+
+    finally:
+        # Limpar arquivo temporário
+        if temp_file and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 @router.post("/manual", response_model=AnaliseResponse)
@@ -199,7 +233,15 @@ async def processar_analise(
         db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
     )
 
-    if not analise.arquivo_path or not os.path.exists(analise.arquivo_path):
+    # Verificar se há arquivo associado
+    if not analise.arquivo_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=Messages.EDITAL_FILE_NOT_FOUND
+        )
+
+    # Verificar se arquivo existe no storage
+    if not file_exists_in_storage(analise.arquivo_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=Messages.EDITAL_FILE_NOT_FOUND
@@ -214,9 +256,22 @@ async def processar_analise(
             detail=Messages.NO_ATESTADOS
         )
 
+    # Baixar arquivo do storage para arquivo temporário
+    temp_file = None
     try:
+        file_ext = os.path.splitext(analise.arquivo_path)[1] or ".pdf"
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+        temp_path = temp_file.name
+        temp_file.close()
+
+        if not save_temp_file_from_storage(analise.arquivo_path, temp_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao baixar arquivo do storage"
+            )
+
         # Reprocessar edital
-        resultado_edital = services.document_processor.process_edital(analise.arquivo_path)
+        resultado_edital = services.document_processor.process_edital(temp_path)
         exigencias = resultado_edital.get("exigencias", [])
 
         # Converter atestados para formato de análise
@@ -237,8 +292,18 @@ async def processar_analise(
 
         return analise
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise handle_exception(e, logger, f"ao reprocessar análise {analise_id}")
+
+    finally:
+        # Limpar arquivo temporário
+        if temp_file and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 @router.delete("/{analise_id}", response_model=Mensagem)
@@ -252,7 +317,7 @@ def excluir_analise(
         db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
     )
 
-    # Remover arquivo se existir
+    # Remover arquivo do storage se existir
     if analise.arquivo_path:
         safe_delete_file(analise.arquivo_path)
 

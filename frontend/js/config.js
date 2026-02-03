@@ -24,8 +24,62 @@ const CONFIG = {
     // Chaves do localStorage
     TOKEN_KEY: 'licitafacil_token',
     USER_KEY: 'licitafacil_user',
-    THEME_KEY: 'licitafacil_theme'
+    THEME_KEY: 'licitafacil_theme',
+
+    // Supabase (carregado dinamicamente do backend)
+    SUPABASE_URL: null,
+    SUPABASE_ANON_KEY: null,
+    SUPABASE_ENABLED: false
 };
+
+// Instância global do Supabase (inicializada após carregar config)
+let supabaseClient = null;
+
+/**
+ * Carrega configuração de autenticação do backend
+ * Detecta automaticamente se Supabase está habilitado
+ */
+async function loadAuthConfig() {
+    try {
+        const config = await api.get('/auth/config');
+
+        if (config.supabase_enabled) {
+            CONFIG.SUPABASE_URL = config.supabase_url;
+            CONFIG.SUPABASE_ANON_KEY = config.supabase_anon_key;
+            CONFIG.SUPABASE_ENABLED = true;
+
+            // Inicializar cliente Supabase se disponível
+            if (typeof window.supabase !== 'undefined') {
+                supabaseClient = window.supabase.createClient(
+                    CONFIG.SUPABASE_URL,
+                    CONFIG.SUPABASE_ANON_KEY
+                );
+                console.log('[AUTH] Supabase client initialized');
+            } else {
+                console.warn('[AUTH] Supabase JS not loaded, using legacy auth');
+            }
+        }
+
+        return config;
+    } catch (error) {
+        console.warn('[AUTH] Failed to load auth config:', error);
+        return { mode: 'legacy', supabase_enabled: false };
+    }
+}
+
+/**
+ * Retorna o cliente Supabase se disponível
+ */
+function getSupabaseClient() {
+    return supabaseClient;
+}
+
+/**
+ * Verifica se Supabase está habilitado e disponível
+ */
+function isSupabaseAvailable() {
+    return CONFIG.SUPABASE_ENABLED && supabaseClient !== null;
+}
 
 // Funções auxiliares para requisições à API
 const api = {
@@ -37,7 +91,16 @@ const api = {
      */
     async request(endpoint, options = {}) {
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
-        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+
+        // Obter token (Supabase ou legacy)
+        let token = null;
+        if (isSupabaseAvailable()) {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            token = session?.access_token;
+        }
+        if (!token) {
+            token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        }
 
         const headers = {
             'Content-Type': 'application/json',
@@ -76,6 +139,9 @@ const api = {
                     // Sessão expirada em outra página - redirecionar para login
                     localStorage.removeItem(CONFIG.TOKEN_KEY);
                     localStorage.removeItem(CONFIG.USER_KEY);
+                    if (isSupabaseAvailable()) {
+                        await supabaseClient.auth.signOut();
+                    }
                     if (!isLoginPage) {
                         window.location.href = 'index.html';
                     }
@@ -139,7 +205,16 @@ const api = {
      */
     async upload(endpoint, formData) {
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
-        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+
+        // Obter token (Supabase ou legacy)
+        let token = null;
+        if (isSupabaseAvailable()) {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            token = session?.access_token;
+        }
+        if (!token) {
+            token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        }
 
         const headers = {};
         if (token) {
@@ -165,6 +240,9 @@ const api = {
                     // Sessão expirada - redirecionar para login
                     localStorage.removeItem(CONFIG.TOKEN_KEY);
                     localStorage.removeItem(CONFIG.USER_KEY);
+                    if (isSupabaseAvailable()) {
+                        await supabaseClient.auth.signOut();
+                    }
                     if (!window.location.pathname.endsWith('index.html')) {
                         window.location.href = 'index.html';
                     }

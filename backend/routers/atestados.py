@@ -1,5 +1,6 @@
 import os
 import uuid
+import tempfile
 from fastapi import Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Union
@@ -17,7 +18,12 @@ from services.processing_mode import is_serverless
 from config import Messages, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.pagination import PaginationParams, paginate_query
 from utils.validation import validate_upload_complete_or_raise
-from utils.router_helpers import get_user_upload_dir, safe_delete_file, save_upload_file
+from utils.router_helpers import (
+    safe_delete_file,
+    save_upload_file_to_storage,
+    file_exists_in_storage,
+    save_temp_file_from_storage
+)
 from utils.http_helpers import get_user_resource_or_404
 from routers.base import AuthenticatedRouter
 
@@ -98,62 +104,93 @@ async def upload_atestado(
     # Validar arquivo (extensão, tamanho e MIME type)
     file_ext = await validate_upload_complete_or_raise(file, ALLOWED_DOCUMENT_EXTENSIONS)
 
-    # Criar diretorio do usuario e salvar arquivo
-    user_upload_dir = get_user_upload_dir(current_user.id, "atestados")
+    # Gerar nome único para o arquivo
     filename = f"{uuid.uuid4()}{file_ext}"
-    filepath = str(user_upload_dir / filename)
-    save_upload_file(file, filepath)
+    original_filename = file.filename or "documento"
+
+    # Determinar content type
+    content_type = file.content_type or "application/octet-stream"
+
+    # Salvar arquivo no Storage (Supabase ou local)
+    storage_path = save_upload_file_to_storage(
+        file=file,
+        user_id=current_user.id,
+        subfolder="atestados",
+        filename=filename,
+        content_type=content_type
+    )
 
     try:
-        original_filename = file.filename or "documento"
         if is_serverless():
             # Modo serverless: processar síncronamente
-            return await _process_sync(db, current_user, filepath, original_filename)
+            return await _process_sync(db, current_user, storage_path, original_filename, file_ext)
         else:
             # Modo tradicional: enfileirar
-            return _enqueue_processing(current_user, filepath, original_filename)
+            return _enqueue_processing(current_user, storage_path, original_filename)
 
     except Exception as e:
-        safe_delete_file(filepath)
+        safe_delete_file(storage_path)
         raise handle_exception(e, logger, "ao processar atestado")
 
 
 async def _process_sync(
     db: Session,
     user: Usuario,
-    filepath: str,
-    original_filename: str
+    storage_path: str,
+    original_filename: str,
+    file_ext: str = ".pdf"
 ) -> AtestadoResponse:
     """Processa atestado de forma síncrona (serverless)."""
     from services.sync_processor import get_sync_processor
 
-    processor = get_sync_processor()
-    result = processor.process_atestado(
-        db=db,
-        user_id=user.id,
-        file_path=filepath,
-        original_filename=original_filename
-    )
+    # Baixar arquivo do storage para arquivo temporário
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+    temp_path = temp_file.name
+    temp_file.close()
 
-    if not result.get("success"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=result.get("error", "Erro ao processar documento")
+    try:
+        if not save_temp_file_from_storage(storage_path, temp_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao baixar arquivo do storage"
+            )
+
+        processor = get_sync_processor()
+        result = processor.process_atestado(
+            db=db,
+            user_id=user.id,
+            file_path=temp_path,
+            original_filename=original_filename,
+            storage_path=storage_path  # Passar o path do storage para salvar no banco
         )
 
-    # Buscar atestado criado usando repository
-    atestado = atestado_repository.get_by_id(db, result["atestado_id"])
-    if atestado is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno: atestado não encontrado após processamento"
-        )
-    return atestado
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=result.get("error", "Erro ao processar documento")
+            )
+
+        # Buscar atestado criado usando repository
+        atestado = atestado_repository.get_by_id(db, result["atestado_id"])
+        if atestado is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro interno: atestado não encontrado após processamento"
+            )
+        return atestado
+
+    finally:
+        # Limpar arquivo temporário
+        if os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 
 def _enqueue_processing(
     user: Usuario,
-    filepath: str,
+    storage_path: str,
     original_filename: str
 ) -> JobResponse:
     """Enfileira processamento assíncrono (tradicional)."""
@@ -163,7 +200,7 @@ def _enqueue_processing(
     processing_queue.add_job(
         job_id=job_id,
         user_id=user.id,
-        file_path=filepath,
+        file_path=storage_path,
         job_type="atestado",
         original_filename=original_filename,
         callback=salvar_atestado_processado
@@ -186,7 +223,15 @@ async def reprocessar_atestado(
         db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
     )
 
-    if not atestado.arquivo_path or not os.path.exists(atestado.arquivo_path):
+    # Verificar se há arquivo associado
+    if not atestado.arquivo_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=Messages.ATESTADO_FILE_NOT_FOUND
+        )
+
+    # Verificar se arquivo existe no storage
+    if not file_exists_in_storage(atestado.arquivo_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=Messages.ATESTADO_FILE_NOT_FOUND
@@ -194,12 +239,15 @@ async def reprocessar_atestado(
 
     try:
         original_name = os.path.basename(atestado.arquivo_path)
+        file_ext = os.path.splitext(atestado.arquivo_path)[1] or ".pdf"
 
         if is_serverless():
-            return await _process_sync(db, current_user, atestado.arquivo_path, original_name)
+            return await _process_sync(db, current_user, atestado.arquivo_path, original_name, file_ext)
         else:
             return _enqueue_processing(current_user, atestado.arquivo_path, original_name)
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise handle_exception(e, logger, f"ao reprocessar atestado {atestado_id}")
 
@@ -265,7 +313,7 @@ def excluir_atestado(
         db, Atestado, atestado_id, current_user.id, Messages.ATESTADO_NOT_FOUND
     )
 
-    # Remover arquivo se existir
+    # Remover arquivo do storage se existir
     if atestado.arquivo_path:
         safe_delete_file(atestado.arquivo_path)
 

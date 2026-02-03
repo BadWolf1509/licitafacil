@@ -2,23 +2,44 @@
 Funções auxiliares reutilizáveis para routers.
 
 Centraliza operações comuns de arquivos e diretórios,
-evitando duplicação de código entre routers.
+usando Supabase Storage em produção e filesystem local em desenvolvimento.
 """
 import os
-import shutil
+import io
 from pathlib import Path
+from typing import Optional
 
 from fastapi import UploadFile
 
 from config import UPLOAD_DIR
+from config.base import IS_SERVERLESS
+from services.storage_service import get_storage
 from logging_config import get_logger
 
 logger = get_logger('utils.router_helpers')
 
 
+def get_storage_path(user_id: int, subfolder: str, filename: str) -> str:
+    """
+    Retorna o caminho de storage para um arquivo.
+
+    Args:
+        user_id: ID do usuário
+        subfolder: Subpasta (ex: "atestados", "editais")
+        filename: Nome do arquivo
+
+    Returns:
+        Caminho no formato "users/{user_id}/{subfolder}/{filename}"
+    """
+    return f"users/{user_id}/{subfolder}/{filename}"
+
+
 def get_user_upload_dir(user_id: int, subfolder: str = "") -> Path:
     """
     Retorna o diretório de upload do usuário, criando-o se necessário.
+
+    NOTA: Em ambiente serverless, usa /tmp que é efêmero.
+    Prefira usar save_upload_file_to_storage() para persistência.
 
     Args:
         user_id: ID do usuário
@@ -39,6 +60,7 @@ def get_user_upload_dir(user_id: int, subfolder: str = "") -> Path:
 def safe_delete_file(filepath: str) -> bool:
     """
     Remove arquivo se existir, logando erros.
+    Suporta tanto paths locais quanto paths de storage.
 
     Args:
         filepath: Caminho do arquivo a remover
@@ -46,6 +68,13 @@ def safe_delete_file(filepath: str) -> bool:
     Returns:
         True se removido com sucesso ou arquivo não existia, False em caso de erro
     """
+    storage = get_storage()
+
+    # Se parece ser um path de storage (users/...)
+    if filepath.startswith("users/"):
+        return storage.delete(filepath)
+
+    # Path local
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
@@ -58,7 +87,9 @@ def safe_delete_file(filepath: str) -> bool:
 
 def save_upload_file(file: UploadFile, destination: str) -> None:
     """
-    Salva arquivo de upload no destino especificado.
+    Salva arquivo de upload no destino especificado (filesystem local).
+
+    NOTA: Em ambiente serverless, prefira usar save_upload_file_to_storage().
 
     Args:
         file: Arquivo de upload do FastAPI
@@ -67,7 +98,95 @@ def save_upload_file(file: UploadFile, destination: str) -> None:
     Raises:
         IOError: Se falhar ao salvar o arquivo
     """
+    import shutil
+
+    # Garantir que o diretório existe
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+
     with open(destination, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
 
+def save_upload_file_to_storage(
+    file: UploadFile,
+    user_id: int,
+    subfolder: str,
+    filename: str,
+    content_type: str = "application/pdf"
+) -> str:
+    """
+    Salva arquivo de upload no storage (Supabase ou local).
+
+    Args:
+        file: Arquivo de upload do FastAPI
+        user_id: ID do usuário
+        subfolder: Subpasta (ex: "atestados", "editais")
+        filename: Nome do arquivo
+        content_type: Tipo MIME do arquivo
+
+    Returns:
+        Caminho do arquivo no storage (para salvar no banco)
+    """
+    storage = get_storage()
+    storage_path = get_storage_path(user_id, subfolder, filename)
+
+    # Ler conteúdo do arquivo
+    file.file.seek(0)
+    file_content = file.file.read()
+
+    # Upload para storage
+    storage.upload(io.BytesIO(file_content), storage_path, content_type)
+
+    logger.info(f"[STORAGE] Arquivo salvo: {storage_path}")
+    return storage_path
+
+
+def get_file_from_storage(storage_path: str) -> Optional[bytes]:
+    """
+    Baixa arquivo do storage.
+
+    Args:
+        storage_path: Caminho do arquivo no storage
+
+    Returns:
+        Conteúdo do arquivo em bytes ou None se não existir
+    """
+    storage = get_storage()
+    return storage.download(storage_path)
+
+
+def file_exists_in_storage(storage_path: str) -> bool:
+    """
+    Verifica se arquivo existe no storage.
+
+    Args:
+        storage_path: Caminho do arquivo no storage
+
+    Returns:
+        True se existe, False caso contrário
+    """
+    storage = get_storage()
+    return storage.exists(storage_path)
+
+
+def save_temp_file_from_storage(storage_path: str, local_path: str) -> bool:
+    """
+    Baixa arquivo do storage para um arquivo local temporário.
+    Útil para processar arquivos com bibliotecas que precisam de path local.
+
+    Args:
+        storage_path: Caminho do arquivo no storage
+        local_path: Caminho local onde salvar
+
+    Returns:
+        True se baixou com sucesso, False caso contrário
+    """
+    content = get_file_from_storage(storage_path)
+    if content is None:
+        return False
+
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    with open(local_path, 'wb') as f:
+        f.write(content)
+
+    return True

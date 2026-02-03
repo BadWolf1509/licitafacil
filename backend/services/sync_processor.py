@@ -32,7 +32,8 @@ class SyncProcessor:
         user_id: int,
         file_path: str,
         original_filename: str,
-        use_vision: bool = True
+        use_vision: bool = True,
+        storage_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Processa um atestado de forma síncrona.
@@ -40,9 +41,11 @@ class SyncProcessor:
         Args:
             db: Sessão do banco de dados
             user_id: ID do usuário
-            file_path: Caminho do arquivo
+            file_path: Caminho do arquivo local (pode ser temporário)
             original_filename: Nome original do arquivo
             use_vision: Se deve usar OCR/Vision
+            storage_path: Caminho do arquivo no storage (Supabase).
+                         Se fornecido, será salvo no banco em vez de file_path.
 
         Returns:
             Dicionário com dados extraídos e ID do atestado criado
@@ -50,14 +53,17 @@ class SyncProcessor:
         logger.info(f"[SYNC] Processando atestado: {original_filename}")
 
         try:
-            # Processar documento
+            # Processar documento usando arquivo local
             resultado = self._processor.process(file_path, use_vision=use_vision)
 
             # Criar atestado no banco
+            # Usa storage_path se fornecido (para Supabase), senão usa file_path
+            arquivo_para_salvar = storage_path if storage_path else file_path
+
             atestado = self._save_atestado(
                 db=db,
                 user_id=user_id,
-                file_path=file_path,
+                file_path=arquivo_para_salvar,
                 original_filename=original_filename,
                 resultado=resultado
             )

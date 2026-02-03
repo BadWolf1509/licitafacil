@@ -17,8 +17,13 @@ class Usuario(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
-    senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     nome: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Supabase Auth ID (UUID) - chave estrangeira para auth.users
+    supabase_id: Mapped[Optional[str]] = mapped_column(String(36), unique=True, index=True, nullable=True)
+
+    # Senha hash (mantido para período de migração, será removido após migração completa)
+    senha_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_approved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)

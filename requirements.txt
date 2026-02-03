@@ -13,6 +13,9 @@ psycopg2-binary>=2.9.10  # Driver PostgreSQL para Supabase
 python-jose[cryptography]>=3.5.0
 passlib[bcrypt]>=1.7.4
 
+# Supabase (Auth, Storage, Realtime)
+supabase>=2.0.0
+
 # Extração de PDF (processamento local)
 pdfplumber>=0.11.9
 PyMuPDF>=1.26.7

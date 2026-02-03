@@ -44,7 +44,15 @@ def env_float(key: str, default: float = 0.0) -> float:
 
 # === Diretorios ===
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+
+# Detectar ambiente serverless (Vercel, AWS Lambda)
+IS_SERVERLESS = os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+
+# Em serverless, usar /tmp (único diretório gravável)
+if IS_SERVERLESS:
+    UPLOAD_DIR = "/tmp/uploads"
+else:
+    UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
 
 # === Extensoes de Arquivo Permitidas ===
