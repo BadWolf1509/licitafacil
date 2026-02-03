@@ -1,5 +1,5 @@
 // LicitaFácil - Autenticação
-// Suporta Supabase Auth (recomendado) e Legacy Auth (fallback)
+// Autenticação via Supabase Auth
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Carregar configuração de autenticação do backend em TODAS as páginas
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkAuth() {
     let hasValidSession = false;
 
-    // Verificar sessão Supabase primeiro
+    // Verificar sessão Supabase
     if (isSupabaseAvailable()) {
         try {
             const { data: { session } } = await getSupabaseClient().auth.getSession();
@@ -41,14 +41,6 @@ async function checkAuth() {
             }
         } catch (error) {
             console.warn('[AUTH] Error checking Supabase session:', error);
-        }
-    }
-
-    // Fallback para token legacy
-    if (!hasValidSession) {
-        const token = localStorage.getItem(CONFIG.TOKEN_KEY);
-        if (token) {
-            hasValidSession = true;
         }
     }
 
@@ -180,6 +172,10 @@ function clearInputError(input) {
  * Realiza login usando Supabase Auth
  */
 async function loginWithSupabase(email, password) {
+    if (!isSupabaseAvailable()) {
+        throw new Error('Serviço de autenticação não disponível. Tente novamente mais tarde.');
+    }
+
     const client = getSupabaseClient();
 
     const { data, error } = await client.auth.signInWithPassword({
@@ -188,18 +184,16 @@ async function loginWithSupabase(email, password) {
     });
 
     if (error) {
-        throw new Error(error.message || 'Email ou senha incorretos');
+        // Traduzir mensagens de erro comuns
+        if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Email ou senha incorretos');
+        }
+        if (error.message.includes('Email not confirmed')) {
+            throw new Error('Email não confirmado. Verifique sua caixa de entrada.');
+        }
+        throw new Error(error.message || 'Erro ao fazer login');
     }
 
-    return data;
-}
-
-/**
- * Realiza login usando autenticação legacy
- */
-async function loginWithLegacy(email, password) {
-    const data = await api.post('/auth/login-json', { email, senha: password });
-    localStorage.setItem(CONFIG.TOKEN_KEY, data.access_token);
     return data;
 }
 
@@ -236,22 +230,11 @@ function setupLoginForm() {
         ui.setButtonLoading(button, true, 'loginBtnText', 'loginSpinner');
 
         try {
-            // Tentar login com Supabase se disponível
-            if (isSupabaseAvailable()) {
-                try {
-                    await loginWithSupabase(email, senha);
-                    console.log('[AUTH] Login via Supabase successful');
-                } catch (supabaseError) {
-                    console.warn('[AUTH] Supabase login failed, trying legacy:', supabaseError.message);
-                    // Fallback para login legacy
-                    await loginWithLegacy(email, senha);
-                }
-            } else {
-                // Login legacy
-                await loginWithLegacy(email, senha);
-            }
+            // Login via Supabase Auth
+            await loginWithSupabase(email, senha);
+            console.log('[AUTH] Login via Supabase successful');
 
-            // Verificar status do usuário
+            // Verificar status do usuário no backend
             const status = await api.get('/auth/status');
 
             if (status.aprovado) {
