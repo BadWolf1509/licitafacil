@@ -657,5 +657,5 @@ document_processor = DocumentProcessor()
 
 # Configurar AtestadoProcessor com referencia ao DocumentProcessor
 # Importação tardia necessária para evitar dependência circular
-from .atestado_processor import atestado_processor  # noqa: E402
+from .atestado.processor import atestado_processor  # noqa: E402
 atestado_processor.set_document_processor(document_processor)

@@ -360,22 +360,43 @@ function setupRegistroForm() {
 }
 
 /**
- * Faz logout do usuário
- * @param {boolean} redirect - Se deve redirecionar para login
+ * Limpa todos os dados de autenticação (Supabase + localStorage)
+ * @returns {Promise<void>}
  */
-async function logout(redirect = true) {
-    // Limpar sessão Supabase
+async function clearAllAuthData() {
+    // 1. Limpar sessão Supabase via API
     if (isSupabaseAvailable()) {
         try {
-            await getSupabaseClient().auth.signOut();
+            await getSupabaseClient().auth.signOut({ scope: 'local' });
         } catch (error) {
             console.warn('[AUTH] Error signing out from Supabase:', error);
         }
     }
 
-    // Limpar tokens locais
+    // 2. Limpar tokens da aplicação
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.USER_KEY);
+
+    // 3. Limpar todas as chaves do Supabase no localStorage
+    // Supabase armazena sessão com padrão: sb-{project-ref}-auth-token
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.startsWith('supabase'))) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
+    console.log('[AUTH] All auth data cleared');
+}
+
+/**
+ * Faz logout do usuário
+ * @param {boolean} redirect - Se deve redirecionar para login
+ */
+async function logout(redirect = true) {
+    await clearAllAuthData();
 
     if (redirect) {
         window.location.href = 'index.html';

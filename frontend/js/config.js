@@ -35,36 +35,47 @@ const CONFIG = {
 // Instância global do Supabase (inicializada após carregar config)
 let supabaseClient = null;
 
+// Promise para garantir que loadAuthConfig execute apenas uma vez
+let authConfigPromise = null;
+
 /**
  * Carrega configuração de autenticação do backend
  * Detecta automaticamente se Supabase está habilitado
+ * IDEMPOTENTE: múltiplas chamadas retornam a mesma Promise
  */
 async function loadAuthConfig() {
-    try {
-        const config = await api.get('/auth/config');
-
-        if (config.supabase_enabled) {
-            CONFIG.SUPABASE_URL = config.supabase_url;
-            CONFIG.SUPABASE_ANON_KEY = config.supabase_anon_key;
-            CONFIG.SUPABASE_ENABLED = true;
-
-            // Inicializar cliente Supabase se disponível
-            if (typeof window.supabase !== 'undefined') {
-                supabaseClient = window.supabase.createClient(
-                    CONFIG.SUPABASE_URL,
-                    CONFIG.SUPABASE_ANON_KEY
-                );
-                console.log('[AUTH] Supabase client initialized');
-            } else {
-                console.warn('[AUTH] Supabase JS not loaded, using legacy auth');
-            }
-        }
-
-        return config;
-    } catch (error) {
-        console.warn('[AUTH] Failed to load auth config:', error);
-        return { mode: 'legacy', supabase_enabled: false };
+    // Se já está carregando ou carregou, retorna a Promise existente
+    if (authConfigPromise) {
+        return authConfigPromise;
     }
+
+    authConfigPromise = (async () => {
+        try {
+            const config = await api.get('/auth/config');
+
+            if (config.supabase_enabled) {
+                CONFIG.SUPABASE_URL = config.supabase_url;
+                CONFIG.SUPABASE_ANON_KEY = config.supabase_anon_key;
+                CONFIG.SUPABASE_ENABLED = true;
+
+                // Inicializar cliente Supabase apenas se ainda não existe
+                if (!supabaseClient && typeof window.supabase !== 'undefined') {
+                    supabaseClient = window.supabase.createClient(
+                        CONFIG.SUPABASE_URL,
+                        CONFIG.SUPABASE_ANON_KEY
+                    );
+                    console.log('[AUTH] Supabase client initialized');
+                }
+            }
+
+            return config;
+        } catch (error) {
+            console.warn('[AUTH] Failed to load auth config:', error);
+            return { mode: 'legacy', supabase_enabled: false };
+        }
+    })();
+
+    return authConfigPromise;
 }
 
 /**
@@ -79,6 +90,35 @@ function getSupabaseClient() {
  */
 function isSupabaseAvailable() {
     return CONFIG.SUPABASE_ENABLED && supabaseClient !== null;
+}
+
+/**
+ * Limpa todos os dados de sessão (usado pelo error handler)
+ * @returns {Promise<void>}
+ */
+async function clearSessionData() {
+    // 1. Limpar sessão Supabase
+    if (isSupabaseAvailable()) {
+        try {
+            await supabaseClient.auth.signOut({ scope: 'local' });
+        } catch (error) {
+            console.warn('[CONFIG] Error signing out:', error);
+        }
+    }
+
+    // 2. Limpar tokens da aplicação
+    localStorage.removeItem(CONFIG.TOKEN_KEY);
+    localStorage.removeItem(CONFIG.USER_KEY);
+
+    // 3. Limpar chaves Supabase do localStorage
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.startsWith('supabase'))) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
 }
 
 // Funções auxiliares para requisições à API
@@ -136,14 +176,11 @@ const api = {
                         throw new Error(data.detail);
                     }
 
-                    // Sessão expirada em outra página - redirecionar para login
-                    localStorage.removeItem(CONFIG.TOKEN_KEY);
-                    localStorage.removeItem(CONFIG.USER_KEY);
-                    if (isSupabaseAvailable()) {
-                        await supabaseClient.auth.signOut();
-                    }
+                    // Sessão expirada em outra página - limpar e redirecionar
+                    await clearSessionData();
                     if (!isLoginPage) {
                         window.location.href = 'index.html';
+                        return; // Evita processamento adicional durante redirect
                     }
                     throw new Error('Sessao expirada. Faca login novamente.');
                 }
@@ -237,14 +274,11 @@ const api = {
 
             if (!response.ok) {
                 if (response.status === 401) {
-                    // Sessão expirada - redirecionar para login
-                    localStorage.removeItem(CONFIG.TOKEN_KEY);
-                    localStorage.removeItem(CONFIG.USER_KEY);
-                    if (isSupabaseAvailable()) {
-                        await supabaseClient.auth.signOut();
-                    }
+                    // Sessão expirada - limpar e redirecionar para login
+                    await clearSessionData();
                     if (!window.location.pathname.endsWith('index.html')) {
                         window.location.href = 'index.html';
+                        return; // Evita processamento adicional durante redirect
                     }
                     throw new Error('Sessao expirada. Faca login novamente.');
                 }

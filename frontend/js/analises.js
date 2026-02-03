@@ -41,23 +41,46 @@ const AnalisesModule = {
             }
 
             container.innerHTML = analises.map(a => {
-                const status = a.resultado_json ?
-                    (a.resultado_json.every(r => r.status === 'atende') ? 'atende' :
-                     a.resultado_json.some(r => r.status === 'atende') ? 'parcial' : 'nao-atende') :
-                    'pendente';
+                // Verificar se tem resultado E se o array nao esta vazio
+                const hasResults = a.resultado_json && a.resultado_json.length > 0;
+                const hasExigencias = a.exigencias_json && a.exigencias_json.length > 0;
+                let status;
+                if (hasResults) {
+                    status = a.resultado_json.every(r => r.status === 'atende') ? 'atende' :
+                             a.resultado_json.some(r => r.status === 'atende') ? 'parcial' : 'nao-atende';
+                } else if (a.arquivo_path) {
+                    status = 'pendente'; // Tem arquivo, pode processar
+                } else if (hasExigencias) {
+                    status = 'manual-falhou'; // Tem exigencias mas sem resultados = falhou
+                } else {
+                    status = 'manual-vazio'; // Analise manual sem exigencias
+                }
 
                 const statusIcon = {
                     'atende': '&#9989;',
                     'parcial': '&#9888;',
                     'nao-atende': '&#10060;',
-                    'pendente': '&#9203;'
+                    'pendente': '&#9203;',
+                    'manual-falhou': '&#10060;',
+                    'manual-vazio': '&#9997;'
                 }[status];
 
                 const statusText = {
                     'atende': 'Atende todos os requisitos',
                     'parcial': 'Atende parcialmente',
                     'nao-atende': 'Nao atende',
-                    'pendente': 'Aguardando processamento'
+                    'pendente': 'Aguardando processamento',
+                    'manual-falhou': 'Analise manual falhou',
+                    'manual-vazio': 'Analise manual vazia'
+                }[status];
+
+                const badgeClass = {
+                    'atende': 'success',
+                    'parcial': 'warning',
+                    'nao-atende': 'error',
+                    'pendente': 'info',
+                    'manual-falhou': 'error',
+                    'manual-vazio': 'secondary'
                 }[status];
 
                 return `
@@ -66,13 +89,13 @@ const AnalisesModule = {
                             <div>
                                 <h3>${a.nome_licitacao}</h3>
                                 <p class="text-muted">${formatarData(a.created_at)}</p>
-                                <span class="badge badge-${status === 'atende' ? 'success' : status === 'parcial' ? 'warning' : 'error'}">
+                                <span class="badge badge-${badgeClass}">
                                     ${statusIcon} ${statusText}
                                 </span>
                             </div>
                             <div class="d-flex gap-1">
                                 <button class="btn btn-primary btn-sm" onclick="AnalisesModule.carregarDetalheAnalise(${a.id})">Ver Detalhes</button>
-                                ${!a.resultado_json ? `<button class="btn btn-outline btn-sm" onclick="AnalisesModule.processarAnalise(${a.id})">Processar</button>` : ''}
+                                ${!hasResults && a.arquivo_path ? `<button class="btn btn-outline btn-sm" onclick="AnalisesModule.processarAnalise(${a.id})">Processar</button>` : ''}
                                 <button class="btn btn-danger btn-sm" onclick="AnalisesModule.excluirAnalise(${a.id})">Excluir</button>
                             </div>
                         </div>
@@ -95,12 +118,40 @@ const AnalisesModule = {
             const container = document.getElementById('resultadoAnalise');
 
             if (!analise.resultado_json || analise.resultado_json.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <p>Esta analise ainda nao foi processada.</p>
-                        <button class="btn btn-primary mt-2" onclick="AnalisesModule.processarAnalise(${id})">Processar Agora</button>
-                    </div>
-                `;
+                const hasExigencias = analise.exigencias_json && analise.exigencias_json.length > 0;
+
+                if (analise.arquivo_path) {
+                    // Tem arquivo, pode processar
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <p>Esta analise ainda nao foi processada.</p>
+                            <button class="btn btn-primary mt-2" onclick="AnalisesModule.processarAnalise(${id})">Processar Agora</button>
+                        </div>
+                    `;
+                } else if (hasExigencias) {
+                    // Analise manual com exigencias mas sem resultados = FALHOU
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="badge badge-error mb-2">&#10060; Analise falhou</div>
+                            <p>Esta analise manual nao conseguiu encontrar correspondencias.</p>
+                            <p class="text-muted"><strong>Possiveis causas:</strong></p>
+                            <ul class="text-muted text-left">
+                                <li>Voce ainda nao cadastrou atestados</li>
+                                <li>Seus atestados nao possuem servicos compativeis</li>
+                                <li>Erro interno no processamento</li>
+                            </ul>
+                            <p class="text-muted mt-2">Cadastre atestados com servicos e crie uma nova analise.</p>
+                        </div>
+                    `;
+                } else {
+                    // Analise manual sem exigencias (nao deveria acontecer)
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <p>Esta analise manual esta vazia.</p>
+                            <p class="text-muted">Crie uma nova analise com as exigencias desejadas.</p>
+                        </div>
+                    `;
+                }
                 return;
             }
 
@@ -446,5 +497,8 @@ function switchAnaliseTab(tabName) { AnalisesModule.switchAnaliseTab(tabName); }
 function adicionarExigencia() { AnalisesModule.adicionarExigencia(); }
 function removerExigencia(index) { AnalisesModule.removerExigencia(index); }
 
-// Inicializar quando DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => AnalisesModule.init());
+// Inicializar quando DOM estiver pronto (aguarda config carregar)
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadAuthConfig();
+    AnalisesModule.init();
+});

@@ -184,24 +184,31 @@ async def criar_analise_manual(
 
     # Converter exigências para dict (Decimal -> float para JSON)
     exigencias = [_serialize_for_json(e.model_dump()) for e in dados.exigencias]
+    logger.info(f"[ANALISE_MANUAL] Exigencias recebidas: {len(exigencias)}")
 
     # Buscar atestados do usuário usando repository
     atestados = atestado_repository.get_all_with_services(db, current_user.id)
+    logger.info(f"[ANALISE_MANUAL] Atestados encontrados: {len(atestados) if atestados else 0}")
 
     # Converter atestados para formato de análise
     atestados_dict = atestados_to_dict(atestados)
+    logger.info(f"[ANALISE_MANUAL] Atestados com servicos: {len(atestados_dict) if atestados_dict else 0}")
 
     # Fazer matching se houver atestados
     resultado_matching = []
     if atestados_dict:
         try:
+            logger.info("[ANALISE_MANUAL] Iniciando matching...")
             resultado_matching = services.document_processor.analyze_qualification(
                 exigencias, atestados_dict
             )
+            logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching) if resultado_matching else 0} resultados")
             # Serializar resultado (Decimal -> float)
             resultado_matching = _serialize_for_json(resultado_matching)
         except Exception as e:
-            logger.warning(f"Erro no matching: {e}")
+            logger.error(f"[ANALISE_MANUAL] Erro no matching: {e}", exc_info=True)
+    else:
+        logger.warning("[ANALISE_MANUAL] Nenhum atestado com servicos para fazer matching")
 
     # Criar análise
     nova_analise = Analise(

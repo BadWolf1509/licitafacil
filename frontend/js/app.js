@@ -1,11 +1,14 @@
 // LicitaFácil - Aplicação Principal
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Configurar menu mobile
     setupMobileNav();
 
+    // Aguardar configuração de autenticação carregar (inicializa Supabase)
+    await loadAuthConfig();
+
     // Verificar autenticação
-    verificarAutenticacao();
+    await verificarAutenticacao();
 
     // Carregar dados do dashboard se estiver na página
     if (window.location.pathname.includes('dashboard')) {
@@ -104,6 +107,8 @@ async function verificarAutenticacao() {
     }
 
     if (!hasSession) {
+        // Limpar qualquer dado residual antes de redirecionar
+        await clearSessionData();
         window.location.href = 'index.html';
         return;
     }
@@ -113,10 +118,9 @@ async function verificarAutenticacao() {
 
         if (!status.aprovado) {
             ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
+            // Limpar sessão completamente e redirecionar
             setTimeout(async () => {
-                if (isSupabaseAvailable()) {
-                    await getSupabaseClient().auth.signOut();
-                }
+                await clearSessionData();
                 window.location.href = 'index.html';
             }, 3000);
             return;
@@ -138,9 +142,8 @@ async function verificarAutenticacao() {
 
     } catch (error) {
         console.error('Erro ao verificar autenticação:', error);
-        if (isSupabaseAvailable()) {
-            await getSupabaseClient().auth.signOut();
-        }
+        // Limpar sessão completamente em caso de erro
+        await clearSessionData();
         window.location.href = 'index.html';
     }
 }
