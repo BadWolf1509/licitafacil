@@ -10,10 +10,18 @@ class TestHealthEndpoint:
     """Testes para o endpoint de health check."""
 
     def test_health_check(self, client: TestClient):
-        """Verifica que /health retorna status healthy."""
+        """Verifica que /health retorna status healthy ou degraded."""
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json()["status"] == "healthy"
+        data = response.json()
+        # Status pode ser "healthy" ou "degraded" dependendo da config de Supabase
+        assert data["status"] in ("healthy", "degraded")
+        # Verifica que tem os campos esperados
+        assert "timestamp" in data
+        assert "version" in data
+        assert "checks" in data
+        # Verifica que o banco de dados esta saudavel
+        assert data["checks"]["database"] == "healthy"
 
 
 class TestCORSHeaders:

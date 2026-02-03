@@ -67,7 +67,7 @@ class ServiceContainer:
     def atestado_service(self) -> AtestadoServiceProtocol:
         """Retorna modulo de servico de atestados."""
         if self._atestado_service is None:
-            from services import atestado_service
+            from services.atestado import service as atestado_service
             self._atestado_service = atestado_service
         return self._atestado_service
 

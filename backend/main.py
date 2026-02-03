@@ -1,13 +1,16 @@
 import os
+from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError as SAIntegrityError, OperationalError
 
-from database import engine, Base
+from database import engine, Base, get_db
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 from routers import auth, admin, atestados, analise, ai_status
 from services.processing_queue import processing_queue
 from middleware.rate_limit import RateLimitMiddleware
@@ -303,9 +306,39 @@ def serve_favicon():
 
 
 @app.get("/health")
-def health_check():
-    """Endpoint de verificação de saúde da API."""
-    return {"status": "healthy"}
+def health_check(db: Session = Depends(get_db)):
+    """Endpoint de verificação de saúde da API com checks de dependências."""
+    checks = {
+        "database": "unknown",
+        "supabase": "disabled"
+    }
+
+    # Verificar banco de dados
+    try:
+        db.execute(text("SELECT 1"))
+        checks["database"] = "healthy"
+    except Exception:
+        checks["database"] = "unhealthy"
+
+    # Verificar Supabase se habilitado
+    try:
+        from config import SUPABASE_AUTH_ENABLED
+        if SUPABASE_AUTH_ENABLED:
+            from services.supabase_auth import _get_supabase_client
+            client = _get_supabase_client()
+            checks["supabase"] = "healthy" if client else "unhealthy"
+    except Exception:
+        checks["supabase"] = "unhealthy"
+
+    # Status geral
+    all_healthy = all(v in ("healthy", "disabled") for v in checks.values())
+
+    return {
+        "status": "healthy" if all_healthy else "degraded",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": API_VERSION,
+        "checks": checks
+    }
 
 
 @app.get("/api/version")

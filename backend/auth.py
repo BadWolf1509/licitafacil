@@ -232,7 +232,7 @@ def _validate_supabase_token(token: str, db: Session) -> Optional[Usuario]:
         return user
 
     except Exception as e:
-        logger.debug(f"[AUTH] Erro ao validar token Supabase: {e}")
+        logger.warning(f"[AUTH] Erro ao validar token Supabase: {e}")
         return None
 
 

@@ -585,7 +585,7 @@ class DocumentProcessor:
         Returns:
             Dicionário com dados extraídos do atestado
         """
-        from .processors.atestado_pipeline import AtestadoPipeline
+        from .atestado.pipeline import AtestadoPipeline
         return AtestadoPipeline(self, file_path, use_vision, progress_callback, cancel_check).run()
 
     def process_edital(self, file_path: str, progress_callback=None, cancel_check=None) -> Dict[str, Any]:

@@ -282,10 +282,18 @@ const ui = {
 
         const alert = document.createElement('div');
         alert.className = `alert alert-${type}`;
-        alert.innerHTML = `
-            <span>${message}</span>
-            <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;margin-left:auto;">✕</button>
-        `;
+
+        // Usar textContent para prevenir XSS
+        const span = document.createElement('span');
+        span.textContent = message;
+        alert.appendChild(span);
+
+        const button = document.createElement('button');
+        button.textContent = '\u2715';
+        button.style.cssText = 'background:none;border:none;cursor:pointer;margin-left:auto;';
+        button.onclick = function() { this.parentElement.remove(); };
+        alert.appendChild(button);
+
         container.appendChild(alert);
 
         // Remover automaticamente após 5 segundos

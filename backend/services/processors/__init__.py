@@ -22,7 +22,6 @@ from .validation_filter import (
 )
 from .item_code_refiner import ItemCodeRefiner, item_code_refiner
 from .text_line_parser import TextLineParser, text_line_parser
-from .atestado_pipeline import AtestadoPipeline
 
 __all__ = [
     "TextProcessor",
@@ -43,5 +42,4 @@ __all__ = [
     "item_code_refiner",
     "TextLineParser",
     "text_line_parser",
-    "AtestadoPipeline",
 ]

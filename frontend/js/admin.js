@@ -68,14 +68,14 @@ async function carregarUsuariosPendentes() {
         container.innerHTML = usuarios.map(u => `
             <div class="user-card">
                 <div class="user-info">
-                    <h4>${u.nome}</h4>
-                    <p class="text-muted">${u.email}</p>
+                    <h4>${Sanitize.escapeHtml(u.nome)}</h4>
+                    <p class="text-muted">${Sanitize.escapeHtml(u.email)}</p>
                     <small class="text-muted">Cadastrado em: ${formatarData(u.created_at)}</small>
                 </div>
                 <div class="user-actions">
                     <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
                     <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
-                    <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                    <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${Sanitize.escapeJs(u.nome)}')">Excluir</button>
                 </div>
             </div>
         `).join('');
@@ -109,21 +109,22 @@ async function carregarTodosUsuarios() {
 
             let actions = '';
             if (!u.is_admin) {
+                const escapedNome = Sanitize.escapeJs(u.nome);
                 if (!u.is_approved && u.is_active) {
                     actions = `
                         <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
                         <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
                     `;
                 } else if (!u.is_active) {
                     actions = `
                         <button class="btn btn-outline btn-sm" onclick="reativarUsuario(${u.id})">Reativar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
                     `;
                 } else {
                     actions = `
                         <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Desativar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${u.nome.replace(/'/g, "\\'")}')">Excluir</button>
+                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
                     `;
                 }
             }
@@ -131,8 +132,8 @@ async function carregarTodosUsuarios() {
             return `
                 <div class="user-card">
                     <div class="user-info">
-                        <h4>${u.nome} ${statusBadge}</h4>
-                        <p class="text-muted">${u.email}</p>
+                        <h4>${Sanitize.escapeHtml(u.nome)} ${statusBadge}</h4>
+                        <p class="text-muted">${Sanitize.escapeHtml(u.email)}</p>
                         <small class="text-muted">Cadastrado em: ${formatarData(u.created_at)}</small>
                     </div>
                     <div class="user-actions">

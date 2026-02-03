@@ -79,9 +79,11 @@ class Atestado(Base):
     # Relacionamentos
     usuario: Mapped["Usuario"] = relationship("Usuario", back_populates="atestados")
 
-    # Índice composto para listagem ordenada por usuário
+    # Índices para consultas otimizadas
     __table_args__ = (
         Index('ix_atestados_user_created', 'user_id', 'created_at'),
+        Index('ix_atestados_contratante', 'contratante'),
+        Index('ix_atestados_data_emissao', 'data_emissao'),
     )
 
 
@@ -92,7 +94,7 @@ class Analise(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False, index=True)
 
-    nome_licitacao: Mapped[str] = mapped_column(String(255), nullable=False)
+    nome_licitacao: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     arquivo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     exigencias_json: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSON, nullable=True)

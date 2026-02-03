@@ -3,6 +3,7 @@ Repositório para operações de Usuario.
 """
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from sqlalchemy import func, case, and_
 
 from models import Usuario
 from .base import BaseRepository
@@ -70,7 +71,7 @@ class UsuarioRepository(BaseRepository[Usuario]):
 
     def get_stats(self, db: Session) -> dict:
         """
-        Retorna estatísticas de usuários.
+        Retorna estatísticas de usuários em uma única query.
 
         Args:
             db: Sessão do banco
@@ -78,19 +79,21 @@ class UsuarioRepository(BaseRepository[Usuario]):
         Returns:
             Dicionário com estatísticas
         """
-        total = db.query(Usuario).count()
-        aprovados = db.query(Usuario).filter(Usuario.is_approved.is_(True)).count()
-        pendentes = db.query(Usuario).filter(
-            Usuario.is_approved.is_(False),
-            Usuario.is_active.is_(True)
-        ).count()
-        inativos = db.query(Usuario).filter(Usuario.is_active.is_(False)).count()
+        result = db.query(
+            func.count(Usuario.id).label("total"),
+            func.sum(case((Usuario.is_approved.is_(True), 1), else_=0)).label("aprovados"),
+            func.sum(case(
+                (and_(Usuario.is_approved.is_(False), Usuario.is_active.is_(True)), 1),
+                else_=0
+            )).label("pendentes"),
+            func.sum(case((Usuario.is_active.is_(False), 1), else_=0)).label("inativos"),
+        ).first()
 
         return {
-            "total_usuarios": total,
-            "usuarios_aprovados": aprovados,
-            "usuarios_pendentes": pendentes,
-            "usuarios_inativos": inativos
+            "total_usuarios": result.total or 0,
+            "usuarios_aprovados": int(result.aprovados or 0),
+            "usuarios_pendentes": int(result.pendentes or 0),
+            "usuarios_inativos": int(result.inativos or 0)
         }
 
     def approve(self, db: Session, usuario: Usuario) -> Usuario:

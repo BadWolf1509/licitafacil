@@ -1,7 +1,7 @@
 // Supabase Edge Function: normalize-text
 // Normaliza texto para comparacao (remove acentos, OCR artifacts, etc)
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 // Stopwords para extracao de palavras-chave
 const STOPWORDS = new Set([
@@ -23,7 +23,7 @@ function removeAccents(text: string): string {
  * Corrige erros comuns de OCR
  */
 function normalizeDescription(desc: string): string {
-  if (!desc) return ""
+  if (!desc) return ''
 
   // Remover acentos
   let text = removeAccents(desc)
@@ -52,7 +52,7 @@ function normalizeDescription(desc: string): string {
  * Converte expoentes, corrige artefatos de OCR e padroniza caixa
  */
 function normalizeUnit(unit: string): string {
-  if (!unit) return ""
+  if (!unit) return ''
 
   let normalized = unit.trim().toUpperCase()
 
@@ -142,30 +142,30 @@ interface NormalizeResponse {
 serve(async (req) => {
   // CORS headers
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
   // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    if (req.method !== "POST") {
+    if (req.method !== 'POST') {
       return new Response(
-        JSON.stringify({ error: "Apenas POST permitido" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 405 }
+        JSON.stringify({ error: 'Apenas POST permitido' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 405 }
       )
     }
 
     const body: NormalizeRequest = await req.json()
     const { text, type = 'description', compareWith } = body
 
-    if (!text || typeof text !== "string") {
+    if (!text || typeof text !== 'string') {
       return new Response(
         JSON.stringify({ error: "Campo 'text' e obrigatorio" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       )
     }
 
@@ -188,7 +188,7 @@ serve(async (req) => {
         if (!compareWith) {
           return new Response(
             JSON.stringify({ error: "Campo 'compareWith' e obrigatorio para type=similarity" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
           )
         }
         response.normalized = normalizeDescription(text)
@@ -203,13 +203,13 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(response),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
-  } catch (error) {
+  } catch (_error) {
     return new Response(
-      JSON.stringify({ error: "Erro interno" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      JSON.stringify({ error: 'Erro interno' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })

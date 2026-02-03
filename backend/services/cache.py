@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import time
+from collections import OrderedDict
 from functools import wraps
 from threading import Lock
 from typing import Any, Callable, Optional, TypeVar
@@ -22,10 +23,10 @@ T = TypeVar('T')
 
 
 class MemoryCache:
-    """Cache em memoria com suporte a TTL."""
+    """Cache em memoria com suporte a TTL e evicao LRU."""
 
     def __init__(self, max_size: int = 1000):
-        self._cache: dict[str, tuple[Any, Optional[float]]] = {}
+        self._cache: OrderedDict[str, tuple[Any, Optional[float]]] = OrderedDict()
         self._lock = Lock()
         self._max_size = max_size
 
@@ -40,19 +41,24 @@ class MemoryCache:
                 del self._cache[key]
                 return None
 
+            # Move para o final (LRU: marca como recentemente usado)
+            self._cache.move_to_end(key)
             return value
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
-        """Define valor no cache com TTL opcional."""
+        """Define valor no cache com TTL opcional e evicao LRU."""
         with self._lock:
             # Limpar entradas expiradas se cache cheio
             if len(self._cache) >= self._max_size:
                 self._cleanup_expired()
 
-            # Se ainda cheio, remover entradas mais antigas
+            # Se ainda cheio, remover entrada menos recentemente usada (LRU)
             if len(self._cache) >= self._max_size:
-                oldest_key = next(iter(self._cache))
-                del self._cache[oldest_key]
+                self._cache.popitem(last=False)  # Remove o primeiro (mais antigo)
+
+            # Se a chave ja existe, remover para atualizar a ordem
+            if key in self._cache:
+                del self._cache[key]
 
             expires_at = time.time() + ttl if ttl else None
             self._cache[key] = (value, expires_at)

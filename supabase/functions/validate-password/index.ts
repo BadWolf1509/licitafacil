@@ -1,7 +1,7 @@
 // Supabase Edge Function: validate-password
 // Valida complexidade de senha sem necessidade de backend
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 // Configuracoes de validacao (espelhando backend/config/security.py)
 const CONFIG = {
@@ -26,19 +26,19 @@ function validatePassword(password: string): ValidationResult {
   }
 
   if (CONFIG.requireUppercase && !/[A-Z]/.test(password)) {
-    errors.push("Senha deve conter pelo menos uma letra maiuscula")
+    errors.push('Senha deve conter pelo menos uma letra maiuscula')
   }
 
   if (CONFIG.requireLowercase && !/[a-z]/.test(password)) {
-    errors.push("Senha deve conter pelo menos uma letra minuscula")
+    errors.push('Senha deve conter pelo menos uma letra minuscula')
   }
 
   if (CONFIG.requireDigit && !/\d/.test(password)) {
-    errors.push("Senha deve conter pelo menos um numero")
+    errors.push('Senha deve conter pelo menos um numero')
   }
 
   if (CONFIG.requireSpecial && !/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;'`~]/.test(password)) {
-    errors.push("Senha deve conter pelo menos um caractere especial")
+    errors.push('Senha deve conter pelo menos um caractere especial')
   }
 
   return {
@@ -52,19 +52,19 @@ function getRequirements(): string[] {
   const requirements: string[] = [`Minimo ${CONFIG.minLength} caracteres`]
 
   if (CONFIG.requireUppercase) {
-    requirements.push("Pelo menos uma letra maiuscula")
+    requirements.push('Pelo menos uma letra maiuscula')
   }
 
   if (CONFIG.requireLowercase) {
-    requirements.push("Pelo menos uma letra minuscula")
+    requirements.push('Pelo menos uma letra minuscula')
   }
 
   if (CONFIG.requireDigit) {
-    requirements.push("Pelo menos um numero")
+    requirements.push('Pelo menos um numero')
   }
 
   if (CONFIG.requireSpecial) {
-    requirements.push("Pelo menos um caractere especial (!@#$%^&*...)")
+    requirements.push('Pelo menos um caractere especial (!@#$%^&*...)')
   }
 
   return requirements
@@ -73,36 +73,36 @@ function getRequirements(): string[] {
 serve(async (req) => {
   // CORS headers
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
   // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     // GET: Retorna requisitos
-    if (req.method === "GET") {
+    if (req.method === 'GET') {
       return new Response(
         JSON.stringify({ requisitos: getRequirements() }),
         {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         }
       )
     }
 
     // POST: Valida senha
-    if (req.method === "POST") {
+    if (req.method === 'POST') {
       const { password } = await req.json()
 
-      if (!password || typeof password !== "string") {
+      if (!password || typeof password !== 'string') {
         return new Response(
           JSON.stringify({ error: "Campo 'password' e obrigatorio" }),
           {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400,
           }
         )
@@ -113,24 +113,24 @@ serve(async (req) => {
       return new Response(
         JSON.stringify(result),
         {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         }
       )
     }
 
     return new Response(
-      JSON.stringify({ error: "Metodo nao permitido" }),
+      JSON.stringify({ error: 'Metodo nao permitido' }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 405,
       }
     )
-  } catch (error) {
+  } catch (_error) {
     return new Response(
-      JSON.stringify({ error: "Erro interno" }),
+      JSON.stringify({ error: 'Erro interno' }),
       {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       }
     )

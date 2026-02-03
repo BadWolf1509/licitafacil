@@ -1,7 +1,7 @@
 // Supabase Edge Function: validate-unit
 // Valida e normaliza unidades de medida de construcao civil
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 // Unidades de medida validas para construcao civil/engenharia
 const VALID_UNITS = new Set([
@@ -32,7 +32,7 @@ function removeAccents(text: string): string {
  * Normaliza unidade para comparacao
  */
 function normalizeUnit(unit: string): string {
-  if (!unit) return ""
+  if (!unit) return ''
 
   let normalized = unit.trim().toUpperCase()
 
@@ -119,33 +119,33 @@ interface ValidateResponse {
 serve(async (req) => {
   // CORS headers
   const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   }
 
   // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders })
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     // GET: Retorna lista de unidades validas
-    if (req.method === "GET") {
+    if (req.method === 'GET') {
       return new Response(
         JSON.stringify({ units: Array.from(VALID_UNITS).sort() }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
     }
 
     // POST: Valida unidade
-    if (req.method === "POST") {
+    if (req.method === 'POST') {
       const body: ValidateRequest = await req.json()
       const { unit } = body
 
-      if (!unit || typeof unit !== "string") {
+      if (!unit || typeof unit !== 'string') {
         return new Response(
           JSON.stringify({ error: "Campo 'unit' e obrigatorio" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         )
       }
 
@@ -159,19 +159,19 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify(response),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       )
     }
 
     return new Response(
-      JSON.stringify({ error: "Metodo nao permitido" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 405 }
+      JSON.stringify({ error: 'Metodo nao permitido' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 405 }
     )
 
-  } catch (error) {
+  } catch (_error) {
     return new Response(
-      JSON.stringify({ error: "Erro interno" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      JSON.stringify({ error: 'Erro interno' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     )
   }
 })

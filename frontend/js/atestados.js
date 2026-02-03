@@ -286,10 +286,10 @@ const AtestadosModule = {
         ].filter(Boolean).join('');
 
         const fileName = this.getJobFileName(job);
-        const syncError = job.poll_error ? `<div class="processing-job-error">${job.poll_error}</div>` : '';
+        const syncError = job.poll_error ? `<div class="processing-job-error">${Sanitize.escapeHtml(job.poll_error)}</div>` : '';
         const errorMessage = this.formatJobError(job);
         const errorHtml = displayStatus === 'failed' && errorMessage
-            ? `<div class="processing-job-error">${errorMessage}</div>`
+            ? `<div class="processing-job-error">${Sanitize.escapeHtml(errorMessage)}</div>`
             : '';
         const actionHtml = displayStatus === 'failed' || displayStatus === 'cancelled'
             ? `
@@ -692,8 +692,8 @@ const AtestadosModule = {
                      data-search="${searchText}">
                     <div class="atestado-card">
                         <div class="atestado-info">
-                            <h3>${a.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
-                            ${a.contratante ? `<p class="text-muted">Contratante: ${a.contratante}</p>` : ''}
+                            <h3>${Sanitize.escapeHtml(a.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
+                            ${a.contratante ? `<p class="text-muted">Contratante: ${Sanitize.escapeHtml(a.contratante)}</p>` : ''}
                             ${a.data_emissao ? `<p class="text-muted">Emitido em: ${this.formatarDataSemHora(a.data_emissao)}</p>` : ''}
                             ${a.servicos_json && a.servicos_json.length > 0 ?
                                 `<span class="badge">${a.servicos_json.length} servico(s) identificado(s)</span>` :
@@ -1001,12 +1001,12 @@ const AtestadosModule = {
 
         const servicosHtml = servicosOrdenados.map((s) => {
             const parsed = this.extrairItemDescricao(s);
-            const itemHtml = parsed.item ? `<span class="servico-item-codigo">${parsed.item}</span>` : '';
+            const itemHtml = parsed.item ? `<span class="servico-item-codigo">${Sanitize.escapeHtml(parsed.item)}</span>` : '';
             const originalIndex = s._originalIndex;
             return `
                 <div class="servico-item" data-index="${originalIndex}">
-                    <span class="servico-descricao">${itemHtml}${parsed.descricao}</span>
-                    <span class="servico-quantidade">${formatarNumero(s.quantidade)} ${s.unidade}</span>
+                    <span class="servico-descricao">${itemHtml}${Sanitize.escapeHtml(parsed.descricao)}</span>
+                    <span class="servico-quantidade">${formatarNumero(s.quantidade)} ${Sanitize.escapeHtml(s.unidade)}</span>
                     <div class="servico-actions">
                         <button class="servico-btn edit" onclick="AtestadosModule.editarServicoItem(${atestado.id}, ${originalIndex})" title="Editar item">&#9998;</button>
                         <button class="servico-btn delete" onclick="AtestadosModule.excluirServicoItem(${atestado.id}, ${originalIndex})" title="Excluir item">&#10005;</button>
@@ -1290,12 +1290,12 @@ const AtestadosModule = {
 
         return `
             <div class="relatorio-header">
-                <h3>${atestado.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
+                <h3>${Sanitize.escapeHtml(atestado.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
                 <div class="relatorio-info">
                     ${atestado.contratante ? `
                         <div class="relatorio-info-item">
                             <span class="relatorio-info-label">Contratante</span>
-                            <span class="relatorio-info-value">${atestado.contratante}</span>
+                            <span class="relatorio-info-value">${Sanitize.escapeHtml(atestado.contratante)}</span>
                         </div>
                     ` : ''}
                     ${atestado.data_emissao ? `
@@ -1425,9 +1425,9 @@ const AtestadosModule = {
 
         content.innerHTML = `
             <div class="detalhes-servico-header">
-                <h4>${servico.descricao}</h4>
+                <h4>${Sanitize.escapeHtml(servico.descricao)}</h4>
                 <div class="detalhes-servico-info">
-                    <span class="badge badge-primary">${servico.unidade}</span>
+                    <span class="badge badge-primary">${Sanitize.escapeHtml(servico.unidade)}</span>
                     <span class="badge badge-success">Total: ${formatarNumero(servico.quantidade)}</span>
                     <span class="badge badge-info">${servico.atestados.length} atestado(s)</span>
                 </div>
@@ -1448,7 +1448,7 @@ const AtestadosModule = {
                         return `
                             <tr class="clickable-row" onclick="AtestadosModule.verAtestado(${a.id})">
                                 <td>${i + 1}</td>
-                                <td>${a.contratante}</td>
+                                <td>${Sanitize.escapeHtml(a.contratante)}</td>
                                 <td>${a.data_emissao ? this.formatarDataSemHora(a.data_emissao) : 'N/A'}</td>
                                 <td class="numero">${formatarNumero(a.quantidade)}</td>
                                 <td class="numero">${percentual.toFixed(1)}%</td>
