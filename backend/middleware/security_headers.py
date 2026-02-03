@@ -68,18 +68,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         Configurada para permitir:
         - Scripts inline (necessario para o frontend atual)
+        - Scripts do Supabase via CDN (jsdelivr)
         - Estilos inline e Google Fonts
         - Fontes do Google Fonts
         - Imagens de data: e blob:
-        - Conexoes apenas para a propria origem
+        - Conexoes para propria origem e Supabase (API + Realtime WebSocket)
         """
         return (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob:; "
             "font-src 'self' https://fonts.gstatic.com; "
-            "connect-src 'self'; "
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co; "
             "frame-ancestors 'none'; "
             "base-uri 'self'; "
             "form-action 'self'"
