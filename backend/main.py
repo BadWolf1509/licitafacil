@@ -322,13 +322,13 @@ def health_check(db: Session = Depends(get_db)):
 
     # Verificar Supabase se habilitado
     try:
-        from config import SUPABASE_AUTH_ENABLED
-        if SUPABASE_AUTH_ENABLED:
+        from auth import is_supabase_auth_enabled
+        if is_supabase_auth_enabled():
             from services.supabase_auth import _get_supabase_client
             client = _get_supabase_client()
             checks["supabase"] = "healthy" if client else "unhealthy"
-    except Exception:
-        checks["supabase"] = "unhealthy"
+    except Exception as e:
+        checks["supabase"] = f"unhealthy: {str(e)[:50]}"
 
     # Status geral
     all_healthy = all(v in ("healthy", "disabled") for v in checks.values())
