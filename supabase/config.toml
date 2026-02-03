@@ -1,0 +1,20 @@
+# Supabase CLI Configuration
+# https://supabase.com/docs/guides/cli/config
+
+[api]
+# Port to use for the API URL
+port = 54321
+# Schemas to expose in your API
+schemas = ["public"]
+
+[db]
+# Port to use for the local database URL
+port = 54322
+
+[studio]
+# Port to use for Supabase Studio
+port = 54323
+
+[functions]
+# Configure Edge Functions
+verify_jwt = false  # Allow unauthenticated requests for validation functions
