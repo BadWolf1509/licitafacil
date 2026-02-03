@@ -143,6 +143,34 @@ async function toggleThemeSwitch() {
 }
 
 /**
+ * Valida complexidade da senha
+ * @param {string} password - Senha a validar
+ * @returns {{valid: boolean, errors: string[]}} - Resultado da validação
+ */
+function validatePassword(password) {
+    const errors = [];
+    const minLength = 8;
+
+    if (!password || password.length < minLength) {
+        errors.push(`Mínimo ${minLength} caracteres`);
+    }
+    if (!/[A-Z]/.test(password)) {
+        errors.push('Pelo menos 1 letra maiúscula');
+    }
+    if (!/[a-z]/.test(password)) {
+        errors.push('Pelo menos 1 letra minúscula');
+    }
+    if (!/[0-9]/.test(password)) {
+        errors.push('Pelo menos 1 número');
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+/**
  * Configura o formulário de alteração de senha
  */
 function setupFormSenha() {
@@ -162,9 +190,10 @@ function setupFormSenha() {
             return;
         }
 
-        // Validar tamanho mínimo
-        if (senhaNova.length < 6) {
-            ui.showAlert('A nova senha deve ter pelo menos 6 caracteres', 'error');
+        // Validar complexidade da senha
+        const validation = validatePassword(senhaNova);
+        if (!validation.valid) {
+            ui.showAlert('Senha inválida: ' + validation.errors.join(', '), 'error');
             return;
         }
 
@@ -172,11 +201,37 @@ function setupFormSenha() {
         ui.setButtonLoading(btn, true, 'btnAlterarSenhaText', 'btnAlterarSenhaSpinner');
 
         try {
-            await api.post('/auth/change-password', {
-                senha_atual: senhaAtual,
-                senha_nova: senhaNova,
-                confirmar_senha: confirmarSenha
+            // Verificar se Supabase está disponível
+            if (!isSupabaseAvailable()) {
+                throw new Error('Serviço de autenticação não disponível. Tente novamente mais tarde.');
+            }
+
+            const client = getSupabaseClient();
+
+            // Obter sessão atual para pegar o email
+            const { data: { session } } = await client.auth.getSession();
+            if (!session) {
+                throw new Error('Sessão expirada. Faça login novamente.');
+            }
+
+            // Verificar senha atual reauthenticando
+            const { error: signInError } = await client.auth.signInWithPassword({
+                email: session.user.email,
+                password: senhaAtual
             });
+
+            if (signInError) {
+                throw new Error('Senha atual incorreta');
+            }
+
+            // Alterar a senha via Supabase Auth
+            const { error: updateError } = await client.auth.updateUser({
+                password: senhaNova
+            });
+
+            if (updateError) {
+                throw new Error(updateError.message || 'Erro ao alterar senha');
+            }
 
             ui.showAlert('Senha alterada com sucesso!', 'success');
 
