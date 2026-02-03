@@ -27,7 +27,9 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/v1/:path*/", "destination": "/api/index.py" },
     { "source": "/api/v1/:path*", "destination": "/api/index.py" },
+    { "source": "/api/:path*/", "destination": "/api/index.py" },
     { "source": "/api/:path*", "destination": "/api/index.py" },
     { "source": "/health", "destination": "/api/index.py" },
     { "source": "/css/:path*", "destination": "/frontend/css/:path*" },
