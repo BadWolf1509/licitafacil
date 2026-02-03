@@ -15,6 +15,5 @@ port = 54322
 # Port to use for Supabase Studio
 port = 54323
 
-[functions]
-# Configure Edge Functions
-verify_jwt = false  # Allow unauthenticated requests for validation functions
+# Note: Edge function-specific config should be in individual function folders
+# or set via CLI flags during deploy
