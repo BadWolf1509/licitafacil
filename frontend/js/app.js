@@ -91,9 +91,19 @@ function setupFormAtestadoDashboard() {
  * Verifica se o usuário está autenticado
  */
 async function verificarAutenticacao() {
-    const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+    // Verificar sessão Supabase
+    let hasSession = false;
 
-    if (!token) {
+    if (isSupabaseAvailable()) {
+        try {
+            const { data: { session } } = await getSupabaseClient().auth.getSession();
+            hasSession = !!session;
+        } catch (error) {
+            console.warn('[APP] Erro ao verificar sessão Supabase:', error);
+        }
+    }
+
+    if (!hasSession) {
         window.location.href = 'index.html';
         return;
     }
@@ -103,8 +113,10 @@ async function verificarAutenticacao() {
 
         if (!status.aprovado) {
             ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
-            setTimeout(() => {
-                localStorage.removeItem(CONFIG.TOKEN_KEY);
+            setTimeout(async () => {
+                if (isSupabaseAvailable()) {
+                    await getSupabaseClient().auth.signOut();
+                }
                 window.location.href = 'index.html';
             }, 3000);
             return;
@@ -126,7 +138,9 @@ async function verificarAutenticacao() {
 
     } catch (error) {
         console.error('Erro ao verificar autenticação:', error);
-        localStorage.removeItem(CONFIG.TOKEN_KEY);
+        if (isSupabaseAvailable()) {
+            await getSupabaseClient().auth.signOut();
+        }
         window.location.href = 'index.html';
     }
 }
