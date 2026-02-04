@@ -86,6 +86,25 @@ class MemoryCache:
         for key in expired:
             del self._cache[key]
 
+    def delete_by_prefix(self, prefix: str) -> int:
+        """
+        Remove todas as chaves que começam com o prefixo.
+
+        Args:
+            prefix: Prefixo das chaves a remover
+
+        Returns:
+            Número de chaves removidas
+        """
+        with self._lock:
+            keys_to_delete = [
+                k for k in self._cache.keys()
+                if k.startswith(prefix)
+            ]
+            for key in keys_to_delete:
+                del self._cache[key]
+            return len(keys_to_delete)
+
     def stats(self) -> dict:
         """Retorna estatisticas do cache."""
         with self._lock:
@@ -167,6 +186,34 @@ class RedisCache:
         except Exception as e:
             logger.error(f"Erro ao limpar Redis: {e}")
 
+    def delete_by_prefix(self, prefix: str) -> int:
+        """
+        Remove todas as chaves que começam com o prefixo usando SCAN.
+
+        Args:
+            prefix: Prefixo das chaves a remover
+
+        Returns:
+            Número de chaves removidas
+        """
+        if not self._available:
+            return 0
+        try:
+            count = 0
+            cursor = 0
+            pattern = f"{prefix}*"
+            while True:
+                cursor, keys = self._client.scan(cursor, match=pattern, count=100)
+                if keys:
+                    self._client.delete(*keys)
+                    count += len(keys)
+                if cursor == 0:
+                    break
+            return count
+        except Exception as e:
+            logger.error(f"Erro ao deletar por prefixo do Redis: {e}")
+            return 0
+
     def stats(self) -> dict:
         """Retorna estatisticas do cache."""
         if not self._available:
@@ -234,6 +281,20 @@ class CacheManager:
         if self._redis:
             self._redis.clear()
         self._memory.clear()
+
+    def delete_by_prefix(self, prefix: str) -> int:
+        """
+        Remove todas as chaves que começam com o prefixo.
+
+        Args:
+            prefix: Prefixo das chaves a remover
+
+        Returns:
+            Número de chaves removidas
+        """
+        if self._redis:
+            return self._redis.delete_by_prefix(prefix)
+        return self._memory.delete_by_prefix(prefix)
 
     def stats(self) -> dict:
         """Retorna estatisticas do cache."""
@@ -336,18 +397,15 @@ def invalidate_prefix(prefix: str) -> int:
     """
     Invalida todas as chaves com um prefixo.
 
-    Nota: So funciona eficientemente com Redis.
-    Para cache em memoria, limpa todo o cache.
+    Funciona tanto com Redis (usando SCAN) quanto com cache em memória.
+
+    Args:
+        prefix: Prefixo das chaves a invalidar
+
+    Returns:
+        Número de chaves invalidadas
     """
     cache = get_cache()
-    if cache.backend == "memory":
-        # Para memoria, nao temos como filtrar por prefixo eficientemente
-        # Limpamos tudo (comportamento simplificado)
-        cache.clear()
-        logger.warning(f"Invalidate prefix '{prefix}' limpou todo o cache (backend=memory)")
-        return -1
-
-    # Redis: usar SCAN para encontrar e deletar chaves
-    # Implementacao simplificada - em producao usar SCAN iterativo
-    logger.info(f"Invalidate prefix '{prefix}' nao implementado para Redis")
-    return 0
+    count = cache.delete_by_prefix(prefix)
+    logger.info(f"Invalidate prefix '{prefix}': {count} chaves removidas")
+    return count

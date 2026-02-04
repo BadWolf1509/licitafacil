@@ -2,11 +2,25 @@
 Repositório para operações de Usuario.
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from sqlalchemy import func, case, and_
 
 from models import Usuario
 from .base import BaseRepository
+
+# Colunas necessárias para listagem de usuários (evita lazy loading)
+_USER_LIST_COLUMNS = [
+    Usuario.id,
+    Usuario.email,
+    Usuario.nome,
+    Usuario.is_admin,
+    Usuario.is_approved,
+    Usuario.is_active,
+    Usuario.tema_preferido,
+    Usuario.created_at,
+    Usuario.approved_at,
+    Usuario.approved_by,
+]
 
 
 class UsuarioRepository(BaseRepository[Usuario]):
@@ -38,7 +52,9 @@ class UsuarioRepository(BaseRepository[Usuario]):
         Returns:
             Lista de usuários pendentes
         """
-        return db.query(Usuario).filter(
+        return db.query(Usuario).options(
+            load_only(*_USER_LIST_COLUMNS)
+        ).filter(
             Usuario.is_approved.is_(False),
             Usuario.is_active.is_(True)
         ).order_by(Usuario.created_at.desc()).all()
@@ -53,7 +69,9 @@ class UsuarioRepository(BaseRepository[Usuario]):
         Returns:
             Lista de usuários ativos
         """
-        return db.query(Usuario).filter(
+        return db.query(Usuario).options(
+            load_only(*_USER_LIST_COLUMNS)
+        ).filter(
             Usuario.is_active.is_(True)
         ).order_by(Usuario.created_at.desc()).all()
 
@@ -61,13 +79,17 @@ class UsuarioRepository(BaseRepository[Usuario]):
         """
         Busca todos os usuários ordenados por data de criação.
 
+        Usa load_only para evitar N+1 queries com relacionamentos.
+
         Args:
             db: Sessão do banco
 
         Returns:
             Lista de usuários
         """
-        return db.query(Usuario).order_by(Usuario.created_at.desc()).all()
+        return db.query(Usuario).options(
+            load_only(*_USER_LIST_COLUMNS)
+        ).order_by(Usuario.created_at.desc()).all()
 
     def get_stats(self, db: Session) -> dict:
         """
