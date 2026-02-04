@@ -5,8 +5,6 @@ Autenticação gerenciada pelo Supabase Auth.
 O frontend usa supabase-js para login/registro.
 Este router fornece endpoints auxiliares e sincronização.
 """
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -64,63 +62,6 @@ def get_auth_config():
 def obter_requisitos_senha():
     """Retorna os requisitos de senha para exibição no frontend."""
     return {"requisitos": get_password_requirements()}
-
-
-@router.get("/debug-token")
-def debug_token_validation(
-    token: Optional[str] = None,
-    db: Session = Depends(get_db)
-):
-    """
-    DEBUG: Endpoint temporário para diagnosticar problemas de autenticação.
-    Remover após resolver o problema.
-    """
-    from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
-
-    result = {
-        "supabase_url_set": bool(SUPABASE_URL),
-        "supabase_url_prefix": SUPABASE_URL[:30] + "..." if SUPABASE_URL and len(SUPABASE_URL) > 30 else SUPABASE_URL,
-        "service_key_set": bool(SUPABASE_SERVICE_KEY),
-        "service_key_prefix": SUPABASE_SERVICE_KEY[:20] + "..." if SUPABASE_SERVICE_KEY and len(SUPABASE_SERVICE_KEY) > 20 else "NOT SET",
-        "anon_key_set": bool(SUPABASE_ANON_KEY),
-        "supabase_auth_enabled": SUPABASE_AUTH_ENABLED,
-    }
-
-    if token:
-        try:
-            from services.supabase_auth import verify_supabase_token, _get_supabase_client
-
-            # Tentar obter cliente
-            try:
-                _get_supabase_client()  # Verifica se cliente pode ser criado
-                result["client_created"] = True
-            except Exception as e:
-                result["client_created"] = False
-                result["client_error"] = str(e)
-                return result
-
-            # Tentar validar token
-            user_data = verify_supabase_token(token)
-            if user_data:
-                result["token_valid"] = True
-                result["supabase_user_id"] = user_data.get("id")
-                result["supabase_email"] = user_data.get("email")
-
-                # Verificar se usuário existe localmente
-                from auth import get_user_by_supabase_id
-                supabase_id = user_data.get("id")
-                local_user = get_user_by_supabase_id(db, supabase_id) if supabase_id else None
-                result["local_user_found"] = local_user is not None
-                if local_user:
-                    result["local_user_email"] = local_user.email
-            else:
-                result["token_valid"] = False
-                result["token_error"] = "verify_supabase_token returned None"
-        except Exception as e:
-            result["token_valid"] = False
-            result["token_error"] = str(e)
-
-    return result
 
 
 # === Endpoints de Registro ===

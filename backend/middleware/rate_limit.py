@@ -4,9 +4,11 @@ Middleware de Rate Limiting para proteção contra abuso.
 Limita o número de requisições por IP em uma janela de tempo.
 Suporta limites diferentes por rota (ex: login mais restritivo).
 """
+import ipaddress
+import os
 import time
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple, Union
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -23,6 +25,22 @@ from config import (
 from logging_config import get_logger
 
 logger = get_logger(__name__)
+
+# IPs/redes de proxies confiáveis (ex: load balancer, CDN)
+# Configurar via variável de ambiente: TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12
+TRUSTED_PROXIES_ENV = os.environ.get("TRUSTED_PROXIES", "")
+TRUSTED_PROXY_NETWORKS: List[Union[ipaddress.IPv4Network, ipaddress.IPv6Network]] = []
+
+for network_str in TRUSTED_PROXIES_ENV.split(","):
+    network_str = network_str.strip()
+    if network_str:
+        try:
+            TRUSTED_PROXY_NETWORKS.append(ipaddress.ip_network(network_str, strict=False))
+        except ValueError as e:
+            logger.warning(f"Rede de proxy inválida ignorada: {network_str} - {e}")
+
+# Intervalo mínimo entre limpezas (segundos)
+CLEANUP_INTERVAL = 60
 
 # Limites específicos por rota (path_contains, requests, window_seconds)
 PATH_SPECIFIC_LIMITS: List[Tuple[str, int, int]] = [
@@ -48,21 +66,55 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Separar contadores por rota para limites específicos
         self.requests: Dict[str, list] = defaultdict(list)
         self.path_requests: Dict[str, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
-        self._cleanup_counter = 0
+        self._last_cleanup = time.time()
+
+    def _is_trusted_proxy(self, ip: str) -> bool:
+        """Verifica se o IP é de um proxy confiável."""
+        if not TRUSTED_PROXY_NETWORKS:
+            return False
+        try:
+            ip_addr = ipaddress.ip_address(ip)
+            return any(ip_addr in network for network in TRUSTED_PROXY_NETWORKS)
+        except ValueError:
+            return False
 
     def _get_client_ip(self, request: Request) -> str:
-        """Obtém o IP do cliente, considerando proxies."""
-        # Verificar headers de proxy
+        """
+        Obtém o IP do cliente de forma segura.
+
+        Só confia em headers de proxy se a requisição vier de um proxy confiável.
+        Isso previne IP spoofing via X-Forwarded-For.
+        """
+        # IP direto da conexão
+        direct_ip = request.client.host if request.client else "unknown"
+
+        # Só considerar headers de proxy se vier de proxy confiável
+        if not self._is_trusted_proxy(direct_ip):
+            return direct_ip
+
+        # Proxy confiável - usar X-Forwarded-For
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            # Pegar o primeiro IP (cliente original)
+            client_ip = forwarded.split(",")[0].strip()
+            # Validar que é um IP válido
+            try:
+                ipaddress.ip_address(client_ip)
+                return client_ip
+            except ValueError:
+                logger.warning(f"X-Forwarded-For inválido: {client_ip}")
+                return direct_ip
 
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip
+            try:
+                ipaddress.ip_address(real_ip)
+                return real_ip
+            except ValueError:
+                logger.warning(f"X-Real-IP inválido: {real_ip}")
+                return direct_ip
 
-        # Fallback para IP direto
-        return request.client.host if request.client else "unknown"
+        return direct_ip
 
     def _cleanup_old_requests(self, current_time: float):
         """Remove requisições antigas para liberar memória."""
@@ -198,11 +250,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             rate_limit_value = self.requests_limit
             rate_window = self.window_seconds
 
-        # Cleanup periódico (a cada 100 requisições)
-        self._cleanup_counter += 1
-        if self._cleanup_counter >= 100:
-            self._cleanup_old_requests(time.time())
-            self._cleanup_counter = 0
+        # Cleanup periódico baseado em tempo (mais previsível, evita memory leak)
+        current_time = time.time()
+        if current_time - self._last_cleanup >= CLEANUP_INTERVAL:
+            self._cleanup_old_requests(current_time)
+            self._last_cleanup = current_time
 
         if is_limited:
             if path_limit:

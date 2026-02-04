@@ -15,6 +15,7 @@ from routers import auth, admin, atestados, analise, ai_status
 from services.processing_queue import processing_queue
 from middleware.rate_limit import RateLimitMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.csrf_protection import CSRFProtectionMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION, ENVIRONMENT
 from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
@@ -97,7 +98,14 @@ if SECURITY_HEADERS_ENABLED:
     )
     logger.info("Security Headers middleware habilitado")
 
-# 3. Compressao GZip (comprime respostas maiores que 1000 bytes)
+# 3. CSRF Protection (requer header X-Requested-With para requisições mutáveis)
+# Desabilitado por padrão para compatibilidade - habilitar via CSRF_PROTECTION_ENABLED=true
+CSRF_PROTECTION_ENABLED = os.environ.get("CSRF_PROTECTION_ENABLED", "false").lower() == "true"
+if CSRF_PROTECTION_ENABLED:
+    app.add_middleware(CSRFProtectionMiddleware, enabled=True)
+    logger.info("CSRF Protection middleware habilitado")
+
+# 4. Compressao GZip (comprime respostas maiores que 1000 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
@@ -135,7 +143,14 @@ app.add_middleware(
     allow_origins=cors_origins,
     allow_credentials=CORS_ALLOW_CREDENTIALS,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    # Headers permitidos explicitamente (evita allow_headers=["*"])
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Correlation-ID",
+        "X-Requested-With",  # Header anti-CSRF
+    ],
 )
 
 # Criar diretório de uploads se não existir
