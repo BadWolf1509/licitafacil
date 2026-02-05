@@ -50,6 +50,7 @@ nul
 backend/tmp_*.py
 backend/.tmp_*
 backend/relatorio_*.json
+backend/scripts/consulta_*.py
 
 # Vercel
 .vercel
