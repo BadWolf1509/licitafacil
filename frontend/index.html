@@ -35,7 +35,7 @@
                     <label class="form-label" for="loginSenha">Senha</label>
                     <div class="password-wrapper">
                         <input type="password" id="loginSenha" class="form-input" placeholder="Sua senha" required>
-                        <button type="button" class="password-toggle" onclick="togglePassword('loginSenha', this)" title="Mostrar senha">
+                        <button type="button" class="password-toggle" title="Mostrar senha">
                             <span class="eye-icon">👁</span>
                         </button>
                     </div>
@@ -59,8 +59,8 @@
                 <div class="form-group">
                     <label class="form-label" for="registroSenha">Senha</label>
                     <div class="password-wrapper">
-                        <input type="password" id="registroSenha" class="form-input" placeholder="Mínimo 6 caracteres" required minlength="6">
-                        <button type="button" class="password-toggle" onclick="togglePassword('registroSenha', this)" title="Mostrar senha">
+                        <input type="password" id="registroSenha" class="form-input" placeholder="Mínimo 8 caracteres" required minlength="8">
+                        <button type="button" class="password-toggle" title="Mostrar senha">
                             <span class="eye-icon">👁</span>
                         </button>
                     </div>
@@ -68,8 +68,8 @@
                 <div class="form-group">
                     <label class="form-label" for="registroConfirmarSenha">Confirmar Senha</label>
                     <div class="password-wrapper">
-                        <input type="password" id="registroConfirmarSenha" class="form-input" placeholder="Repita a senha" required>
-                        <button type="button" class="password-toggle" onclick="togglePassword('registroConfirmarSenha', this)" title="Mostrar senha">
+                        <input type="password" id="registroConfirmarSenha" class="form-input" placeholder="Repita a senha" required minlength="8">
+                        <button type="button" class="password-toggle" title="Mostrar senha">
                             <span class="eye-icon">👁</span>
                         </button>
                     </div>

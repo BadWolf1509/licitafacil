@@ -27,7 +27,7 @@
             <a href="analises.html" class="active">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
             <a href="perfil.html">Perfil</a>
-            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
+            <a href="#" class="nav-logout">Sair</a>
         </nav>
     </header>
 
@@ -36,7 +36,7 @@
 
         <div class="d-flex justify-between align-center mb-3">
             <h1>Análises de Licitações</h1>
-            <button class="btn btn-primary" onclick="abrirModalNovaAnalise()">+ Nova Análise</button>
+            <button class="btn btn-primary" id="btnNovaAnalise">+ Nova Análise</button>
         </div>
 
         <!-- Lista de análises -->
@@ -52,7 +52,7 @@
             <div class="card">
                 <div class="d-flex justify-between align-center mb-3">
                     <h2 id="analiseNome">Análise</h2>
-                    <button class="btn btn-outline btn-sm" onclick="voltarLista()">← Voltar</button>
+                    <button class="btn btn-outline btn-sm" id="btnVoltarLista">← Voltar</button>
                 </div>
                 <div id="resultadoAnalise"></div>
             </div>
@@ -64,15 +64,15 @@
         <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h2>Nova Análise de Licitação</h2>
-                <button class="modal-close" onclick="fecharModal('modalNovaAnalise')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
 
             <!-- Tabs do Modal -->
             <div class="modal-tabs" id="modalAnaliseTabs">
-                <button class="modal-tab active" data-tab="upload" onclick="switchAnaliseTab('upload')">
+                <button class="modal-tab active" data-tab="upload">
                     📄 Upload de PDF
                 </button>
-                <button class="modal-tab" data-tab="manual" onclick="switchAnaliseTab('manual')">
+                <button class="modal-tab" data-tab="manual">
                     ✏️ Cadastro Manual
                 </button>
             </div>
@@ -98,7 +98,7 @@
                             <span id="btnAnaliseText">Analisar</span>
                             <span id="btnAnaliseSpinner" class="spinner hidden"></span>
                         </button>
-                        <button type="button" class="btn btn-outline" onclick="fecharModal('modalNovaAnalise')">Cancelar</button>
+                        <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -120,7 +120,7 @@
                         <div id="listaExigencias">
                             <!-- Exigências serão adicionadas aqui -->
                         </div>
-                        <button type="button" class="btn btn-outline btn-sm mt-2" onclick="adicionarExigencia()">
+                        <button type="button" class="btn btn-outline btn-sm mt-2" id="btnAdicionarExigencia">
                             + Adicionar Exigência
                         </button>
                     </div>
@@ -130,7 +130,7 @@
                             <span id="btnAnaliseManualText">Analisar</span>
                             <span id="btnAnaliseManualSpinner" class="spinner hidden"></span>
                         </button>
-                        <button type="button" class="btn btn-outline" onclick="fecharModal('modalNovaAnalise')">Cancelar</button>
+                        <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
                     </div>
                 </form>
             </div>

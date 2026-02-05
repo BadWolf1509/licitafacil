@@ -1,8 +1,8 @@
 """
 Serviço integrado de processamento de documentos.
-Combina extração de PDF, OCR e análise com IA.
-Suporta GPT-4o Vision para análise direta de imagens.
-Inclui processamento paralelo opcional para melhor performance.
+Fachada que delega para sub-processadores especializados.
+
+Pós-processamento de serviços extraído para postprocessor.py.
 """
 
 from typing import Dict, Any, List
@@ -14,29 +14,23 @@ from .document_ai_service import document_ai_service  # noqa: F401
 from .pdf_extraction_service import pdf_extraction_service, ProcessingCancelled  # noqa: F401 (re-export)
 from .table_extraction_service import table_extraction_service  # noqa: F401
 from .document_analysis_service import document_analysis_service  # noqa: F401
-# Módulos extraídos para migração gradual
 from .pdf_converter import pdf_converter  # noqa: F401
-from .extraction import (
-    # text_normalizer
+from .extraction import (  # noqa: F401 (re-exports)
     normalize_unit,
     normalize_desc_for_match,
     description_similarity,
-    # table_processor
     parse_item_tuple,
     item_tuple_to_str,
     parse_quantity,
-    # item_filters
     filter_classification_paths,
     remove_duplicate_services,
     filter_summary_rows,
-    # quality_assessor
     UNIT_TOKENS,
-    # item_utils
     extract_item_code,
     split_item_description,
 )
 from .edital_processor import edital_processor
-from .processing_helpers import (
+from .processing_helpers import (  # noqa: F401 (re-exports)
     normalize_item_code as helpers_normalize_item_code,
     is_section_header_desc,
     is_narrative_desc,
@@ -44,366 +38,48 @@ from .processing_helpers import (
     split_restart_prefix,
     item_key as helpers_item_key,
 )
-from .processors.text_processor import text_processor
-from .processors.text_cleanup import strip_trailing_unit_qty
-from .processors.deduplication import ServiceDeduplicator
-from .processors.service_merger import ServiceMerger
-from .processors.validation_filter import ServiceFilter
+from .processors.text_processor import text_processor  # noqa: F401
+from .processors.text_cleanup import strip_trailing_unit_qty  # noqa: F401
+from .processors.deduplication import ServiceDeduplicator  # noqa: F401
+from .processors.service_merger import ServiceMerger  # noqa: F401
+from .processors.validation_filter import ServiceFilter  # noqa: F401
 from config import AtestadoProcessingConfig as APC, PAID_SERVICES_ENABLED
+
+# Pós-processamento extraído para módulo dedicado
+from . import postprocessor
 
 from logging_config import get_logger
 logger = get_logger('services.document_processor')
 
 
 class DocumentProcessor:
-    """Processador integrado de documentos."""
+    """Processador integrado de documentos - fachada para sub-processadores."""
 
+    # Delegação para postprocessor (mantém interface para pipeline/processor)
     def _filter_items_without_code(self, servicos: list, min_items_with_code: int = 5) -> list:
-        """
-        Remove itens sem código de item quando há itens suficientes com código.
-
-        Itens sem código (item=None) geralmente são descrições gerais do documento
-        (ex: "Execução de obra de SISTEMAS DE ILUMINAÇÃO") que foram erroneamente
-        extraídos como serviços pela IA.
-
-        Só remove itens sem código quando há pelo menos `min_items_with_code` itens
-        com código, para não afetar documentos simples sem numeração.
-
-        Args:
-            servicos: Lista de serviços
-            min_items_with_code: Mínimo de itens com código para ativar o filtro
-
-        Returns:
-            Lista filtrada de serviços
-        """
-        if not servicos:
-            return servicos
-
-        # Contar itens com e sem código
-        com_codigo = [s for s in servicos if s.get("item")]
-        sem_codigo = [s for s in servicos if not s.get("item")]
-
-        # Se há poucos itens com código, manter todos (documento pode não ter numeração)
-        if len(com_codigo) < min_items_with_code:
-            return servicos
-
-        # Se há itens suficientes com código, remover os sem código
-        if sem_codigo:
-            logger.info(f"[FILTRO] Removendo {len(sem_codigo)} itens sem código de item (há {len(com_codigo)} itens com código)")
-            for s in sem_codigo:
-                desc = (s.get("descricao") or "")[:50]
-                logger.info(f"[FILTRO] Removido item sem código: {desc}...")
-
-        return com_codigo
+        return postprocessor.filter_items_without_code(servicos, min_items_with_code)
 
     def _build_restart_prefix_maps(self, servicos: list) -> tuple[Dict[tuple, str], Dict[str, str]]:
-        prefix_map: Dict[tuple, str] = {}
-        prefixes_by_code: Dict[str, set] = {}
-        codes_without_prefix: set = set()
-        for servico in servicos or []:
-            if servico.get("_section") == "AD":
-                continue
-            prefix, core = split_restart_prefix(servico.get("item"))
-            code = helpers_normalize_item_code(core)
-            if not code:
-                continue
-            if not prefix:
-                codes_without_prefix.add(code)
-                continue
-            unit = normalize_unit(servico.get("unidade") or "")
-            qty = parse_quantity(servico.get("quantidade"))
-            prefix_map[(code, unit, qty)] = prefix
-            prefixes_by_code.setdefault(code, set()).add(prefix)
-        unique_prefix_by_code = {
-            code: next(iter(prefixes))
-            for code, prefixes in prefixes_by_code.items()
-            if len(prefixes) == 1 and code not in codes_without_prefix
-        }
-        return prefix_map, unique_prefix_by_code
+        return postprocessor.build_restart_prefix_maps(servicos)
 
     def _should_replace_desc(self, current_desc: str, candidate_desc: str) -> bool:
-        if not candidate_desc:
-            return False
-        if is_section_header_desc(candidate_desc):
-            return False
-        if is_contaminated_desc(candidate_desc):
-            return False
-        current = (current_desc or "").strip()
-        candidate = candidate_desc.strip()
-        if not current:
-            return True
-        if is_section_header_desc(current):
-            return True
-        if is_contaminated_desc(current):
-            # Substituir descrição contaminada apenas se candidato não estiver contaminado
-            return True
-        if len(current) < 12:
-            return True
-
-        sim = description_similarity(current, candidate)
-
-        # Descrições muito diferentes (sim < 0.3)
-        if sim < 0.3:
-            # Aceitar descrições mais curtas se forem específicas (>= 20 chars)
-            # e não forem contaminadas
-            if len(candidate) >= 20:
-                return True
-
-        # REMOVIDO: Lógica "longer wins" que causava substituição incorreta
-        # As descrições serão corrigidas pelo description_fixer.py
-
-        return False
+        return postprocessor.should_replace_desc(current_desc, candidate_desc)
 
     def _build_text_item_map(self, items: list) -> dict:
-        text_map: Dict[tuple, str] = {}
-        for item in items or []:
-            key = helpers_item_key(item)
-            if not key:
-                continue
-            desc = (item.get("descricao") or "").strip()
-            # Filtrar descrições inválidas, narrativas ou contaminadas
-            if not desc or is_section_header_desc(desc) or is_narrative_desc(desc):
-                continue
-            if is_contaminated_desc(desc):
-                continue
-            existing = text_map.get(key)
-            # Manter primeira ocorrência, não a mais longa (evita spillover)
-            if not existing:
-                text_map[key] = desc
-        return text_map
+        return postprocessor.build_text_item_map(items)
 
     def _apply_text_descriptions(self, servicos: list, text_map: dict) -> int:
-        if not servicos or not text_map:
-            return 0
-        updated = 0
-        for servico in servicos:
-            key = helpers_item_key(servico)
-            if not key:
-                continue
-            candidate = text_map.get(key)
-            if not candidate:
-                continue
-            if is_narrative_desc(candidate):
-                continue
-            if self._should_replace_desc(servico.get("descricao"), candidate):
-                servico["descricao"] = candidate
-                servico["_desc_from_text"] = True
-                updated += 1
-        return updated
-
-    def _servico_match_key(self, servico: dict) -> str:
-        desc = normalize_desc_for_match(servico.get("descricao") or "")
-        unit = normalize_unit(servico.get("unidade") or "")
-        if not desc:
-            return ""
-        return f"{desc}|||{unit}"
-
-    def _servico_desc_key(self, servico: dict) -> str:
-        return normalize_desc_for_match(servico.get("descricao") or "")
-
-    def _table_candidates_by_code(self, servicos_table: list) -> dict:
-        if not servicos_table:
-            return {}
-        unit_tokens = UNIT_TOKENS
-        candidates: Dict[str, Any] = {}
-        for servico in servicos_table:
-            item = servico.get("item") or extract_item_code(servico.get("descricao") or "")
-            if not item:
-                continue
-            item_tuple = parse_item_tuple(item)
-            if not item_tuple:
-                continue
-            desc = (servico.get("descricao") or "").strip()
-            if len(desc) < 8:
-                continue
-            qty = parse_quantity(servico.get("quantidade"))
-            if qty is None:
-                continue
-            unit = normalize_unit(servico.get("unidade") or "")
-            if unit and unit not in unit_tokens:
-                unit = ""
-            normalized_item = item_tuple_to_str(item_tuple)
-            candidate = {
-                "item": normalized_item,
-                "descricao": desc,
-                "quantidade": qty,
-                "unidade": unit
-            }
-            existing = candidates.get(normalized_item)
-            if not existing or len(desc) > len(existing.get("descricao") or ""):
-                candidates[normalized_item] = candidate
-        return candidates
-
-    def _attach_item_codes_from_table(self, servicos: list, servicos_table: list) -> list:
-        if not servicos or not servicos_table:
-            return servicos
-        table_candidates = self._table_candidates_by_code(servicos_table)
-        if not table_candidates:
-            return servicos
-
-        match_threshold = APC.CODE_MATCH_THRESHOLD
-
-        used_codes = {s.get("item") for s in servicos if s.get("item")}
-        used_codes.discard(None)
-        for servico in servicos:
-            if servico.get("item"):
-                continue
-            desc = servico.get("descricao") or ""
-            unit = normalize_unit(servico.get("unidade") or "")
-            qty = parse_quantity(servico.get("quantidade"))
-            best_code = None
-            best_score = 0.0
-            best_candidate = None
-            for code, candidate in table_candidates.items():
-                if code in used_codes:
-                    continue
-                score = description_similarity(desc, candidate["descricao"])
-                if score < match_threshold:
-                    continue
-                if unit and candidate["unidade"] and unit == candidate["unidade"]:
-                    score += 0.1
-                cand_qty = candidate.get("quantidade")
-                if qty is not None and cand_qty is not None and isinstance(qty, (int, float)) and isinstance(cand_qty, (int, float)) and qty != 0 and cand_qty != 0:
-                    diff = abs(qty - cand_qty)
-                    denom = max(abs(qty), abs(cand_qty))
-                    if denom > 0 and (diff / denom) <= 0.05:
-                        score += 0.1
-                if score > best_score:
-                    best_score = score
-                    best_code = code
-                    best_candidate = candidate
-            if best_code:
-                servico["item"] = best_code
-                used_codes.add(best_code)
-                if best_candidate and not servico.get("unidade") and best_candidate.get("unidade"):
-                    servico["unidade"] = best_candidate["unidade"]
-                if best_candidate and parse_quantity(servico.get("quantidade")) in (None, 0) and best_candidate.get("quantidade") is not None:
-                    servico["quantidade"] = best_candidate["quantidade"]
-
-        return servicos
+        return postprocessor.apply_text_descriptions(servicos, text_map)
 
     def _postprocess_servicos(
-        self,
-        servicos: list,
-        use_ai: bool,
-        table_used: bool,
-        servicos_table: list,
-        texto: str,
-        strict_item_gate: bool = False,
-        skip_no_code_dedupe: bool = False
+        self, servicos: list, use_ai: bool, table_used: bool,
+        servicos_table: list, texto: str,
+        strict_item_gate: bool = False, skip_no_code_dedupe: bool = False
     ) -> list:
-        """
-        Aplica pós-processamento nos serviços extraídos.
-
-        Inclui: normalização, filtros, deduplicação, limpeza de códigos.
-
-        Args:
-            servicos: Lista de serviços brutos
-            use_ai: Se IA foi usada
-            table_used: Se tabela foi usada com alta confiança
-            servicos_table: Serviços da tabela (para enriquecimento)
-            texto: Texto extraido do documento
-            strict_item_gate: Se True, remove itens nao encontrados no texto/tabela
-            skip_no_code_dedupe: Se True, evita dedupe agressiva para documentos sem itens numerados
-
-        Returns:
-            Lista de serviços processados
-        """
-        # Etapa 1: Preparação inicial
-        servicos = filter_summary_rows(servicos)
-        servicos = text_processor.extract_hidden_items_from_servicos(servicos)
-
-        # Etapa 2: Enriquecer com dados da tabela se IA foi usada
-        if use_ai and not table_used:
-            servicos = self._attach_item_codes_from_table(servicos, servicos_table)
-            servicos = ServiceDeduplicator(servicos).prefer_items_with_code()
-
-        # Etapa 3: Normalizar campos de cada serviço
-        self._normalize_servicos_fields(servicos)
-
-        # Etapa 4: Tratar prefixos de restart e duplicatas (usando classes extraídas)
-        servicos = ServiceMerger(servicos).normalize_prefixes()
-        servicos = ServiceDeduplicator(servicos).dedupe_by_restart_prefix()
-        servicos = ServiceDeduplicator(servicos).dedupe_within_planilha()
-        servicos = ServiceDeduplicator(servicos).cleanup_orphan_suffixes()
-
-        # Etapa 5: Aplicar filtros finais
-        servicos = self._apply_servicos_filters(
-            servicos, texto, servicos_table, strict_item_gate, skip_no_code_dedupe
+        return postprocessor.postprocess_servicos(
+            servicos, use_ai, table_used, servicos_table, texto,
+            strict_item_gate, skip_no_code_dedupe
         )
-
-        return servicos
-
-    def _normalize_servicos_fields(self, servicos: list) -> None:
-        """Normaliza campos de cada serviço (item, descricao, quantidade, unidade)."""
-        for servico in servicos:
-            # Normalizar item e descrição
-            desc = servico.get("descricao", "")
-            existing_item = servico.get("item")
-            item, clean_desc = split_item_description(desc)
-            if not item and existing_item:
-                item = existing_item
-            if item:
-                servico["item"] = item
-                if clean_desc:
-                    servico["descricao"] = clean_desc
-            else:
-                servico["item"] = None
-
-            # Normalizar quantidade
-            qty = parse_quantity(servico.get("quantidade"))
-            if qty is not None:
-                servico["quantidade"] = qty
-
-            # Normalizar unidade
-            unit = servico.get("unidade")
-            if isinstance(unit, str):
-                unit = unit.strip()
-                if unit:
-                    unit = normalize_unit(unit)
-                servico["unidade"] = unit
-
-            # Limpar trailing unit/qty da descrição
-            desc = servico.get("descricao") or ""
-            cleaned_desc = strip_trailing_unit_qty(desc, unit, qty)
-            if cleaned_desc and cleaned_desc != desc:
-                servico["descricao"] = cleaned_desc
-
-            # Fix B2: Remover prefixo UN/QTD da descrição
-            desc = servico.get("descricao") or ""
-            cleaned_prefix = text_processor.strip_unit_qty_prefix(desc)
-            if cleaned_prefix and cleaned_prefix != desc:
-                servico["descricao"] = cleaned_prefix
-
-    def _apply_servicos_filters(
-        self,
-        servicos: list,
-        texto: str,
-        servicos_table: list,
-        strict_item_gate: bool,
-        skip_no_code_dedupe: bool
-    ) -> list:
-        """Aplica filtros finais nos serviços."""
-        # Usar classes extraídas para filtros e deduplicação
-        if strict_item_gate:
-            servicos = ServiceFilter(servicos, texto, servicos_table).filter_not_in_sources()
-
-        servicos = filter_classification_paths(servicos)
-
-        if skip_no_code_dedupe:
-            com_item = [s for s in servicos if s.get("item")]
-            sem_item = [s for s in servicos if not s.get("item")]
-            sem_item = ServiceDeduplicator(sem_item).dedupe_by_desc_unit()
-            servicos = com_item + sem_item
-        else:
-            servicos = remove_duplicate_services(servicos)
-
-        servicos = ServiceDeduplicator(servicos).remove_duplicate_pairs()
-        servicos = ServiceFilter(servicos).filter_headers()
-        servicos = ServiceFilter(servicos).filter_no_quantity()
-        servicos = self._filter_items_without_code(servicos)
-
-        return servicos
 
     def process_atestado(
         self,
@@ -412,34 +88,12 @@ class DocumentProcessor:
         progress_callback=None,
         cancel_check=None
     ) -> Dict[str, Any]:
-        """
-        Processa um atestado de capacidade técnica usando abordagem híbrida.
-
-        Combina GPT-4o Vision (para precisão) com OCR+texto (para completude).
-
-        Args:
-            file_path: Caminho para o arquivo (PDF ou imagem)
-            use_vision: Se True, usa abordagem híbrida Vision+OCR; se False, apenas OCR+texto
-
-        Returns:
-            Dicionário com dados extraídos do atestado
-        """
+        """Processa um atestado de capacidade técnica usando abordagem híbrida."""
         from .atestado.pipeline import AtestadoPipeline
         return AtestadoPipeline(self, file_path, use_vision, progress_callback, cancel_check).run()
 
     def process_edital(self, file_path: str, progress_callback=None, cancel_check=None) -> Dict[str, Any]:
-        """
-        Processa uma pagina de edital com quantitativos minimos.
-        Delega ao EditalProcessor.
-
-        Args:
-            file_path: Caminho para o arquivo PDF
-            progress_callback: Callback para progresso
-            cancel_check: Funcao para verificar cancelamento
-
-        Returns:
-            Dicionario com exigencias extraidas
-        """
+        """Processa uma pagina de edital com quantitativos minimos."""
         return edital_processor.process(file_path, progress_callback, cancel_check)
 
     def analyze_qualification(
@@ -447,26 +101,11 @@ class DocumentProcessor:
         exigencias: List[Dict[str, Any]],
         atestados: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Analisa a qualificacao tecnica comparando exigencias e atestados.
-        Delega ao EditalProcessor.
-
-        Args:
-            exigencias: Lista de exigencias do edital
-            atestados: Lista de atestados do usuario
-
-        Returns:
-            Resultado da analise com status de atendimento
-        """
+        """Analisa a qualificacao tecnica comparando exigencias e atestados."""
         return edital_processor.analyze_qualification(exigencias, atestados)
 
     def get_status(self) -> Dict[str, Any]:
-        """
-        Retorna o status dos serviços de processamento.
-
-        Returns:
-            Dicionário com status de cada serviço
-        """
+        """Retorna o status dos serviços de processamento."""
         provider_status = ai_provider.get_status()
         return {
             "pdf_extractor": True,

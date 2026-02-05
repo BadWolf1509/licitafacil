@@ -142,8 +142,13 @@ if not CORS_ORIGINS:
         logger.error("CORS_ORIGINS não definido em produção! Usando lista vazia.")
         cors_origins = []
     else:
-        cors_origins = ["*"]
-        logger.warning("CORS configurado para aceitar todas as origens (desenvolvimento)")
+        cors_origins = [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+        ]
+        logger.warning(f"CORS configurado para origens de desenvolvimento: {cors_origins}")
 else:
     cors_origins = CORS_ORIGINS
     logger.info(f"CORS configurado para origens: {cors_origins}")

@@ -4,12 +4,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Aguardar config carregar antes de fazer chamadas API
     await loadAuthConfig();
 
+    setupAdminEventDelegation();
     verificarAdmin();
     setupTabs();
     carregarEstatisticas();
     carregarUsuariosPendentes();
     carregarTodosUsuarios();
 });
+
+function setupAdminEventDelegation() {
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const userId = btn.dataset.userId ? parseInt(btn.dataset.userId, 10) : null;
+        if (!userId) return;
+        switch (action) {
+            case 'aprovar': aprovarUsuario(userId); break;
+            case 'rejeitar': rejeitarUsuario(userId); break;
+            case 'reativar': reativarUsuario(userId); break;
+            case 'excluir': excluirUsuario(userId, btn.dataset.userNome || ''); break;
+        }
+    });
+}
 
 async function verificarAdmin() {
     try {
@@ -18,7 +35,7 @@ async function verificarAdmin() {
             ui.showAlert('Acesso restrito a administradores', 'error');
             setTimeout(() => {
                 window.location.href = 'dashboard.html';
-            }, 2000);
+            }, CONFIG.TIMEOUTS.INIT_DELAY);
         }
     } catch (error) {
         // Limpar sessão completamente antes de redirecionar
@@ -79,9 +96,9 @@ async function carregarUsuariosPendentes() {
                     <small class="text-muted">Cadastrado em: ${formatarData(u.created_at)}</small>
                 </div>
                 <div class="user-actions">
-                    <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
-                    <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
-                    <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${Sanitize.escapeJs(u.nome)}')">Excluir</button>
+                    <button class="btn btn-success btn-sm" data-action="aprovar" data-user-id="${u.id}">Aprovar</button>
+                    <button class="btn btn-danger btn-sm" data-action="rejeitar" data-user-id="${u.id}">Rejeitar</button>
+                    <button class="btn btn-outline btn-sm" data-action="excluir" data-user-id="${u.id}" data-user-nome="${Sanitize.escapeHtml(u.nome)}">Excluir</button>
                 </div>
             </div>
         `).join('');
@@ -116,22 +133,22 @@ async function carregarTodosUsuarios() {
 
             let actions = '';
             if (!u.is_admin) {
-                const escapedNome = Sanitize.escapeJs(u.nome);
+                const htmlNome = Sanitize.escapeHtml(u.nome);
                 if (!u.is_approved && u.is_active) {
                     actions = `
-                        <button class="btn btn-success btn-sm" onclick="aprovarUsuario(${u.id})">Aprovar</button>
-                        <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Rejeitar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
+                        <button class="btn btn-success btn-sm" data-action="aprovar" data-user-id="${u.id}">Aprovar</button>
+                        <button class="btn btn-danger btn-sm" data-action="rejeitar" data-user-id="${u.id}">Rejeitar</button>
+                        <button class="btn btn-outline btn-sm" data-action="excluir" data-user-id="${u.id}" data-user-nome="${htmlNome}">Excluir</button>
                     `;
                 } else if (!u.is_active) {
                     actions = `
-                        <button class="btn btn-outline btn-sm" onclick="reativarUsuario(${u.id})">Reativar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
+                        <button class="btn btn-outline btn-sm" data-action="reativar" data-user-id="${u.id}">Reativar</button>
+                        <button class="btn btn-outline btn-sm" data-action="excluir" data-user-id="${u.id}" data-user-nome="${htmlNome}">Excluir</button>
                     `;
                 } else {
                     actions = `
-                        <button class="btn btn-danger btn-sm" onclick="rejeitarUsuario(${u.id})">Desativar</button>
-                        <button class="btn btn-outline btn-sm" onclick="excluirUsuario(${u.id}, '${escapedNome}')">Excluir</button>
+                        <button class="btn btn-danger btn-sm" data-action="rejeitar" data-user-id="${u.id}">Desativar</button>
+                        <button class="btn btn-outline btn-sm" data-action="excluir" data-user-id="${u.id}" data-user-nome="${htmlNome}">Excluir</button>
                     `;
                 }
             }

@@ -87,7 +87,7 @@ const AnalisesModule = {
                     <div class="card">
                         <div class="d-flex justify-between align-center">
                             <div>
-                                <h3>${a.nome_licitacao}</h3>
+                                <h3>${Sanitize.escapeHtml(a.nome_licitacao)}</h3>
                                 <p class="text-muted">${formatarData(a.created_at)}</p>
                                 <span class="badge badge-${badgeClass}">
                                     ${statusIcon} ${statusText}
@@ -501,4 +501,22 @@ function removerExigencia(index) { AnalisesModule.removerExigencia(index); }
 document.addEventListener('DOMContentLoaded', async () => {
     await loadAuthConfig();
     AnalisesModule.init();
+
+    // Event listeners para botoes de pagina (substituem onclick inline)
+    const btnNova = document.getElementById('btnNovaAnalise');
+    if (btnNova) btnNova.addEventListener('click', () => AnalisesModule.abrirModalNovaAnalise());
+
+    const btnVoltar = document.getElementById('btnVoltarLista');
+    if (btnVoltar) btnVoltar.addEventListener('click', () => AnalisesModule.voltarLista());
+
+    const btnExigencia = document.getElementById('btnAdicionarExigencia');
+    if (btnExigencia) btnExigencia.addEventListener('click', () => AnalisesModule.adicionarExigencia());
+
+    // Tabs do modal de analise
+    document.querySelectorAll('#modalAnaliseTabs .modal-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.dataset.tab;
+            AnalisesModule.switchAnaliseTab(tabName);
+        });
+    });
 });

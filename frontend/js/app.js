@@ -1,6 +1,9 @@
 // LicitaFácil - Aplicação Principal
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Configurar handlers globais (event delegation para onclick inline)
+    setupGlobalHandlers();
+
     // Configurar menu mobile
     setupMobileNav();
 
@@ -14,8 +17,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (window.location.pathname.includes('dashboard')) {
         carregarDashboard();
         setupFormAtestadoDashboard();
+        setupDashboardActions();
     }
 });
+
+/**
+ * Configura handlers globais via event delegation.
+ * Substitui onclick inline no HTML por listeners centralizados.
+ */
+function setupGlobalHandlers() {
+    document.addEventListener('click', (e) => {
+        // Logout
+        const logoutEl = e.target.closest('.nav-logout');
+        if (logoutEl) {
+            e.preventDefault();
+            logout();
+            return;
+        }
+
+        // Modal close (X button)
+        const closeBtn = e.target.closest('.modal-close');
+        if (closeBtn) {
+            const modal = closeBtn.closest('.modal');
+            if (modal) fecharModal(modal.id);
+            return;
+        }
+
+        // Modal dismiss (cancel/close buttons with data attribute)
+        const dismissBtn = e.target.closest('[data-dismiss="modal"]');
+        if (dismissBtn) {
+            const modal = dismissBtn.closest('.modal');
+            if (modal) fecharModal(modal.id);
+            return;
+        }
+
+        // Password toggle
+        const toggleBtn = e.target.closest('.password-toggle');
+        if (toggleBtn) {
+            const wrapper = toggleBtn.closest('.password-wrapper');
+            const input = wrapper ? wrapper.querySelector('input') : null;
+            if (input) togglePassword(input.id, toggleBtn);
+            return;
+        }
+    });
+}
 
 /**
  * Configura o menu mobile (hamburger)
@@ -50,6 +95,29 @@ function setupMobileNav() {
             toggle.setAttribute('aria-expanded', 'false');
         }
     });
+}
+
+/**
+ * Configura event listeners para os action cards do dashboard
+ */
+function setupDashboardActions() {
+    const actionAtestado = document.getElementById('actionCadastrarAtestado');
+    if (actionAtestado) {
+        const handler = () => abrirModalAtestado();
+        actionAtestado.addEventListener('click', handler);
+        actionAtestado.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+        });
+    }
+
+    const actionAnalise = document.getElementById('actionNovaAnalise');
+    if (actionAnalise) {
+        const handler = () => { window.location.href = 'analises.html'; };
+        actionAnalise.addEventListener('click', handler);
+        actionAnalise.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+        });
+    }
 }
 
 /**
@@ -122,7 +190,7 @@ async function verificarAutenticacao() {
             setTimeout(async () => {
                 await clearSessionData();
                 window.location.href = 'index.html';
-            }, 3000);
+            }, CONFIG.TIMEOUTS.POLLING_INTERVAL);
             return;
         }
 
@@ -191,7 +259,7 @@ async function carregarDashboard() {
                 return `
                 <li class="recent-item">
                     <div>
-                        <strong>${a.nome_licitacao}</strong> ${statusBadge}
+                        <strong>${Sanitize.escapeHtml(a.nome_licitacao)}</strong> ${statusBadge}
                         <br>
                         <small class="text-muted">${formatarData(a.created_at)}</small>
                     </div>

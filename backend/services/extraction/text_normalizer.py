@@ -235,11 +235,79 @@ def normalize_desc_for_match(desc: str) -> str:
     return normalize_description(cleaned)
 
 
+# Regras de normalização morfológica para português (construção civil)
+# Plural: mais específico primeiro para evitar aplicação incorreta
+_PLURAL_RULES = [
+    (re.compile(r'OES$'), 'AO'),     # TUBULACOES → TUBULACAO
+    (re.compile(r'AES$'), 'AO'),     # CAPITAES → CAPITAO
+    (re.compile(r'AIS$'), 'AL'),     # MATERIAIS → MATERIAL
+    (re.compile(r'EIS$'), 'EL'),     # PAPEIS → PAPEL
+    (re.compile(r'OIS$'), 'OL'),     # LENCOIS → LENCOL
+    (re.compile(r'NS$'), 'M'),       # ARMAZENS → ARMAZEM
+    (re.compile(r'ORES$'), 'OR'),    # CONDUTORES → CONDUTOR
+    (re.compile(r'S$'), ''),         # BLOCOS → BLOCO, LAJOTAS → LAJOTA
+]
+
+# Gênero: normaliza adjetivos femininos para masculino
+_GENDER_RULES = [
+    (re.compile(r'ADA$'), 'ADO'),    # FURADA → FURADO, MOLDADA → MOLDADO
+    (re.compile(r'IDA$'), 'IDO'),    # POLIDA → POLIDO
+    (re.compile(r'ICA$'), 'ICO'),    # CERAMICA → CERAMICO
+]
+
+# Substantivos femininos que NÃO devem ter gênero normalizado
+_GENDER_EXCEPTIONS: FrozenSet[str] = frozenset({
+    'LAJOTA', 'ARGAMASSA', 'AREIA', 'PEDRA', 'BRITA', 'TELHA',
+    'VIGA', 'CALHA', 'COLA', 'TINTA', 'MANTA', 'FITA',
+    'MASSA', 'TAMPA', 'PLACA', 'CHAPA', 'CAIXA', 'VALVULA',
+    'TORNEIRA', 'PORTA', 'JANELA', 'ESQUADRIA', 'FORMA',
+    'LONA', 'PENEIRA', 'LIXA', 'MOLA', 'PORCA', 'CALDA',
+})
+
+
+@lru_cache(maxsize=4096)
+def normalize_pt_morphology(term: str) -> str:
+    """
+    Normaliza morfologia de termo português para matching.
+
+    Aplica normalização de plural (LAJOTAS→LAJOTA) e gênero
+    (FURADA→FURADO) específica para termos de construção civil.
+    Não usa stemmer externo para evitar over-stemming.
+
+    Args:
+        term: Termo já normalizado (uppercase, sem acentos)
+
+    Returns:
+        Termo com morfologia normalizada
+    """
+    if len(term) <= 2:
+        return term
+
+    normalized = term
+
+    # Plural: aplicar primeira regra que casa
+    for pattern, replacement in _PLURAL_RULES:
+        new = pattern.sub(replacement, normalized)
+        if new != normalized:
+            normalized = new
+            break
+
+    # Gênero: normalizar adjetivos (pular substantivos femininos)
+    if normalized not in _GENDER_EXCEPTIONS:
+        for pattern, replacement in _GENDER_RULES:
+            new = pattern.sub(replacement, normalized)
+            if new != normalized:
+                normalized = new
+                break
+
+    return normalized
+
+
 @lru_cache(maxsize=2048)
 def _extract_keywords_cached(desc: str) -> FrozenSet[str]:
     """Versão cacheada de extract_keywords usando stopwords padrão."""
     normalized = normalize_description(desc)
-    words = frozenset(normalized.split())
+    words = frozenset(normalize_pt_morphology(w) for w in normalized.split())
     return words - STOPWORDS
 
 
@@ -247,19 +315,22 @@ def extract_keywords(desc: str, stopwords: Set[str] = STOPWORDS) -> Set[str]:
     """
     Extrai palavras-chave significativas da descrição.
 
+    Aplica normalização morfológica (plural/gênero) a cada palavra
+    antes de filtrar stopwords.
+
     Args:
         desc: Descrição original
         stopwords: Conjunto de palavras a ignorar
 
     Returns:
-        Conjunto de palavras-chave
+        Conjunto de palavras-chave normalizadas
     """
     # Se usando stopwords padrão, usar versão cacheada
     if stopwords is STOPWORDS:
         return set(_extract_keywords_cached(desc))
 
     normalized = normalize_description(desc)
-    words = set(normalized.split())
+    words = set(normalize_pt_morphology(w) for w in normalized.split())
     return words - stopwords
 
 

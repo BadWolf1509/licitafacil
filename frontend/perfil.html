@@ -27,7 +27,7 @@
             <a href="analises.html">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
             <a href="perfil.html" class="active">Perfil</a>
-            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
+            <a href="#" class="nav-logout">Sair</a>
         </nav>
     </header>
 
@@ -73,7 +73,7 @@
                                 <span>Claro</span>
                             </span>
                             <label class="theme-switch">
-                                <input type="checkbox" id="inputTema" onchange="toggleThemeSwitch()">
+                                <input type="checkbox" id="inputTema">
                                 <span class="theme-switch-slider"></span>
                             </label>
                             <span class="theme-switch-label">
@@ -100,7 +100,7 @@
                         <div class="password-wrapper">
                             <input type="password" class="form-input" id="inputSenhaAtual" required
                                 placeholder="Digite sua senha atual">
-                            <button type="button" class="password-toggle" onclick="togglePassword('inputSenhaAtual', this)">
+                            <button type="button" class="password-toggle">
                                 <span class="eye-icon">👁</span>
                             </button>
                         </div>
@@ -110,7 +110,7 @@
                         <div class="password-wrapper">
                             <input type="password" class="form-input" id="inputSenhaNova" required
                                 minlength="8" placeholder="Mínimo 8 caracteres, maiúscula, minúscula e número">
-                            <button type="button" class="password-toggle" onclick="togglePassword('inputSenhaNova', this)">
+                            <button type="button" class="password-toggle">
                                 <span class="eye-icon">👁</span>
                             </button>
                         </div>
@@ -120,7 +120,7 @@
                         <div class="password-wrapper">
                             <input type="password" class="form-input" id="inputConfirmarSenha" required
                                 minlength="8" placeholder="Repita a nova senha">
-                            <button type="button" class="password-toggle" onclick="togglePassword('inputConfirmarSenha', this)">
+                            <button type="button" class="password-toggle">
                                 <span class="eye-icon">👁</span>
                             </button>
                         </div>

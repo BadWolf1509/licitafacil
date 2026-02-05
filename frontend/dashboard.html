@@ -27,7 +27,7 @@
             <a href="analises.html">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
             <a href="perfil.html">Perfil</a>
-            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
+            <a href="#" class="nav-logout">Sair</a>
         </nav>
     </header>
 
@@ -59,14 +59,14 @@
         <!-- Ações rápidas -->
         <h2 class="mb-2">Ações Rápidas</h2>
         <div class="dashboard-grid mb-3">
-            <div class="card action-card" onclick="abrirModalAtestado()">
+            <div class="card action-card" id="actionCadastrarAtestado" role="button" tabindex="0" aria-label="Cadastrar Atestado">
                 <div class="action-icon">📄</div>
                 <div class="action-content">
                     <h3>Cadastrar Atestado</h3>
                     <p>Adicione um novo atestado de capacidade técnica</p>
                 </div>
             </div>
-            <div class="card action-card" onclick="window.location.href='analises.html'">
+            <div class="card action-card" id="actionNovaAnalise" role="button" tabindex="0" aria-label="Nova Análise">
                 <div class="action-icon">🔍</div>
                 <div class="action-content">
                     <h3>Nova Análise</h3>
@@ -92,7 +92,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Cadastrar Atestado</h2>
-                <button class="modal-close" onclick="fecharModal('modalAtestado')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
             <form id="formAtestado">
                 <div class="form-group">
@@ -123,7 +123,7 @@
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary" style="flex: 1;">Cadastrar</button>
-                    <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
                 </div>
             </form>
         </div>

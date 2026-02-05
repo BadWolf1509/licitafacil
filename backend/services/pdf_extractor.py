@@ -7,6 +7,9 @@ from exceptions import PDFError
 import pdfplumber
 import fitz  # PyMuPDF
 from typing import List, Dict, Any
+from logging_config import get_logger
+
+logger = get_logger('services.pdf_extractor')
 
 
 class PDFExtractor:
@@ -27,16 +30,20 @@ class PDFExtractor:
             Texto extraído do PDF
         """
         text_parts = []
+        logger.info(f"Extraindo texto de: {file_path}")
 
         try:
             with pdfplumber.open(file_path) as pdf:
+                logger.debug(f"PDF aberto: {len(pdf.pages)} paginas")
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
                         text_parts.append(page_text)
         except Exception as e:
+            logger.error(f"Erro PDF: {e}", exc_info=True)
             raise PDFError("extrair texto", str(e))
 
+        logger.info(f"Texto extraido: {len(text_parts)} paginas com conteudo")
         return "\n\n".join(text_parts)
 
     def extract_tables(
@@ -54,9 +61,11 @@ class PDFExtractor:
             Lista de tabelas, onde cada tabela é uma lista de linhas
         """
         all_tables: List[Any] = []
+        logger.info(f"Extraindo tabelas de: {file_path}")
 
         try:
             with pdfplumber.open(file_path) as pdf:
+                logger.debug(f"PDF aberto: {len(pdf.pages)} paginas")
                 for page_index, page in enumerate(pdf.pages, start=1):
                     tables = page.extract_tables()
                     if tables:
@@ -81,8 +90,10 @@ class PDFExtractor:
                                 else:
                                     all_tables.append(cleaned_table)
         except Exception as e:
+            logger.error(f"Erro PDF: {e}", exc_info=True)
             raise PDFError("extrair tabelas", str(e))
 
+        logger.info(f"Tabelas extraidas: {len(all_tables)} tabelas encontradas")
         return all_tables
 
     def extract_all(self, file_path: str) -> Dict[str, Any]:
@@ -103,10 +114,12 @@ class PDFExtractor:
             "precisa_ocr": False
         }
 
+        logger.info(f"Processando PDF completo: {file_path}")
         try:
             with pdfplumber.open(file_path) as pdf:
                 pages = list(pdf.pages)
                 result["paginas"] = len(pages)
+                logger.debug(f"PDF aberto: {len(pages)} paginas")
 
                 text_parts = []
                 all_tables = []
@@ -138,8 +151,10 @@ class PDFExtractor:
                 result["precisa_ocr"] = not result["tem_texto"]
 
         except Exception as e:
+            logger.error(f"Erro PDF: {e}", exc_info=True)
             raise PDFError("processar", str(e))
 
+        logger.info(f"PDF processado: {result['paginas']} pags, {len(result['tabelas'])} tabelas, tem_texto={result['tem_texto']}")
         return result
 
     def pdf_to_images(self, file_path: str, dpi: int = 200) -> List[bytes]:
@@ -156,17 +171,21 @@ class PDFExtractor:
         images = []
         zoom = dpi / 72  # 72 é o DPI padrão do PDF
         matrix = fitz.Matrix(zoom, zoom)
+        logger.info(f"Convertendo PDF para imagens (DPI={dpi}): {file_path}")
 
         try:
             doc = fitz.open(file_path)
+            logger.debug(f"PDF aberto: {len(doc)} paginas")
             for page in doc:
                 pix = page.get_pixmap(matrix=matrix)
                 img_bytes = pix.tobytes("png")
                 images.append(img_bytes)
             doc.close()
         except Exception as e:
+            logger.error(f"Erro PDF: {e}", exc_info=True)
             raise PDFError("converter para imagens", str(e))
 
+        logger.info(f"Imagens geradas: {len(images)} paginas")
         return images
 
 

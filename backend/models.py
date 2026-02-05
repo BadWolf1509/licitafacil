@@ -30,7 +30,7 @@ class Usuario(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    approved_by: Mapped[Optional[int]] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+    approved_by: Mapped[Optional[int]] = mapped_column(ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True)
 
     # Relacionamentos
     atestados: Mapped[List["Atestado"]] = relationship("Atestado", back_populates="usuario")
@@ -49,11 +49,15 @@ class Usuario(Base):
 
 
 class Atestado(Base):
-    """Modelo de atestado de capacidade tecnica."""
+    """Modelo de atestado de capacidade tecnica.
+
+    Nota: Atestados e Analises usam hard-delete por design (conformidade LGPD).
+    Usuarios usam soft-delete (is_active) para manter historico de aprovacao.
+    """
     __tablename__ = "atestados"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
 
     descricao_servico: Mapped[str] = mapped_column(Text, nullable=False)
     quantidade: Mapped[Optional[Decimal]] = mapped_column(Numeric(15, 4), nullable=True)
@@ -85,7 +89,7 @@ class Analise(Base):
     __tablename__ = "analises"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True)
 
     nome_licitacao: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     arquivo_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
@@ -135,9 +139,10 @@ class ProcessingJobModel(Base):
 
     pipeline: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
-    # Índice composto para queries de jobs por usuário e status
+    # Índices compostos para queries de jobs por usuário e status
     __table_args__ = (
         Index('ix_jobs_user_status', 'user_id', 'status'),
+        Index('ix_jobs_user_created', 'user_id', 'created_at'),
     )
 
 

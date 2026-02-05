@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         (!path.includes('.html') && path.endsWith('/'));
 
     if (isLoginPage && document.getElementById('loginForm')) {
+        // Configurar password toggles via event delegation
+        setupPasswordToggles();
+
         // Verificar se já está logado
         await checkAuth();
 
@@ -241,7 +244,7 @@ function setupLoginForm() {
                 ui.showAlert('Login realizado com sucesso!', 'success');
                 setTimeout(() => {
                     window.location.href = 'dashboard.html';
-                }, 1000);
+                }, CONFIG.TIMEOUTS.REDIRECT_DELAY);
             } else {
                 ui.showAlert('Seu cadastro está aguardando aprovação do administrador.', 'warning');
                 await logout(false);
@@ -401,6 +404,19 @@ async function logout(redirect = true) {
     if (redirect) {
         window.location.href = 'index.html';
     }
+}
+
+/**
+ * Configura password toggle buttons via event delegation (pagina de login)
+ */
+function setupPasswordToggles() {
+    document.querySelectorAll('.password-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const wrapper = btn.closest('.password-wrapper');
+            const input = wrapper ? wrapper.querySelector('input') : null;
+            if (input) togglePassword(input.id, btn);
+        });
+    });
 }
 
 /**

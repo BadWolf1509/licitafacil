@@ -18,7 +18,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base
-from models import Usuario, Atestado, Analise
+from models import Usuario, Atestado, Analise, ProcessingJobModel, AuditLog
 
 
 # === Configuração do Banco de Dados de Teste ===
@@ -48,9 +48,11 @@ def db_session(test_engine) -> Generator[Session, None, None]:
     finally:
         session.rollback()
         # Limpar dados de teste
-        session.execute(Usuario.__table__.delete())
-        session.execute(Atestado.__table__.delete())
+        session.execute(AuditLog.__table__.delete())
+        session.execute(ProcessingJobModel.__table__.delete())
         session.execute(Analise.__table__.delete())
+        session.execute(Atestado.__table__.delete())
+        session.execute(Usuario.__table__.delete())
         session.commit()
         session.close()
 

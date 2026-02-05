@@ -20,12 +20,12 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
 
     return `
         <div class="relatorio-header">
-            <h3>${atestado.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
+            <h3>${Sanitize.escapeHtml(atestado.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
             <div class="relatorio-info">
                 ${atestado.contratante ? `
                     <div class="relatorio-info-item">
                         <span class="relatorio-info-label">Contratante</span>
-                        <span class="relatorio-info-value">${atestado.contratante}</span>
+                        <span class="relatorio-info-value">${Sanitize.escapeHtml(atestado.contratante)}</span>
                     </div>
                 ` : ''}
                 ${atestado.data_emissao ? `
@@ -170,7 +170,7 @@ export function gerarDetalhesServico(servico, formatarDataFn = formatarDataSemHo
                     return `
                         <tr class="clickable-row" onclick="AtestadosModule.verAtestado(${a.id})">
                             <td>${i + 1}</td>
-                            <td>${a.contratante}</td>
+                            <td>${Sanitize.escapeHtml(a.contratante || '')}</td>
                             <td>${a.data_emissao ? formatarDataFn(a.data_emissao) : 'N/A'}</td>
                             <td class="numero">${formatarNumero(a.quantidade)}</td>
                             <td class="numero">${percentual.toFixed(1)}%</td>

@@ -247,6 +247,25 @@ class TextSectionConfig:
     DUP_RATIO_MAX: ClassVar[float] = env_float("ATTESTADO_TEXT_SECTION_DUP_RATIO_MAX", 0.35)
 
 
+@dataclass(frozen=True)
+class PostprocessConfig:
+    """
+    Configuracoes de pos-processamento de servicos extraidos.
+
+    Attributes:
+        MIN_ITEMS_WITH_CODE: Minimo de itens com codigo para filtrar itens sem codigo.
+        DESC_REPLACE_SIMILARITY: Similaridade abaixo da qual descricao candidata substitui atual.
+        MIN_DESC_LEN_FOR_REPLACE: Comprimento minimo de descricao candidata para substituicao.
+        QTY_MATCH_TOLERANCE: Tolerancia percentual para match de quantidade (0-1).
+        MATCH_SCORE_BOOST: Incremento de score quando unidade ou quantidade conferem.
+    """
+    MIN_ITEMS_WITH_CODE: ClassVar[int] = env_int("ATTESTADO_PP_MIN_ITEMS_WITH_CODE", 5)
+    DESC_REPLACE_SIMILARITY: ClassVar[float] = env_float("ATTESTADO_PP_DESC_REPLACE_SIM", 0.3)
+    MIN_DESC_LEN_FOR_REPLACE: ClassVar[int] = env_int("ATTESTADO_PP_MIN_DESC_LEN_REPLACE", 20)
+    QTY_MATCH_TOLERANCE: ClassVar[float] = env_float("ATTESTADO_PP_QTY_MATCH_TOLERANCE", 0.05)
+    MATCH_SCORE_BOOST: ClassVar[float] = env_float("ATTESTADO_PP_MATCH_SCORE_BOOST", 0.1)
+
+
 class AtestadoProcessingConfig:
     """
     Configurações centralizadas para processamento de atestados.
@@ -270,6 +289,7 @@ class AtestadoProcessingConfig:
     vision = VisionConfig
     restart = RestartConfig
     text_section = TextSectionConfig
+    postprocess = PostprocessConfig
 
     # === Acesso direto para compatibilidade (legado) ===
     # OCR e Layout
@@ -335,3 +355,9 @@ class AtestadoProcessingConfig:
     TEXT_SECTION_TABLE_CONFIDENCE_MIN = TextSectionConfig.TABLE_CONFIDENCE_MIN
     TEXT_SECTION_QTY_RATIO_MIN = TextSectionConfig.QTY_RATIO_MIN
     TEXT_SECTION_DUP_RATIO_MAX = TextSectionConfig.DUP_RATIO_MAX
+    # Pos-processamento
+    PP_MIN_ITEMS_WITH_CODE = PostprocessConfig.MIN_ITEMS_WITH_CODE
+    PP_DESC_REPLACE_SIMILARITY = PostprocessConfig.DESC_REPLACE_SIMILARITY
+    PP_MIN_DESC_LEN_FOR_REPLACE = PostprocessConfig.MIN_DESC_LEN_FOR_REPLACE
+    PP_QTY_MATCH_TOLERANCE = PostprocessConfig.QTY_MATCH_TOLERANCE
+    PP_MATCH_SCORE_BOOST = PostprocessConfig.MATCH_SCORE_BOOST

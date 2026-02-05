@@ -54,6 +54,7 @@ const AtestadosModule = {
 
     // Inicializacao
     init() {
+        this.setupEventDelegation();
         this.carregarAtestados();
         this.carregarJobsEmProcessamento();
         this.setupUpload();
@@ -61,6 +62,35 @@ const AtestadosModule = {
         this.startJobsRefresh();
         this.startJobsRenderer();
         this.startCleanupInterval();
+    },
+
+    setupEventDelegation() {
+        const container = document.getElementById('listaAtestados');
+        if (container) {
+            container.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-action]');
+                if (!btn) return;
+                const action = btn.dataset.action;
+                const id = parseInt(btn.dataset.id || btn.dataset.atestadoId, 10);
+                const index = btn.dataset.index !== undefined ? parseInt(btn.dataset.index, 10) : null;
+                switch (action) {
+                    case 'ver-resultado': this.verResultadoConsolidado(id); break;
+                    case 'adicionar-servico': this.adicionarServicoItem(id); break;
+                    case 'editar-atestado': this.editarAtestado(id); break;
+                    case 'excluir-atestado': this.excluirAtestado(id); break;
+                    case 'editar-servico': this.editarServicoItem(id, index); break;
+                    case 'excluir-servico': this.excluirServicoItem(id, index); break;
+                    case 'toggle-servicos': this.toggleServicos(btn, id); break;
+                }
+            });
+            container.addEventListener('input', (e) => {
+                const input = e.target.closest('[data-action="filtrar-servicos"]');
+                if (input) {
+                    const atestadoId = parseInt(input.dataset.atestadoId, 10);
+                    this.filtrarServicosAtestado(atestadoId, input.value);
+                }
+            });
+        }
     },
 
     // Re-exportar funcoes de formatacao
@@ -164,7 +194,7 @@ const AtestadosModule = {
     },
 
     startCleanupInterval() {
-        setInterval(() => this.cleanupOrphanedResources(), 30000);
+        setInterval(() => this.cleanupOrphanedResources(), CONFIG.TIMEOUTS.CLEANUP_INTERVAL);
     },
 
     markJobCompleted(job) {
@@ -173,7 +203,7 @@ const AtestadosModule = {
             setTimeout(() => {
                 state.recentlyCompletedPaths.delete(job.file_path);
                 this.carregarAtestados();
-            }, 8000);
+            }, CONFIG.TIMEOUTS.COMPLETION_HIGHLIGHT);
         }
     },
 
@@ -258,7 +288,7 @@ const AtestadosModule = {
             }
         };
 
-        const timerId = setInterval(poll, 3000);
+        const timerId = setInterval(poll, CONFIG.TIMEOUTS.POLLING_INTERVAL);
         state.jobTimers.set(jobId, { type: 'polling', timerId });
         await poll();
     },
@@ -345,7 +375,7 @@ const AtestadosModule = {
             if (hasActiveJobs) {
                 this.carregarJobsEmProcessamento();
             }
-        }, 10000);
+        }, CONFIG.TIMEOUTS.JOBS_REFRESH);
     },
 
     startJobsRenderer() {
@@ -366,7 +396,7 @@ const AtestadosModule = {
                 });
                 this.scheduleRender();
             }
-        }, 5000);
+        }, CONFIG.TIMEOUTS.RENDER_INTERVAL);
     },
 
     // === CRUD ATESTADOS ===
@@ -427,8 +457,8 @@ const AtestadosModule = {
                      data-search="${searchText}">
                     <div class="atestado-card">
                         <div class="atestado-info">
-                            <h3>${a.descricao_servico || 'Atestado de Capacidade Tecnica'}</h3>
-                            ${a.contratante ? `<p class="text-muted">Contratante: ${a.contratante}</p>` : ''}
+                            <h3>${Sanitize.escapeHtml(a.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
+                            ${a.contratante ? `<p class="text-muted">Contratante: ${Sanitize.escapeHtml(a.contratante)}</p>` : ''}
                             ${a.data_emissao ? `<p class="text-muted">Emitido em: ${formatarDataSemHora(a.data_emissao)}</p>` : ''}
                             ${a.servicos_json && a.servicos_json.length > 0 ?
                                 `<span class="badge">${a.servicos_json.length} servico(s) identificado(s)</span>` :
@@ -436,10 +466,10 @@ const AtestadosModule = {
                             }
                         </div>
                         <div class="atestado-actions">
-                            <button class="btn btn-primary btn-sm" onclick="AtestadosModule.verResultadoConsolidado(${a.id})">Resultado Consolidado</button>
-                            <button class="btn btn-outline btn-sm" onclick="AtestadosModule.adicionarServicoItem(${a.id})">+ Item</button>
-                            <button class="btn btn-outline btn-sm" onclick="AtestadosModule.editarAtestado(${a.id})">Editar</button>
-                            <button class="btn btn-danger btn-sm" onclick="AtestadosModule.excluirAtestado(${a.id})">Excluir</button>
+                            <button class="btn btn-primary btn-sm" data-action="ver-resultado" data-id="${a.id}">Resultado Consolidado</button>
+                            <button class="btn btn-outline btn-sm" data-action="adicionar-servico" data-id="${a.id}">+ Item</button>
+                            <button class="btn btn-outline btn-sm" data-action="editar-atestado" data-id="${a.id}">Editar</button>
+                            <button class="btn btn-danger btn-sm" data-action="excluir-atestado" data-id="${a.id}">Excluir</button>
                         </div>
                     </div>
                     ${this.renderizarServicosPreview(a)}
@@ -740,8 +770,8 @@ const AtestadosModule = {
                     <span class="servico-descricao">${itemHtml}${parsed.descricao}</span>
                     <span class="servico-quantidade">${formatarNumero(s.quantidade)} ${s.unidade}</span>
                     <div class="servico-actions">
-                        <button class="servico-btn edit" onclick="AtestadosModule.editarServicoItem(${atestado.id}, ${originalIndex})" title="Editar item">&#9998;</button>
-                        <button class="servico-btn delete" onclick="AtestadosModule.excluirServicoItem(${atestado.id}, ${originalIndex})" title="Excluir item">&#10005;</button>
+                        <button class="servico-btn edit" data-action="editar-servico" data-atestado-id="${atestado.id}" data-index="${originalIndex}" title="Editar item">&#9998;</button>
+                        <button class="servico-btn delete" data-action="excluir-servico" data-atestado-id="${atestado.id}" data-index="${originalIndex}" title="Excluir item">&#10005;</button>
                     </div>
                 </div>
             `;
@@ -750,7 +780,7 @@ const AtestadosModule = {
         const totalServicos = atestado.servicos_json.length;
         return `
             <div style="margin-top: var(--spacing-md);">
-                <button class="servicos-toggle" onclick="AtestadosModule.toggleServicos(this, ${atestado.id})">
+                <button class="servicos-toggle" data-action="toggle-servicos" data-atestado-id="${atestado.id}">
                     <span class="chevron">${isOpen ? '&#9660;' : '&#9654;'}</span>
                     Ver detalhes (<span id="servicosCount-${atestado.id}">${totalServicos}</span> servico(s))
                 </button>
@@ -759,7 +789,7 @@ const AtestadosModule = {
                         <input type="text"
                                class="form-input form-input-sm"
                                placeholder="Filtrar servicos..."
-                               oninput="AtestadosModule.filtrarServicosAtestado(${atestado.id}, this.value)"
+                               data-action="filtrar-servicos" data-atestado-id="${atestado.id}"
                                data-total="${totalServicos}">
                     </div>
                     <div class="servicos-container" id="servicosContainer-${atestado.id}">
@@ -886,7 +916,7 @@ const AtestadosModule = {
             content.innerHTML = gerarRelatorioGeral(state.relatorioConsolidadoCache);
 
         } catch (error) {
-            content.innerHTML = `<div class="alert alert-danger">Erro ao carregar atestados: ${error.message}</div>`;
+            content.innerHTML = `<div class="alert alert-danger">Erro ao carregar atestados: ${Sanitize.escapeHtml(error.message)}</div>`;
         }
     },
 

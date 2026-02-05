@@ -148,6 +148,45 @@ MANDATORY_PATTERNS = [
     "ANTICHAMA",
 ]
 
+# Grupos de qualificadores mutuamente exclusivos.
+# Se a exigência contém um termo de um grupo, o serviço deve conter
+# o MESMO termo (ou nenhum do grupo) para ser considerado compatível.
+EXCLUSIVE_QUALIFIER_GROUPS: List[Set[str]] = [
+    {"HORIZONTAL", "VERTICAL"},
+    {"INTERNO", "INTERNA", "EXTERNA", "EXTERNO"},
+    {"SUPERIOR", "INFERIOR"},
+    {"VEDACAO", "ESTRUTURAL"},
+    {"SIMPLES", "ARMADO", "PROTENDIDO"},
+    {"MACICA", "NERVURADA", "TRELICADA"},
+    {"MANUAL", "MECANIZADA", "MECANIZADO"},
+    {"SOLDAVEL", "ROSCAVEL"},
+    {"ESCAVACAO", "ATERRO"},
+    {"FLEXIVEL", "RIGIDO"},
+    {"PVA", "ACRILICO"},
+]
+
+
+def _check_exclusive_qualifiers(req_keywords: Set[str], serv_keywords: Set[str]) -> bool:
+    """
+    Verifica se o serviço não contradiz a exigência em qualificadores exclusivos.
+
+    Se a exigência menciona VERTICAL e o serviço menciona HORIZONTAL,
+    são serviços incompatíveis e o match deve ser rejeitado.
+
+    Returns:
+        True se compatível, False se contraditório.
+    """
+    for group in EXCLUSIVE_QUALIFIER_GROUPS:
+        req_in_group = req_keywords & group
+        serv_in_group = serv_keywords & group
+        # Se a exigência menciona múltiplos qualificadores do grupo
+        # (ex: "flexivel e/ou rigido"), qualquer um é aceitável.
+        if len(req_in_group) > 1:
+            continue
+        if req_in_group and serv_in_group and req_in_group != serv_in_group:
+            return False
+    return True
+
 
 def _detect_activity(keywords: Set[str]) -> Optional[str]:
     for name, tokens in ACTIVITY_TOKENS:
@@ -198,6 +237,7 @@ class MatchingService:
                 "common": 0,
                 "mandatory": 0,
                 "activity": 0,
+                "qualifier": 0,
                 "similarity": 0,
             }
 
@@ -233,6 +273,10 @@ class MatchingService:
                         rejected["activity"] += 1
                         continue
 
+                    if not _check_exclusive_qualifiers(req_keywords, serv.keywords):
+                        rejected["qualifier"] += 1
+                        continue
+
                     sim = _keyword_similarity(req_keywords, serv.keywords)
                     if sim < SIMILARITY_THRESHOLD:
                         rejected["similarity"] += 1
@@ -259,9 +303,11 @@ class MatchingService:
                         "unidade": req_unit or best_item_unit or req_unit_raw,
                         "percentual_cobertura": (at_qty / req_qty * 100) if req_qty > 0 else 0.0,
                         "itens": at_items,
+                        "best_similarity": best_score,
                     })
 
-            matches.sort(key=lambda m: m["quantidade"], reverse=True)
+            # Ranking: similaridade primeiro, quantidade como desempate
+            matches.sort(key=lambda m: (m["best_similarity"], m["quantidade"]), reverse=True)
 
             if allow_sum:
                 recomendados: List[Dict[str, Any]] = []

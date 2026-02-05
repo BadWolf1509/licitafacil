@@ -7,6 +7,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarPerfil();
     setupFormPerfil();
     setupFormSenha();
+
+    // Theme switch listener (substitui onchange inline)
+    const inputTema = document.getElementById('inputTema');
+    if (inputTema) inputTema.addEventListener('change', toggleThemeSwitch);
 });
 
 /**

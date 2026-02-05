@@ -212,6 +212,7 @@ class JobRepository:
             ).first()
 
             if not model:
+                logger.warning(f"update_status: Job {job_id} nao encontrado, ignorando update para {status.value}")
                 return
 
             model.status = status.value
@@ -255,6 +256,7 @@ class JobRepository:
             ).first()
 
             if not model:
+                logger.warning(f"update_progress: Job {job_id} nao encontrado, ignorando update de progresso")
                 return
 
             model.progress_current = current
@@ -282,6 +284,7 @@ class JobRepository:
             ).first()
 
             if not model:
+                logger.warning(f"increment_attempts: Job {job_id} nao encontrado")
                 return 0
 
             model.attempts = (model.attempts or 0) + 1

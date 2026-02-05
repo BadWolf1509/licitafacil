@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r ../requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest tests/ -x -q --ignore=tests/integration --cov=. --cov-report=term-missing --cov-config=.coveragerc --cov-fail-under=50
+
+      - name: Type check
+        run: python -m mypy . --ignore-missing-imports
+        continue-on-error: true

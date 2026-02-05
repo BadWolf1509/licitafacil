@@ -29,6 +29,8 @@ const AtestadosModule = {
     },
 
     // === FORMATACAO E UTILIDADES ===
+    // Nota: estas funcoes tambem existem em atestados/formatters.js (ES module).
+    // Mantidas aqui para o build non-module. Fonte canonica: formatters.js
 
     formatarTempo(ms) {
         const total = Math.max(0, Math.floor(ms / 1000));
@@ -481,7 +483,7 @@ const AtestadosModule = {
     },
 
     startCleanupInterval() {
-        setInterval(() => this.cleanupOrphanedResources(), 30000);
+        setInterval(() => this.cleanupOrphanedResources(), CONFIG.TIMEOUTS.CLEANUP_INTERVAL);
     },
 
     markJobCompleted(job) {
@@ -539,7 +541,7 @@ const AtestadosModule = {
                 }
             }
         };
-        this.jobTimers.set(jobId, setInterval(poll, 3000));
+        this.jobTimers.set(jobId, setInterval(poll, CONFIG.TIMEOUTS.POLLING_INTERVAL));
         await poll();
     },
 
@@ -611,7 +613,7 @@ const AtestadosModule = {
             if (hasActiveJobs) {
                 this.carregarJobsEmProcessamento();
             }
-        }, 10000);
+        }, CONFIG.TIMEOUTS.RENDER_INTERVAL * 2);
     },
 
     startJobsRenderer() {
@@ -632,7 +634,7 @@ const AtestadosModule = {
                 });
                 this.scheduleRender();
             }
-        }, 5000);
+        }, CONFIG.TIMEOUTS.RENDER_INTERVAL);
     },
 
     // === CRUD ATESTADOS ===
@@ -1390,7 +1392,7 @@ const AtestadosModule = {
             content.innerHTML = this.gerarRelatorioGeral(this.relatorioConsolidadoCache);
 
         } catch (error) {
-            content.innerHTML = `<div class="alert alert-danger">Erro ao carregar atestados: ${error.message}</div>`;
+            content.innerHTML = `<div class="alert alert-danger">Erro ao carregar atestados: ${Sanitize.escapeHtml(error.message)}</div>`;
         }
     },
 

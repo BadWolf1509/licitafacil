@@ -246,5 +246,5 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Aguardar um pouco para o auth config carregar
-    setTimeout(checkAndInit, 500);
+    setTimeout(checkAndInit, CONFIG.TIMEOUTS.REALTIME_RECONNECT);
 });

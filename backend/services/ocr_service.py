@@ -228,7 +228,8 @@ class OCRService:
             texts = [result[1] for result in results]
             return " ".join(texts)
         except Exception as e:
-            raise OCRError(str(e))
+            logger.error(f"Erro OCR: {e}", exc_info=True)
+            raise OCRError(str(e)) from e
 
     def _extract_with_tesseract(self, image_array: np.ndarray) -> Optional[str]:
         """Tenta extrair texto usando Tesseract (mais leve)."""
@@ -282,7 +283,8 @@ class OCRService:
             texts = [result[1] for result in results]
             return " ".join(texts)
         except Exception as e:
-            raise OCRError(str(e))
+            logger.error(f"Erro OCR: {e}", exc_info=True)
+            raise OCRError(str(e)) from e
 
     def extract_words_from_bytes(self, image_bytes: bytes, min_confidence: float = 0.3, use_binarization: bool = False) -> List[Dict[str, Any]]:
         """
@@ -325,7 +327,8 @@ class OCRService:
                 })
             return words
         except Exception as e:
-            raise OCRError(str(e))
+            logger.error(f"Erro OCR: {e}", exc_info=True)
+            raise OCRError(str(e)) from e
 
 
 # Instância singleton para uso global

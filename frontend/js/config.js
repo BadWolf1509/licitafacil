@@ -29,7 +29,21 @@ const CONFIG = {
     // Supabase (carregado dinamicamente do backend)
     SUPABASE_URL: null,
     SUPABASE_ANON_KEY: null,
-    SUPABASE_ENABLED: false
+    SUPABASE_ENABLED: false,
+
+    // Constantes de tempo (ms) centralizadas
+    TIMEOUTS: {
+        TOAST_DURATION: 5000,
+        REDIRECT_DELAY: 1000,
+        CLEANUP_INTERVAL: 30000,
+        POLLING_INTERVAL: 3000,
+        RENDER_INTERVAL: 5000,
+        DEBOUNCE_INPUT: 500,
+        REALTIME_RECONNECT: 500,
+        INIT_DELAY: 2000,
+        COMPLETION_HIGHLIGHT: 8000,
+        JOBS_REFRESH: 10000,
+    }
 };
 
 // Instância global do Supabase (inicializada após carregar config)
@@ -130,6 +144,12 @@ const api = {
      * @returns {Promise<object>} - Resposta da API
      */
     async request(endpoint, options = {}) {
+        // Verificar conectividade antes de tentar requisicao
+        if (!navigator.onLine) {
+            ui.showAlert('Sem conexao com a internet. Verifique sua conexao.', 'error');
+            throw new Error('Sem conexao com a internet');
+        }
+
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
 
         // Obter token (Supabase ou legacy)
@@ -330,8 +350,8 @@ const ui = {
 
         container.appendChild(alert);
 
-        // Remover automaticamente após 5 segundos
-        setTimeout(() => alert.remove(), 5000);
+        // Remover automaticamente
+        setTimeout(() => alert.remove(), CONFIG.TIMEOUTS.TOAST_DURATION);
     },
 
     /**
@@ -383,3 +403,7 @@ const theme = {
 
 // Inicializar tema
 theme.init();
+
+// Deteccao de conectividade
+window.addEventListener('online', () => ui.showAlert('Conexao restaurada!', 'success'));
+window.addEventListener('offline', () => ui.showAlert('Conexao perdida. Algumas funcionalidades podem nao funcionar.', 'warning'));

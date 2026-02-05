@@ -27,7 +27,7 @@
             <a href="analises.html">Análises</a>
             <a href="admin.html" id="adminLink" class="hidden">Admin</a>
             <a href="perfil.html">Perfil</a>
-            <a href="#" class="nav-logout" onclick="logout(); return false;">Sair</a>
+            <a href="#" class="nav-logout">Sair</a>
         </nav>
     </header>
 
@@ -39,10 +39,10 @@
         <div class="d-flex justify-between align-center mb-3">
             <h1>Meus Atestados</h1>
             <div class="d-flex gap-2">
-                <button class="btn btn-outline" onclick="abrirRelatorioGeral()" id="btnRelatorioGeral" style="display: none;">
+                <button class="btn btn-outline" id="btnRelatorioGeral" style="display: none;">
                     Relatorio Geral
                 </button>
-                <button class="btn btn-primary" onclick="abrirModalAtestado()">+ Novo Atestado</button>
+                <button class="btn btn-primary" id="btnNovoAtestado">+ Novo Atestado</button>
             </div>
         </div>
 
@@ -52,7 +52,7 @@
                    id="filtroAtestadosInput"
                    class="form-input"
                    placeholder="Filtrar atestados por descricao, contratante..."
-                   oninput="AtestadosModule.filtrarAtestados(this.value)">
+                   >
             <span class="filtro-contador" id="atestadosFiltradosCount"></span>
         </div>
 
@@ -70,7 +70,7 @@
         <div class="modal-content modal-resultado">
             <div class="modal-header">
                 <h2>Resultado Consolidado</h2>
-                <button class="modal-close" onclick="fecharModal('modalResultado')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
             <div id="resultadoContent">
                 Carregando...
@@ -83,7 +83,7 @@
         <div class="modal-content modal-relatorio-geral">
             <div class="modal-header">
                 <h2>Relatorio Consolidado - Todos os Atestados</h2>
-                <button class="modal-close" onclick="fecharModal('modalRelatorioGeral')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
             <div id="relatorioGeralContent">
                 Carregando...
@@ -96,7 +96,7 @@
         <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h2>Detalhes do Servico</h2>
-                <button class="modal-close" onclick="fecharModal('modalDetalhesServico')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
             <div id="detalhesServicoContent">
                 Carregando...
@@ -109,15 +109,15 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalAtestadoTitle">Novo Atestado</h2>
-                <button class="modal-close" onclick="fecharModal('modalAtestado')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
 
             <!-- Tabs do Modal -->
             <div class="modal-tabs" id="modalAtestadoTabs">
-                <button class="modal-tab active" data-tab="upload" onclick="switchAtestadoTab('upload')">
+                <button class="modal-tab active" data-tab="upload">
                     📄 Upload de Arquivo
                 </button>
-                <button class="modal-tab" data-tab="manual" onclick="switchAtestadoTab('manual')">
+                <button class="modal-tab" data-tab="manual">
                     ✏️ Cadastro Manual
                 </button>
             </div>
@@ -155,7 +155,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar</button>
-                        <button type="button" class="btn btn-outline" onclick="fecharModal('modalAtestado')">Cancelar</button>
+                        <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -167,9 +167,9 @@
         <div class="modal-content modal-sm">
             <div class="modal-header">
                 <h2 id="modalServicoTitle">Editar Item de Servico</h2>
-                <button class="modal-close" onclick="fecharModal('modalEditarServico')">&times;</button>
+                <button class="modal-close">&times;</button>
             </div>
-            <form id="formEditarServico" onsubmit="salvarServicoItem(event)">
+            <form id="formEditarServico">
                 <input type="hidden" id="editServicoAtestadoId">
                 <input type="hidden" id="editServicoIndex">
                 <div class="form-group">
@@ -196,7 +196,7 @@
                 </div>
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar</button>
-                    <button type="button" class="btn btn-outline" onclick="fecharModal('modalEditarServico')">Cancelar</button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -211,18 +211,41 @@
     <script src="js/app.js"></script>
     <script src="js/atestados.js"></script>
     <script>
-        // Funcoes globais para compatibilidade com onclick no HTML
+        // Event listeners para botoes de pagina
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnRelatorio = document.getElementById('btnRelatorioGeral');
+            if (btnRelatorio) btnRelatorio.addEventListener('click', () => AtestadosModule.abrirRelatorioGeral());
+
+            const btnNovo = document.getElementById('btnNovoAtestado');
+            if (btnNovo) btnNovo.addEventListener('click', () => AtestadosModule.abrirModalAtestado());
+
+            const filtro = document.getElementById('filtroAtestadosInput');
+            if (filtro) filtro.addEventListener('input', (e) => AtestadosModule.filtrarAtestados(e.target.value));
+
+            const formEditar = document.getElementById('formEditarServico');
+            if (formEditar) formEditar.addEventListener('submit', (e) => AtestadosModule.salvarServicoItem(e));
+
+            // Tabs do modal de atestado
+            document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+                    document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(t => {
+                        t.classList.toggle('active', t.dataset.tab === tabName);
+                    });
+                    document.getElementById('tabUpload').classList.toggle('active', tabName === 'upload');
+                    document.getElementById('tabManual').classList.toggle('active', tabName === 'manual');
+                });
+            });
+        });
+
+        // Funcoes globais mantidas para compatibilidade com onclick em templates JS
         function abrirModalAtestado() { AtestadosModule.abrirModalAtestado(); }
         function abrirRelatorioGeral() { AtestadosModule.abrirRelatorioGeral(); }
         function salvarServicoItem(event) { AtestadosModule.salvarServicoItem(event); }
-
-        // Alternar tabs do modal de atestado
         function switchAtestadoTab(tabName) {
-            // Atualizar tabs
             document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(tab => {
                 tab.classList.toggle('active', tab.dataset.tab === tabName);
             });
-            // Atualizar conteudos
             document.getElementById('tabUpload').classList.toggle('active', tabName === 'upload');
             document.getElementById('tabManual').classList.toggle('active', tabName === 'manual');
         }
