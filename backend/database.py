@@ -12,6 +12,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
 import os
+import sys
 from dotenv import load_dotenv
 
 # Carregar .env do diretório raiz do projeto (um nível acima do backend)
@@ -20,22 +21,37 @@ load_dotenv(env_path)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-if not DATABASE_URL:
+# Em modo de teste (pytest), usar SQLite em memoria
+_TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes") or "pytest" in sys.modules
+
+if not DATABASE_URL and not _TESTING:
     raise ValueError(
         "DATABASE_URL não configurada. "
         "Configure com uma URL PostgreSQL do Supabase no arquivo .env"
     )
 
-if not DATABASE_URL.startswith("postgresql"):
+if DATABASE_URL and not DATABASE_URL.startswith("postgresql") and not _TESTING:
     raise ValueError(
         f"DATABASE_URL inválida: deve ser PostgreSQL. "
         f"Recebido: {DATABASE_URL[:20]}..."
     )
 
-# Detectar se está usando Supabase Pooler (porta 6543)
+# Fallback para SQLite em testes quando DATABASE_URL nao esta configurada
+if not DATABASE_URL and _TESTING:
+    DATABASE_URL = "sqlite:///./test_licitafacil.db"
+
+# Detectar tipo de banco
+_is_sqlite = DATABASE_URL.startswith("sqlite")
 _is_supabase_pooler = ":6543/" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
 
-if _is_supabase_pooler:
+if _is_sqlite:
+    # SQLite para testes locais
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        echo=False
+    )
+elif _is_supabase_pooler:
     # Supabase Pooler (transaction mode): NullPool obrigatório
     # para evitar double-pooling que causa problemas de commit/rollback
     engine = create_engine(
