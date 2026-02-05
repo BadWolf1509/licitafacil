@@ -5,8 +5,7 @@ Suporta GPT-4o Vision para análise direta de imagens.
 Inclui processamento paralelo opcional para melhor performance.
 """
 
-from typing import Dict, Any, List, Optional, Set
-import re
+from typing import Dict, Any, List
 
 from .pdf_extractor import pdf_extractor  # noqa: F401
 from .ocr_service import ocr_service  # noqa: F401
@@ -21,7 +20,6 @@ from .extraction import (
     # text_normalizer
     normalize_unit,
     normalize_desc_for_match,
-    extract_keywords,
     description_similarity,
     # table_processor
     parse_item_tuple,
@@ -33,6 +31,9 @@ from .extraction import (
     filter_summary_rows,
     # quality_assessor
     UNIT_TOKENS,
+    # item_utils
+    extract_item_code,
+    split_item_description,
 )
 from .edital_processor import edital_processor
 from .processing_helpers import (
@@ -190,124 +191,6 @@ class DocumentProcessor:
                 updated += 1
         return updated
 
-    def _backfill_quantities_from_text(self, servicos: list, texto: str) -> int:
-        """Preenche quantidades faltantes via texto extraído."""
-        return text_processor.backfill_quantities_from_text(servicos, texto)
-
-    def _extract_items_from_text_section(
-        self,
-        texto: str,
-        existing_keys: Optional[Set] = None
-    ) -> list:
-        """Extrai itens da seção de serviços via text_section."""
-        return text_processor.extract_items_from_text_section(texto, existing_keys)
-
-    def _item_qty_matches_code(self, item_code: str, qty: float) -> bool:
-        if not item_code or qty is None:
-            return False
-        digits = re.sub(r'\D', '', item_code)
-        if not digits:
-            return False
-        try:
-            return float(digits) == float(qty)
-        except (TypeError, ValueError):
-            return False
-
-    def _clear_item_code_quantities(self, servicos: list, min_ratio: float = 0.7, min_samples: int = 10) -> int:
-        if not servicos:
-            return 0
-        total = 0
-        matches = 0
-        for s in servicos:
-            item_code = helpers_normalize_item_code(s.get("item"))
-            qty = parse_quantity(s.get("quantidade"))
-            if not item_code or qty is None:
-                continue
-            total += 1
-            if self._item_qty_matches_code(item_code, qty):
-                matches += 1
-        ratio = (matches / total) if total else 0.0
-        if total < min_samples or ratio < min_ratio:
-            return 0
-
-        cleared = 0
-        for s in servicos:
-            item_code = helpers_normalize_item_code(s.get("item"))
-            qty = parse_quantity(s.get("quantidade"))
-            if item_code and qty is not None and self._item_qty_matches_code(item_code, qty):
-                s["quantidade"] = None
-                cleared += 1
-        if cleared:
-            logger.info(f"[QTY] Quantidades removidas por vazamento de coluna: {cleared} (ratio={ratio:.0%})")
-        return cleared
-
-    def _summarize_table_debug(self, debug: dict) -> dict:
-        if not isinstance(debug, dict):
-            return {}
-        summary = {}
-        for key in ("source", "tables", "pages", "pages_used", "error"):
-            if key in debug:
-                summary[key] = debug.get(key)
-        if "ocr_noise" in debug:
-            summary["ocr_noise"] = debug.get("ocr_noise")
-        return summary
-
-    def _calc_qty_ratio(self, servicos: list) -> float:
-        """Calcula a proporção de serviços com quantidade válida."""
-        if not servicos:
-            return 0.0
-        qty_count = sum(1 for s in servicos if parse_quantity(s.get("quantidade")) not in (None, 0))
-        return qty_count / len(servicos)
-
-    def _extract_item_code(self, desc: str) -> str:
-        """
-        Extrai código do item da descrição (ex: "001.03.01" de "001.03.01 MOBILIZAÇÃO").
-        Também reconhece formatos com prefixo AD- (legacy) e reinícios Sx-.
-        """
-        if not desc:
-            return ""
-
-        text = desc.strip()
-
-        # Primeiro, tentar extrair formato com prefixo Sx- (ex: S2-1.1)
-        restart_match = re.match(r'^(S\d+-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
-        if restart_match:
-            return restart_match.group(1).upper()
-
-        # Tentar extrair formato com prefixo AD- (legacy: AD-1.1, AD-1.1-A)
-        ad_match = re.match(r'^(AD-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
-        if ad_match:
-            return ad_match.group(1).upper()
-
-        # Formato numérico padrão (ex: 1.1, 10.4, 10.4-A)
-        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}(?:-[A-Z])?)\b', text)
-        if not match:
-            match = re.match(r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\b', text)
-
-        if match:
-            code = re.sub(r'[\s]+', '.', match.group(1))
-            code = re.sub(r'\.{2,}', '.', code).strip('.')
-            return code
-        return ""
-
-    def _split_item_description(self, desc: str) -> tuple[str, str]:
-        """
-        Separa o codigo do item da descricao, se presente.
-        """
-        if not desc:
-            return "", ""
-
-        code = self._extract_item_code(desc)
-        if not code:
-            return "", desc.strip()
-
-        cleaned = re.sub(
-            r"^(S\d+-)?(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*[-.]?\s*",
-            "",
-            desc
-        ).strip()
-        return code, cleaned or desc.strip()
-
     def _servico_match_key(self, servico: dict) -> str:
         desc = normalize_desc_for_match(servico.get("descricao") or "")
         unit = normalize_unit(servico.get("unidade") or "")
@@ -324,7 +207,7 @@ class DocumentProcessor:
         unit_tokens = UNIT_TOKENS
         candidates: Dict[str, Any] = {}
         for servico in servicos_table:
-            item = servico.get("item") or self._extract_item_code(servico.get("descricao") or "")
+            item = servico.get("item") or extract_item_code(servico.get("descricao") or "")
             if not item:
                 continue
             item_tuple = parse_item_tuple(item)
@@ -399,16 +282,6 @@ class DocumentProcessor:
 
         return servicos
 
-    def _is_short_description(self, desc: str) -> bool:
-        desc = (desc or '').strip()
-        if not desc:
-            return True
-        if len(desc) < 35:
-            return True
-        if len(desc.split()) < 4:
-            return True
-        return False
-
     def _postprocess_servicos(
         self,
         servicos: list,
@@ -467,7 +340,7 @@ class DocumentProcessor:
             # Normalizar item e descrição
             desc = servico.get("descricao", "")
             existing_item = servico.get("item")
-            item, clean_desc = self._split_item_description(desc)
+            item, clean_desc = split_item_description(desc)
             if not item and existing_item:
                 item = existing_item
             if item:
@@ -531,40 +404,6 @@ class DocumentProcessor:
         servicos = self._filter_items_without_code(servicos)
 
         return servicos
-
-    def _find_better_description(self, item: dict, candidates: list) -> str:
-        target_desc = (item.get('descricao') or '').strip()
-        target_unit = normalize_unit(item.get('unidade') or '')
-        try:
-            target_qty = float(item.get('quantidade') or 0)
-        except (TypeError, ValueError):
-            target_qty = 0
-        target_kw = extract_keywords(target_desc)
-
-        best_desc = None
-        best_len = len(target_desc)
-
-        for cand in candidates:
-            cand_desc = (cand.get('descricao') or '').strip()
-            if not cand_desc or len(cand_desc) <= best_len:
-                continue
-            cand_unit = normalize_unit(cand.get('unidade') or '')
-            if target_unit and cand_unit and cand_unit != target_unit:
-                continue
-            try:
-                cand_qty = float(cand.get('quantidade') or 0)
-            except (TypeError, ValueError):
-                cand_qty = 0
-            if target_qty and cand_qty and abs(target_qty - cand_qty) > 0.01:
-                continue
-            cand_kw = extract_keywords(cand_desc)
-            if target_kw and cand_kw and len(target_kw & cand_kw) == 0:
-                if not cand_desc.upper().startswith(target_desc.upper()):
-                    continue
-            best_desc = cand_desc
-            best_len = len(cand_desc)
-
-        return best_desc or ''
 
     def process_atestado(
         self,

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from dotenv import load_dotenv
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError as SAIntegrityError, OperationalError
 
@@ -13,9 +13,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from routers import auth, admin, atestados, analise, ai_status
 from services.processing_queue import processing_queue
+from services.metrics import get_metrics, get_metrics_content_type, set_app_info
 from middleware.rate_limit import RateLimitMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.csrf_protection import CSRFProtectionMiddleware
+from middleware.http_metrics import HTTPMetricsMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION, ENVIRONMENT
 from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
@@ -60,6 +62,10 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Aviso de configuracao: {warning.config_name}={warning.value}: {warning.message}")
 
     logger.info(f"Configuracao validada: {get_config_summary()}")
+
+    # Startup: inicializar metricas
+    set_app_info(version=API_VERSION, environment=ENVIRONMENT)
+    logger.info("Metricas Prometheus inicializadas")
 
     # Startup: iniciar fila de processamento
     await processing_queue.start()
@@ -107,6 +113,10 @@ if CSRF_PROTECTION_ENABLED:
 
 # 4. Compressao GZip (comprime respostas maiores que 1000 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# 5. Métricas HTTP (coleta métricas Prometheus para todas as requisições)
+app.add_middleware(HTTPMetricsMiddleware)
+logger.info("HTTP Metrics middleware habilitado")
 
 
 # Middleware para Correlation ID (request tracing)
@@ -362,6 +372,20 @@ def api_version():
         "prefix": API_PREFIX,
         "status": "stable"
     }
+
+
+@app.get("/metrics")
+def metrics():
+    """
+    Endpoint de metricas Prometheus.
+
+    Expoe metricas de processamento, fila e requisicoes HTTP
+    no formato compativel com Prometheus/Grafana.
+    """
+    return Response(
+        content=get_metrics(),
+        media_type=get_metrics_content_type()
+    )
 
 
 if __name__ == "__main__":

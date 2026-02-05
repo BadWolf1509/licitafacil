@@ -163,9 +163,10 @@ async function carregarDashboard() {
         const analises = analisesResp.items || [];
         document.getElementById('totalAnalises').textContent = analisesResp.total || analises.length;
 
-        // Contar licitações atendidas
+        // Contar licitações atendidas (todas as exigências devem ser atendidas)
         const atendidas = analises.filter(a =>
-            a.resultado_json?.some(r => r.status === 'atende')
+            a.resultado_json && a.resultado_json.length > 0 &&
+            a.resultado_json.every(r => r.status === 'atende')
         ).length;
         document.getElementById('licitacoesAtendidas').textContent = atendidas;
 
@@ -174,16 +175,29 @@ async function carregarDashboard() {
         if (analises.length === 0) {
             recentList.innerHTML = '<li class="recent-item text-muted">Nenhuma análise realizada ainda.</li>';
         } else {
-            recentList.innerHTML = analises.slice(0, 5).map(a => `
+            recentList.innerHTML = analises.slice(0, 5).map(a => {
+                let statusBadge = '';
+                if (a.resultado_json && a.resultado_json.length > 0) {
+                    const allMet = a.resultado_json.every(r => r.status === 'atende');
+                    const anyMet = a.resultado_json.some(r => r.status === 'atende');
+                    if (allMet) {
+                        statusBadge = '<span class="badge badge-success">Atende</span>';
+                    } else if (anyMet) {
+                        statusBadge = '<span class="badge badge-warning">Parcial</span>';
+                    } else {
+                        statusBadge = '<span class="badge badge-error">Não Atende</span>';
+                    }
+                }
+                return `
                 <li class="recent-item">
                     <div>
-                        <strong>${a.nome_licitacao}</strong>
+                        <strong>${a.nome_licitacao}</strong> ${statusBadge}
                         <br>
                         <small class="text-muted">${formatarData(a.created_at)}</small>
                     </div>
                     <a href="analises.html?id=${a.id}" class="btn btn-outline btn-sm">Ver</a>
-                </li>
-            `).join('');
+                </li>`;
+            }).join('');
         }
 
     } catch (error) {

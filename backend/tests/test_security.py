@@ -135,8 +135,8 @@ class TestSeedPasswordValidation:
 
         # Seed deve verificar ADMIN_PASSWORD
         assert "ADMIN_PASSWORD" in content
-        # Seed deve ter validação de tamanho mínimo
-        assert "< 8" in content or "len(admin_password)" in content
+        # Seed deve ter validação de complexidade (via validate_password)
+        assert "validate_password" in content
 
 
 class TestRateLimitingSecurity:

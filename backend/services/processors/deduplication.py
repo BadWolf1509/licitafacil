@@ -8,8 +8,6 @@ oferecendo múltiplas estratégias para remover duplicatas.
 from typing import Any, Dict, List, Set
 import logging
 
-import re
-
 from services.extraction import (
     normalize_description,
     normalize_unit,
@@ -18,6 +16,7 @@ from services.extraction import (
     extract_keywords,
     quantities_similar,
     description_similarity,
+    extract_item_code,
 )
 from config import AtestadoProcessingConfig as APC
 from services.processing_helpers import (
@@ -379,36 +378,7 @@ class ServiceDeduplicator:
         """Gera chave baseada apenas na descrição normalizada."""
         return normalize_desc_for_match(servico.get("descricao") or "")
 
-    def _extract_item_code(self, desc: str) -> str:
-        """
-        Extrai código do item da descrição (ex: "001.03.01" de "001.03.01 MOBILIZAÇÃO").
-        Também reconhece formatos com prefixo AD- (legacy) e reinícios Sx-.
-        """
-        if not desc:
-            return ""
-
-        text = desc.strip()
-
-        # Primeiro, tentar extrair formato com prefixo Sx- (ex: S2-1.1)
-        restart_match = re.match(r'^(S\d+-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
-        if restart_match:
-            return restart_match.group(1).upper()
-
-        # Tentar extrair formato com prefixo AD- (legacy: AD-1.1, AD-1.1-A)
-        ad_match = re.match(r'^(AD-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
-        if ad_match:
-            return ad_match.group(1).upper()
-
-        # Formato numérico padrão (ex: 1.1, 10.4, 10.4-A)
-        match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}(?:-[A-Z])?)\b', text)
-        if not match:
-            match = re.match(r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\b', text)
-
-        if match:
-            code = re.sub(r'[\s]+', '.', match.group(1))
-            code = re.sub(r'\.{2,}', '.', code).strip('.')
-            return code
-        return ""
+    # _extract_item_code → extraction.item_utils.extract_item_code (standalone)
 
     def prefer_items_with_code(self) -> List[Dict[str, Any]]:
         """
@@ -442,7 +412,7 @@ class ServiceDeduplicator:
         coded = []
         no_code = []
         for servico in servicos:
-            item = servico.get("item") or self._extract_item_code(servico.get("descricao") or "")
+            item = servico.get("item") or extract_item_code(servico.get("descricao") or "")
             if item:
                 servico["item"] = item
                 coded.append(servico)

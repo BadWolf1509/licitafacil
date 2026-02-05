@@ -5,7 +5,7 @@ Fornece validação de tokens JWT do Supabase e gerenciamento de usuários.
 """
 from typing import Optional, Dict, Any
 
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY
+from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY, ENVIRONMENT
 from logging_config import get_logger
 
 logger = get_logger('services.supabase_auth')
@@ -82,15 +82,19 @@ def create_supabase_user(email: str, password: str, user_metadata: Optional[Dict
         if user_metadata:
             options["data"] = user_metadata
 
+        # Auto-confirmar email apenas em desenvolvimento
+        # Em produção, o usuário deve confirmar por email
+        auto_confirm = ENVIRONMENT != "production"
+
         response = client.auth.admin.create_user({
             "email": email,
             "password": password,
-            "email_confirm": True,  # Auto-confirmar email para desenvolvimento
+            "email_confirm": auto_confirm,
             "user_metadata": user_metadata or {}
         })
 
         if response and response.user:
-            logger.info(f"[SUPABASE_AUTH] Usuário criado: {email}")
+            logger.info(f"[SUPABASE_AUTH] Usuário criado: sub={response.user.id}")
             return {
                 "id": response.user.id,
                 "email": response.user.email,

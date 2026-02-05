@@ -111,17 +111,21 @@ def save_upload_file_to_storage(
     user_id: int,
     subfolder: str,
     filename: str,
-    content_type: str = "application/pdf"
+    content_type: str = "application/pdf",
+    use_streaming: bool = True
 ) -> str:
     """
     Salva arquivo de upload no storage (Supabase ou local).
 
+    Usa streaming por padrao para reduzir uso de memoria em arquivos grandes.
+
     Args:
         file: Arquivo de upload do FastAPI
-        user_id: ID do usuário
+        user_id: ID do usuario
         subfolder: Subpasta (ex: "atestados", "editais")
         filename: Nome do arquivo
         content_type: Tipo MIME do arquivo
+        use_streaming: Se True, usa streaming para reduzir memoria (default True)
 
     Returns:
         Caminho do arquivo no storage (para salvar no banco)
@@ -129,12 +133,15 @@ def save_upload_file_to_storage(
     storage = get_storage()
     storage_path = get_storage_path(user_id, subfolder, filename)
 
-    # Ler conteúdo do arquivo
     file.file.seek(0)
-    file_content = file.file.read()
 
-    # Upload para storage
-    storage.upload(io.BytesIO(file_content), storage_path, content_type)
+    if use_streaming:
+        # Usar streaming - nao carrega arquivo inteiro em memoria
+        storage.upload_stream(file.file, storage_path, content_type)
+    else:
+        # Modo legado - carrega arquivo inteiro
+        file_content = file.file.read()
+        storage.upload(io.BytesIO(file_content), storage_path, content_type)
 
     logger.info(f"[STORAGE] Arquivo salvo: {storage_path}")
     return storage_path
@@ -188,13 +195,30 @@ def validate_file_content(content: bytes, expected_extension: str) -> bool:
 
     # Magic bytes por extensão
     MAGIC_BYTES = {
+        # Documentos
         ".pdf": [b'%PDF'],
+        # Imagens
         ".png": [b'\x89PNG\r\n\x1a\n'],
         ".jpg": [b'\xff\xd8\xff'],
         ".jpeg": [b'\xff\xd8\xff'],
         ".tiff": [b'II*\x00', b'MM\x00*'],
         ".tif": [b'II*\x00', b'MM\x00*'],
         ".bmp": [b'BM'],
+        ".gif": [b'GIF87a', b'GIF89a'],
+        ".webp": [b'RIFF'],  # RIFF....WEBP
+        # Office Open XML (ZIP-based)
+        ".docx": [b'PK\x03\x04'],
+        ".xlsx": [b'PK\x03\x04'],
+        ".pptx": [b'PK\x03\x04'],
+        ".odt": [b'PK\x03\x04'],   # OpenDocument
+        ".ods": [b'PK\x03\x04'],
+        ".odp": [b'PK\x03\x04'],
+        # Compactados
+        ".zip": [b'PK\x03\x04', b'PK\x05\x06'],  # Empty zip
+        # Office legado (OLE/CFB)
+        ".doc": [b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'],
+        ".xls": [b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'],
+        ".ppt": [b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'],
     }
 
     ext = expected_extension.lower()

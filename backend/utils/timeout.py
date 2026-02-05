@@ -149,8 +149,17 @@ def timeout_context(timeout_seconds: int, operation_name: str = "Operation"):
             signal.alarm(0)  # type: ignore[attr-defined]
             signal.signal(signal.SIGALRM, old_handler)
     else:
-        # Windows: timeout nao disponivel via signal
-        logger.debug(f"Timeout via signal nao disponivel neste sistema para {operation_name}")
+        # Windows: timeout via signal nao disponivel
+        # Usar with_timeout_sync() ou run_with_timeout() para timeout cross-platform
+        import os
+        env = os.environ.get("ENVIRONMENT", "development")
+        if env == "production":
+            logger.warning(
+                f"[TIMEOUT] SIGALRM nao disponivel em Windows para {operation_name}. "
+                "Considere usar with_timeout_sync() para timeout cross-platform."
+            )
+        else:
+            logger.debug(f"Timeout via signal nao disponivel neste sistema para {operation_name}")
         yield
 
 

@@ -2,10 +2,15 @@
 Processador de atestados de capacidade técnica.
 Extrai serviços, quantidades e dados de documentos de atestado.
 """
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
+
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from pathlib import Path
 
 from logging_config import get_logger
+
+if TYPE_CHECKING:
+    from services.interfaces import DocumentProcessorProtocol
 
 logger = get_logger('services.atestado.processor')
 
@@ -21,7 +26,7 @@ class AtestadoProcessor:
     - Texto bruto
     """
 
-    def __init__(self, document_processor=None):
+    def __init__(self, document_processor: Optional[DocumentProcessorProtocol] = None):
         """
         Inicializa o processador.
 
@@ -30,7 +35,7 @@ class AtestadoProcessor:
         """
         self._doc_processor = document_processor
 
-    def set_document_processor(self, document_processor):
+    def set_document_processor(self, document_processor: DocumentProcessorProtocol) -> None:
         """Define referência ao DocumentProcessor."""
         self._doc_processor = document_processor
 
@@ -281,14 +286,13 @@ class AtestadoProcessor:
 
     def _clear_item_code_quantities(self, servicos: list) -> int:
         """Limpa quantidades que parecem ser códigos de item."""
-        from ..processing_helpers import clear_item_code_quantities
+        from ..extraction import clear_item_code_quantities
         return clear_item_code_quantities(servicos)
 
     def _backfill_quantities_from_text(self, servicos: list, texto: str) -> int:
         """Preenche quantidades faltantes do texto."""
-        if self._doc_processor:
-            return self._doc_processor._backfill_quantities_from_text(servicos, texto)
-        return 0
+        from ..processors.text_processor import text_processor
+        return text_processor.backfill_quantities_from_text(servicos, texto)
 
     def _enrich_servicos_from_text(
         self,
@@ -350,8 +354,9 @@ class AtestadoProcessor:
                     page_text_items = text_extraction_service.extract_items_from_text_lines(
                         page_text
                     )
+                    from ..processors.text_processor import text_processor as tp
                     page_section_items = (
-                        dp._extract_items_from_text_section(page_text)
+                        tp.extract_items_from_text_section(page_text)
                         if text_section_enabled else []
                     )
                     for item in page_text_items + page_section_items:
@@ -361,8 +366,9 @@ class AtestadoProcessor:
                     section_items.extend(page_section_items)
             else:
                 text_items = text_extraction_service.extract_items_from_text_lines(texto)
+                from ..processors.text_processor import text_processor as tp
                 section_items = (
-                    dp._extract_items_from_text_section(texto)
+                    tp.extract_items_from_text_section(texto)
                     if text_section_enabled else []
                 )
 

@@ -7,6 +7,7 @@ e models compartilhados.
 """
 
 import asyncio
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Callable
 from collections import deque
@@ -17,6 +18,12 @@ from config import QUEUE_MAX_CONCURRENT, QUEUE_POLL_INTERVAL
 from .models import JobStatus, ProcessingJob
 from .job_repository import JobRepository
 from .job_executor import JobExecutor
+from .metrics import (
+    record_job_completed,
+    record_job_failed,
+    record_job_cancelled,
+    update_queue_metrics
+)
 
 logger = get_logger('services.processing_queue')
 
@@ -39,6 +46,7 @@ class ProcessingQueue:
 
     def __init__(self):
         self._queue: deque = deque()
+        self._queued_jobs: Dict[str, ProcessingJob] = {}  # Índice para O(1) lookup
         self._processing: Dict[str, ProcessingJob] = {}
         self._lock = threading.Lock()
         self._is_running = False
@@ -70,7 +78,11 @@ class ProcessingQueue:
         return self._repository.get_pending()
 
     def get_job(self, job_id: str) -> Optional[ProcessingJob]:
-        """Busca um job pelo ID via repositório."""
+        """Busca um job pelo ID (memória primeiro, depois repositório)."""
+        with self._lock:
+            job = self._queued_jobs.get(job_id) or self._processing.get(job_id)
+        if job:
+            return job
         return self._repository.get_by_id(job_id)
 
     def get_user_jobs(self, user_id: int, limit: int = 20) -> List[ProcessingJob]:
@@ -119,6 +131,7 @@ class ProcessingQueue:
 
         with self._lock:
             self._queue.append(job)
+            self._queued_jobs[job_id] = job  # Adicionar ao índice para O(1) lookup
             if callback:
                 self._callbacks[job_id] = callback
 
@@ -148,12 +161,8 @@ class ProcessingQueue:
         new_pipeline = self.STAGE_TO_PIPELINE.get(stage) if stage else None
 
         with self._lock:
-            job = self._processing.get(job_id)
-            if not job:
-                for queued in self._queue:
-                    if queued.id == job_id:
-                        job = queued
-                        break
+            # O(1) lookup em vez de O(n) linear search
+            job = self._processing.get(job_id) or self._queued_jobs.get(job_id)
             if job:
                 job.progress_current = current
                 job.progress_total = total
@@ -189,6 +198,7 @@ class ProcessingQueue:
 
         with self._lock:
             self._queue = deque([j for j in self._queue if j.id != job_id])
+            self._queued_jobs.pop(job_id, None)  # Remover do índice
             if job_id in self._processing:
                 self._cancel_requested.add(job_id)
                 self._processing[job_id].status = JobStatus.CANCELLED
@@ -202,6 +212,7 @@ class ProcessingQueue:
         """Remove um job do banco e da fila/memória."""
         with self._lock:
             self._queue = deque([j for j in self._queue if j.id != job_id])
+            self._queued_jobs.pop(job_id, None)  # Remover do índice
             self._processing.pop(job_id, None)
             self._cancel_requested.discard(job_id)
             self._callbacks.pop(job_id, None)
@@ -228,6 +239,7 @@ class ProcessingQueue:
             with self._lock:
                 while len(jobs_to_process) < self._max_concurrent and self._queue:
                     job = self._queue.popleft()
+                    self._queued_jobs.pop(job.id, None)  # Remover do índice de fila
                     jobs_to_process.append(job)
                     self._processing[job.id] = job
 
@@ -248,9 +260,27 @@ class ProcessingQueue:
                             if job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
                                 self._cancel_requested.discard(job.id)
 
+                            # Registrar metricas por status
+                            if job.status == JobStatus.COMPLETED:
+                                duration = 0.0
+                                if job.started_at and job.completed_at:
+                                    try:
+                                        from datetime import datetime
+                                        start = datetime.fromisoformat(job.started_at)
+                                        end = datetime.fromisoformat(job.completed_at)
+                                        duration = (end - start).total_seconds()
+                                    except Exception:
+                                        pass
+                                record_job_completed(job.job_type, job.pipeline or 'unknown', duration)
+                            elif job.status == JobStatus.FAILED:
+                                record_job_failed(job.job_type)
+                            elif job.status == JobStatus.CANCELLED:
+                                record_job_cancelled(job.job_type)
+
                             # Re-adicionar à fila se precisa retry
                             if job.status == JobStatus.PENDING:
                                 self._queue.append(job)
+                                self._queued_jobs[job.id] = job
 
                             # Coletar callback para executar fora do lock
                             callback = self._callbacks.pop(job.id, None)
@@ -276,14 +306,33 @@ class ProcessingQueue:
 
         # Recarregar jobs pendentes do banco
         pending = self._load_pending_jobs()
+        valid_count = 0
+        orphaned_count = 0
+
         with self._lock:
             for job in pending:
+                # Verificar se o arquivo do job ainda existe
+                if not job.file_path or not os.path.exists(job.file_path):
+                    # Marcar como falho - arquivo órfão
+                    job.status = JobStatus.FAILED
+                    job.completed_at = _now_iso()
+                    job.error = f"Arquivo não encontrado ao reiniciar: {job.file_path}"
+                    self._save_job(job)
+                    orphaned_count += 1
+                    logger.warning(f"Job órfão marcado como FAILED: {job.id} (arquivo: {job.file_path})")
+                    continue
+
                 if job.status == JobStatus.PROCESSING:
                     job.status = JobStatus.PENDING
                 self._queue.append(job)
+                self._queued_jobs[job.id] = job
+                valid_count += 1
 
         self._worker_task = asyncio.create_task(self._worker())
-        logger.info(f"ProcessingQueue iniciada com {len(pending)} jobs pendentes")
+        logger.info(
+            f"ProcessingQueue iniciada: {valid_count} jobs válidos, "
+            f"{orphaned_count} jobs órfãos marcados como FAILED"
+        )
 
     async def stop(self):
         """Para o worker de processamento."""
@@ -299,10 +348,16 @@ class ProcessingQueue:
     def get_status(self) -> Dict[str, Any]:
         """Retorna status da fila."""
         with self._lock:
+            queue_len = len(self._queue)
+            processing_len = len(self._processing)
+
+            # Atualizar metricas Prometheus
+            update_queue_metrics(queue_len, processing_len)
+
             return {
                 "is_running": self._is_running,
-                "queue_size": len(self._queue),
-                "processing_count": len(self._processing),
+                "queue_size": queue_len,
+                "processing_count": processing_len,
                 "max_concurrent": self._max_concurrent,
                 "poll_interval": self._poll_interval
             }

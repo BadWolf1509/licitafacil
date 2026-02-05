@@ -108,6 +108,18 @@ from .validation import (
     detect_mime_type,
 )
 
+# Defaults
+from .defaults import (
+    DEFAULT_ADMIN_EMAIL,
+    DEFAULT_ADMIN_NAME,
+    MIN_PASSWORD_LENGTH,
+    DEFAULT_PAGE,
+    DEFAULT_PROCESSING_TIMEOUT_SECONDS,
+    DEFAULT_OCR_TIMEOUT_SECONDS,
+    MAX_TEMP_FILE_AGE_HOURS,
+    TEMP_CLEANUP_INTERVAL_HOURS,
+)
+
 # Exportar tudo
 __all__ = [
     # Base
@@ -187,4 +199,13 @@ __all__ = [
     "validate_mime_type",
     "validate_upload_complete",
     "detect_mime_type",
+    # Defaults
+    "DEFAULT_ADMIN_EMAIL",
+    "DEFAULT_ADMIN_NAME",
+    "MIN_PASSWORD_LENGTH",
+    "DEFAULT_PAGE",
+    "DEFAULT_PROCESSING_TIMEOUT_SECONDS",
+    "DEFAULT_OCR_TIMEOUT_SECONDS",
+    "MAX_TEMP_FILE_AGE_HOURS",
+    "TEMP_CLEANUP_INTERVAL_HOURS",
 ]

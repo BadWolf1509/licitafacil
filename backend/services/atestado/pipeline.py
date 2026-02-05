@@ -3,11 +3,16 @@ Pipeline de processamento de atestados.
 
 Extrai e orquestra as fases do processamento de atestados de capacidade técnica.
 """
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from logging_config import get_logger
 from config import AtestadoProcessingConfig as APC
+
+if TYPE_CHECKING:
+    from services.interfaces import DocumentProcessorProtocol
 
 logger = get_logger('services.atestado.pipeline')
 
@@ -25,7 +30,7 @@ class AtestadoPipeline:
 
     def __init__(
         self,
-        processor: Any,  # DocumentProcessor instance
+        processor: DocumentProcessorProtocol,
         file_path: str,
         use_vision: bool = True,
         progress_callback: ProgressCallback = None,
@@ -172,7 +177,8 @@ class AtestadoPipeline:
             and not self._doc_analysis.get("is_scanned")
             and not self._doc_analysis.get("has_image_tables")
         ):
-            cleared = self._processor._clear_item_code_quantities(self._servicos_table)
+            from ..extraction import clear_item_code_quantities
+            cleared = clear_item_code_quantities(self._servicos_table)
             filled = text_processor.backfill_quantities_from_text(self._servicos_table, self._texto)
             if cleared or filled:
                 text_backfill = {"cleared": cleared, "filled": filled}
@@ -367,193 +373,245 @@ class AtestadoPipeline:
     def _phase4_text_enrichment(self) -> None:
         """Fase 4: Enriquecimento via texto."""
         from ..pdf_extraction_service import pdf_extraction_service
-        from ..text_extraction_service import text_extraction_service
-        from ..processors.text_processor import text_processor
-        from ..processors.item_code_refiner import item_code_refiner
-        from ..processing_helpers import (
-            split_restart_prefix,
-            normalize_item_code as helpers_normalize_item_code,
-            item_key as helpers_item_key,
-        )
-        from ..extraction import (
-            normalize_unit,
-            normalize_description,
-            parse_quantity,
-            parse_item_tuple,
-        )
 
         pdf_extraction_service._notify_progress(self._progress_callback, 0, 0, "final", "Finalizando processamento")
         pdf_extraction_service._check_cancel(self._cancel_check)
 
         self._servicos_raw = self._dados.get("servicos") or []
         self._text_items = []
+
+        self._check_text_section_gate()
+
+        can_process_text = (
+            self._texto
+            and isinstance(self._doc_analysis, dict)
+            and not self._doc_analysis.get("is_scanned")
+            and self._table_used
+        )
+        if can_process_text:
+            self._enrich_from_text()
+
+        self._update_text_section_debug()
+
+    def _check_text_section_gate(self) -> None:
+        """Verifica se text_section deve ser desabilitado por tabela forte."""
+        if not (self._table_used and isinstance(self._table_debug, dict)):
+            return
+
+        source = (self._table_debug.get("source") or "").lower()
+        stats = self._table_debug.get("stats") or {}
+        duplicate_ratio = stats.get("duplicate_ratio", 0.0)
+
+        if (
+            source == "pdfplumber"
+            and self._table_confidence >= APC.TEXT_SECTION_TABLE_CONFIDENCE_MIN
+            and self._qty_ratio >= APC.TEXT_SECTION_QTY_RATIO_MIN
+            and duplicate_ratio <= APC.TEXT_SECTION_DUP_RATIO_MAX
+        ):
+            self._text_section_enabled = False
+            self._text_section_reason = (
+                "strong_table "
+                f"source={source} qty_ratio={self._qty_ratio:.2f} "
+                f"confidence={self._table_confidence:.2f} duplicate_ratio={duplicate_ratio:.2f}"
+            )
+            logger.info(f"[TEXTO] text_section desativado: {self._text_section_reason}")
+
+    def _enrich_from_text(self) -> None:
+        """Executa o enriquecimento completo via texto nativo do PDF."""
+        from ..text_extraction_service import text_extraction_service
+        from ..processors.text_processor import text_processor
+        from ..processors.item_code_refiner import item_code_refiner
+        from ..extraction import parse_item_tuple
+
+        page_segments = text_extraction_service.split_text_by_pages(self._texto or "")
+        page_planilha_map, page_planilha_audit = text_extraction_service.build_page_planilha_map(page_segments)
+
+        # Reatribuir planilha por página
+        if page_planilha_map:
+            remapped = text_extraction_service.apply_page_planilha_map(self._servicos_raw, page_planilha_map)
+            if remapped:
+                logger.info(f"[TEXTO] Planilha reatribuida por pagina: {remapped} itens")
+            if isinstance(self._dados.get("_debug"), dict):
+                self._dados["_debug"]["page_planilha"] = {
+                    "map": page_planilha_map,
+                    "audit": page_planilha_audit
+                }
+
+        # Extrair itens do texto
+        section_items = self._extract_text_items(page_segments, page_planilha_map, text_processor)
+
+        # Refinar códigos de item
+        text_codes = text_processor.extract_item_codes_from_text_lines(self._texto or "")
+        updated = item_code_refiner.refine(self._servicos_raw, self._text_items, text_codes)
+        if updated:
+            logger.info(f"[TEXTO] Codigos refinados do texto: {updated}")
+
+        # Combinar candidatos e enriquecer
+        text_candidates = section_items + self._text_items
+        if text_candidates:
+            self._apply_restart_prefix_mapping(text_candidates)
+            self._apply_text_enrichment(text_candidates)
+            self._merge_text_candidates(text_candidates)
+
+        # Verificar modo itemless
+        self._check_itemless_mode(text_processor, parse_item_tuple)
+
+    def _extract_text_items(
+        self,
+        page_segments: list,
+        page_planilha_map: Optional[Dict],
+        text_processor: Any
+    ) -> List[Dict]:
+        """Extrai itens de texto por página ou do texto completo."""
+        from ..processing_helpers import split_restart_prefix
+
         section_items: List[Dict] = []
 
-        # Determinar se text_section está habilitado
-        if self._table_used and isinstance(self._table_debug, dict):
-            source = (self._table_debug.get("source") or "").lower()
-            stats = self._table_debug.get("stats") or {}
-            duplicate_ratio = stats.get("duplicate_ratio", 0.0)
-            if (
-                source == "pdfplumber"
-                and self._table_confidence >= APC.TEXT_SECTION_TABLE_CONFIDENCE_MIN
-                and self._qty_ratio >= APC.TEXT_SECTION_QTY_RATIO_MIN
-                and duplicate_ratio <= APC.TEXT_SECTION_DUP_RATIO_MAX
-            ):
-                self._text_section_enabled = False
-                self._text_section_reason = (
-                    "strong_table "
-                    f"source={source} qty_ratio={self._qty_ratio:.2f} "
-                    f"confidence={self._table_confidence:.2f} duplicate_ratio={duplicate_ratio:.2f}"
+        if page_planilha_map:
+            for page_num, page_text in page_segments:
+                planilha_id = page_planilha_map.get(page_num, 0)
+                if not planilha_id:
+                    continue
+                page_text_items = text_processor.extract_items_from_text_lines(page_text)
+                page_section_items = (
+                    text_processor.extract_items_from_text_section(page_text) if self._text_section_enabled else []
                 )
-                logger.info(f"[TEXTO] text_section desativado: {self._text_section_reason}")
-
-        # Processar texto se disponível
-        if self._texto and isinstance(self._doc_analysis, dict) and not self._doc_analysis.get("is_scanned") and self._table_used:
-            page_segments = text_extraction_service.split_text_by_pages(self._texto)
-            page_planilha_map, page_planilha_audit = text_extraction_service.build_page_planilha_map(page_segments)
-
-            if page_planilha_map:
-                remapped = text_extraction_service.apply_page_planilha_map(self._servicos_raw, page_planilha_map)
-                if remapped:
-                    logger.info(f"[TEXTO] Planilha reatribuida por pagina: {remapped} itens")
-                if isinstance(self._dados.get("_debug"), dict):
-                    self._dados["_debug"]["page_planilha"] = {
-                        "map": page_planilha_map,
-                        "audit": page_planilha_audit
-                    }
-
-            # Extrair itens do texto
-            if page_planilha_map:
-                for page_num, page_text in page_segments:
-                    planilha_id = page_planilha_map.get(page_num, 0)
-                    if not planilha_id:
-                        continue
-                    page_text_items = text_processor.extract_items_from_text_lines(page_text)
-                    page_section_items = (
-                        text_processor.extract_items_from_text_section(page_text) if self._text_section_enabled else []
-                    )
-                    for item in page_text_items + page_section_items:
-                        prefix, core = split_restart_prefix(item.get("item"))
-                        if prefix:
-                            item["item"] = core
-                            item.pop("_item_prefix", None)
-                        item["_page"] = page_num
-                        item["_planilha_id"] = planilha_id
-                    self._text_items.extend(page_text_items)
-                    section_items.extend(page_section_items)
-            else:
-                self._text_items = text_processor.extract_items_from_text_lines(self._texto)
-                section_items = text_processor.extract_items_from_text_section(self._texto) if self._text_section_enabled else []
-
-            # Refinar códigos de item
-            text_codes = text_processor.extract_item_codes_from_text_lines(self._texto)
-            updated = item_code_refiner.refine(self._servicos_raw, self._text_items, text_codes)
-            if updated:
-                logger.info(f"[TEXTO] Codigos refinados do texto: {updated}")
-
-            # Combinar candidatos
-            text_candidates = []
-            if section_items:
-                text_candidates.extend(section_items)
-            if self._text_items:
-                text_candidates.extend(self._text_items)
-
-            # Mapear prefixos de reinício
-            prefix_map, unique_prefix_by_code = self._processor._build_restart_prefix_maps(self._servicos_raw)
-            if text_candidates and (prefix_map or unique_prefix_by_code):
-                for item in text_candidates:
+                for item in page_text_items + page_section_items:
                     prefix, core = split_restart_prefix(item.get("item"))
                     if prefix:
-                        continue
-                    code = helpers_normalize_item_code(core)
-                    if not code:
-                        continue
-                    unit = normalize_unit(item.get("unidade") or "")
-                    qty = parse_quantity(item.get("quantidade"))
-                    mapped = prefix_map.get((code, unit, qty)) or unique_prefix_by_code.get(code)
-                    if mapped:
-                        item["item"] = f"{mapped}-{code}"
+                        item["item"] = core
+                        item.pop("_item_prefix", None)
+                    item["_page"] = page_num
+                    item["_planilha_id"] = planilha_id
+                self._text_items.extend(page_text_items)
+                section_items.extend(page_section_items)
+        else:
+            self._text_items = text_processor.extract_items_from_text_lines(self._texto)
+            section_items = text_processor.extract_items_from_text_section(self._texto) if self._text_section_enabled else []
 
-            # Aplicar descrições do texto
-            text_map = self._processor._build_text_item_map(text_candidates)
-            enriched = self._processor._apply_text_descriptions(self._servicos_raw, text_map)
-            if enriched:
-                logger.info(f"[TEXTO] Descricoes enriquecidas pelo texto: {enriched}")
+        return section_items
 
-            # Adicionar/atualizar itens do texto
-            existing_index: Dict[tuple, dict] = {}
-            existing_keys = set()
-            for servico in self._servicos_raw:
-                key = helpers_item_key(servico)
-                if key:
-                    existing_keys.add(key)
-                    existing_index[key] = servico
+    def _apply_restart_prefix_mapping(self, text_candidates: List[Dict]) -> None:
+        """Mapeia prefixos de reinício nos candidatos de texto."""
+        from ..processing_helpers import (
+            split_restart_prefix,
+            normalize_item_code as helpers_normalize_item_code,
+        )
+        from ..extraction import normalize_unit, parse_quantity
 
-            if text_candidates:
-                added = 0
-                replaced = 0
-                for item in text_candidates:
-                    key = helpers_item_key(item)
-                    if not key:
-                        continue
-                    existing = existing_index.get(key)
-                    if existing:
-                        if self._processor._should_replace_desc(existing.get("descricao") or "", item.get("descricao") or ""):
-                            existing["descricao"] = (item.get("descricao") or "").strip()
-                            existing["_desc_from_text"] = True
-                            replaced += 1
-                        continue
-                    self._servicos_raw.append(item)
-                    existing_keys.add(key)
-                    existing_index[key] = item
-                    added += 1
-                if added:
-                    logger.info(f"[TEXTO] Itens adicionados do texto: {added}")
-                if replaced:
-                    logger.info(f"[TEXTO] Itens atualizados pelo texto: {replaced}")
+        prefix_map, unique_prefix_by_code = self._processor._build_restart_prefix_maps(self._servicos_raw)
+        if not (prefix_map or unique_prefix_by_code):
+            return
 
-            # Verificar modo itemless
-            structured_ratio = None
-            with_code = [s for s in self._servicos_raw if s.get("item")]
-            if with_code:
-                structured = [
-                    parse_item_tuple(str(s.get("item")))
-                    for s in with_code
-                ]
-                structured = [t for t in structured if t and len(t) >= 2]
-                structured_ratio = len(structured) / len(with_code)
+        for item in text_candidates:
+            prefix, core = split_restart_prefix(item.get("item"))
+            if prefix:
+                continue
+            code = helpers_normalize_item_code(core)
+            if not code:
+                continue
+            unit = normalize_unit(item.get("unidade") or "")
+            qty = parse_quantity(item.get("quantidade"))
+            mapped = prefix_map.get((code, unit, qty)) or unique_prefix_by_code.get(code)
+            if mapped:
+                item["item"] = f"{mapped}-{code}"
 
-            if structured_ratio is not None and structured_ratio < 0.4:
-                self._itemless_mode = True
-                no_code_items = text_processor.extract_items_without_codes_from_text(self._texto)
-                if no_code_items:
-                    if len(no_code_items) >= len(self._servicos_raw):
-                        self._servicos_raw = list(no_code_items)
-                        logger.info(f"[TEXTO] Itens sem codigo substituindo tabela: {len(self._servicos_raw)}")
-                    else:
-                        existing_keys = set()
-                        for existing in self._servicos_raw:
-                            desc_key = normalize_description(existing.get("descricao") or "")[:80]
-                            unit_key = normalize_unit(existing.get("unidade") or "")
-                            qty_key = parse_quantity(existing.get("quantidade"))
-                            existing_keys.add((desc_key, unit_key, qty_key))
-                        added_no_code = 0
-                        for item in no_code_items:
-                            desc_key = normalize_description(item.get("descricao") or "")[:80]
-                            unit_key = normalize_unit(item.get("unidade") or "")
-                            qty_key = parse_quantity(item.get("quantidade"))
-                            key = (desc_key, unit_key, qty_key)
-                            if key in existing_keys:
-                                continue
-                            existing_keys.add(key)
-                            if key:
-                                self._servicos_raw.append(item)
-                                added_no_code += 1
-                        if added_no_code:
-                            logger.info(f"[TEXTO] Itens sem codigo adicionados do texto: {added_no_code}")
+    def _apply_text_enrichment(self, text_candidates: List[Dict]) -> None:
+        """Aplica descrições de texto aos serviços existentes."""
+        text_map = self._processor._build_text_item_map(text_candidates)
+        enriched = self._processor._apply_text_descriptions(self._servicos_raw, text_map)
+        if enriched:
+            logger.info(f"[TEXTO] Descricoes enriquecidas pelo texto: {enriched}")
 
-        # Atualizar debug
+    def _merge_text_candidates(self, text_candidates: List[Dict]) -> None:
+        """Adiciona/atualiza serviços com itens extraídos do texto."""
+        from ..processing_helpers import item_key as helpers_item_key
+
+        existing_index: Dict[tuple, dict] = {}
+        existing_keys = set()
+        for servico in self._servicos_raw:
+            key = helpers_item_key(servico)
+            if key:
+                existing_keys.add(key)
+                existing_index[key] = servico
+
+        added = 0
+        replaced = 0
+        for item in text_candidates:
+            key = helpers_item_key(item)
+            if not key:
+                continue
+            existing = existing_index.get(key)
+            if existing:
+                if self._processor._should_replace_desc(existing.get("descricao") or "", item.get("descricao") or ""):
+                    existing["descricao"] = (item.get("descricao") or "").strip()
+                    existing["_desc_from_text"] = True
+                    replaced += 1
+                continue
+            self._servicos_raw.append(item)
+            existing_keys.add(key)
+            existing_index[key] = item
+            added += 1
+
+        if added:
+            logger.info(f"[TEXTO] Itens adicionados do texto: {added}")
+        if replaced:
+            logger.info(f"[TEXTO] Itens atualizados pelo texto: {replaced}")
+
+    def _check_itemless_mode(self, text_processor: Any, parse_item_tuple: Any) -> None:
+        """Verifica e aplica modo itemless se códigos estruturados são insuficientes."""
+        from ..extraction import normalize_unit, normalize_description, parse_quantity
+
+        with_code = [s for s in self._servicos_raw if s.get("item")]
+        if not with_code:
+            return
+
+        structured = [
+            parse_item_tuple(str(s.get("item")))
+            for s in with_code
+        ]
+        structured = [t for t in structured if t and len(t) >= 2]
+        structured_ratio = len(structured) / len(with_code)
+
+        if structured_ratio >= 0.4:
+            return
+
+        self._itemless_mode = True
+        no_code_items = text_processor.extract_items_without_codes_from_text(self._texto)
+        if not no_code_items:
+            return
+
+        if len(no_code_items) >= len(self._servicos_raw):
+            self._servicos_raw = list(no_code_items)
+            logger.info(f"[TEXTO] Itens sem codigo substituindo tabela: {len(self._servicos_raw)}")
+            return
+
+        # Adicionar itens sem código que não existem
+        existing_keys = set()
+        for existing in self._servicos_raw:
+            desc_key = normalize_description(existing.get("descricao") or "")[:80]
+            unit_key = normalize_unit(existing.get("unidade") or "")
+            qty_key = parse_quantity(existing.get("quantidade"))
+            existing_keys.add((desc_key, unit_key, qty_key))
+
+        added_no_code = 0
+        for item in no_code_items:
+            desc_key = normalize_description(item.get("descricao") or "")[:80]
+            unit_key = normalize_unit(item.get("unidade") or "")
+            qty_key = parse_quantity(item.get("quantidade"))
+            key = (desc_key, unit_key, qty_key)
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            if key:
+                self._servicos_raw.append(item)
+                added_no_code += 1
+
+        if added_no_code:
+            logger.info(f"[TEXTO] Itens sem codigo adicionados do texto: {added_no_code}")
+
+    def _update_text_section_debug(self) -> None:
+        """Atualiza informações de debug da seção de texto."""
         if isinstance(self._dados.get("_debug"), dict):
             self._dados["_debug"]["text_section"] = {
                 "enabled": self._text_section_enabled,
@@ -572,7 +630,8 @@ class AtestadoPipeline:
         from ..extraction import parse_quantity, parse_item_tuple
 
         # Limpar quantidades baseadas em código
-        cleared = self._processor._clear_item_code_quantities(self._servicos_raw)
+        from ..extraction import clear_item_code_quantities
+        cleared = clear_item_code_quantities(self._servicos_raw)
         if self._texto:
             needs_qty = any(parse_quantity(s.get("quantidade")) in (None, 0) for s in self._servicos_raw)
             if cleared or needs_qty:
@@ -620,7 +679,7 @@ class AtestadoPipeline:
             use_ai,
             self._table_used,
             self._servicos_table,
-            self._texto,
+            self._texto or "",
             self._strict_item_gate,
             skip_no_code_dedupe=self._itemless_mode
         )

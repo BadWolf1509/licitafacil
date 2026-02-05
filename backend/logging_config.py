@@ -465,5 +465,111 @@ def log_sanitized(
     logger.log(level, f"{message}: {safe_data}")
 
 
+# === Structured Action Logging ===
+
+def log_action(
+    logger: logging.Logger,
+    action: str,
+    user_id: Optional[int] = None,
+    resource_type: Optional[str] = None,
+    resource_id: Optional[int] = None,
+    level: int = logging.INFO,
+    **extra
+) -> None:
+    """
+    Loga uma acao do usuario com campos estruturados padronizados.
+
+    Este e o helper recomendado para logs de acoes/auditoria.
+    Garante que os campos obrigatorios estejam sempre presentes.
+
+    Args:
+        logger: Logger a usar
+        action: Acao realizada (ex: "create", "update", "delete", "login")
+        user_id: ID do usuario (opcional se nao autenticado)
+        resource_type: Tipo do recurso (ex: "atestado", "analise")
+        resource_id: ID do recurso afetado
+        level: Nivel de log (default: INFO)
+        **extra: Campos adicionais
+
+    Example:
+        log_action(logger, "upload", user_id=123, resource_type="atestado",
+                   filename="doc.pdf", size_bytes=1024)
+        # Output JSON: {"action": "upload", "user_id": 123, "resource_type": "atestado", ...}
+
+        log_action(logger, "login_failed", extra_ip="192.168.1.1")
+        # Output JSON: {"action": "login_failed", "ip": "192.168.1.1", ...}
+    """
+    context: Dict[str, Any] = {
+        'action': action,
+        'request_id': get_correlation_id() or '-',
+    }
+
+    if user_id is not None:
+        context['user_id'] = user_id
+    if resource_type:
+        context['resource_type'] = resource_type
+    if resource_id is not None:
+        context['resource_id'] = resource_id
+
+    # Adicionar campos extras
+    context.update(extra)
+
+    # Construir mensagem legivel
+    msg_parts = [f"[{action.upper()}]"]
+    if user_id:
+        msg_parts.append(f"user={user_id}")
+    if resource_type:
+        resource_str = f"{resource_type}"
+        if resource_id:
+            resource_str += f"#{resource_id}"
+        msg_parts.append(resource_str)
+
+    message = " ".join(msg_parts)
+
+    # Logar com contexto estruturado
+    log_with_context(logger, level, message, **context)
+
+
+def log_request(
+    logger: logging.Logger,
+    method: str,
+    path: str,
+    status_code: int,
+    duration_ms: float,
+    user_id: Optional[int] = None,
+    **extra
+) -> None:
+    """
+    Loga uma requisicao HTTP com campos estruturados.
+
+    Args:
+        logger: Logger a usar
+        method: Metodo HTTP (GET, POST, etc.)
+        path: Path da requisicao
+        status_code: Codigo de status HTTP
+        duration_ms: Duracao em milissegundos
+        user_id: ID do usuario (se autenticado)
+        **extra: Campos adicionais
+    """
+    level = logging.INFO if status_code < 400 else logging.WARNING
+
+    context = {
+        'action': 'http_request',
+        'request_id': get_correlation_id() or '-',
+        'method': method,
+        'path': path,
+        'status_code': status_code,
+        'duration_ms': round(duration_ms, 2),
+    }
+
+    if user_id is not None:
+        context['user_id'] = user_id
+
+    context.update(extra)
+
+    message = f"[HTTP] {method} {path} -> {status_code} ({duration_ms:.2f}ms)"
+    log_with_context(logger, level, message, **context)
+
+
 # Configurar logging na importação
 setup_logging()

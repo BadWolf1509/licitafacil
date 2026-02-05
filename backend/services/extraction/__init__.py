@@ -95,6 +95,10 @@ from .item_utils import (
     split_restart_prefix,
     item_code_in_text,
     max_restart_prefix_index,
+    extract_item_code,
+    split_item_description,
+    item_qty_matches_code,
+    clear_item_code_quantities,
 )
 
 __all__ = [
@@ -165,6 +169,10 @@ __all__ = [
     'split_restart_prefix',
     'item_code_in_text',
     'max_restart_prefix_index',
+    'extract_item_code',
+    'split_item_description',
+    'item_qty_matches_code',
+    'clear_item_code_quantities',
     # normalizers
     'DescriptionNormalizer',
 ]

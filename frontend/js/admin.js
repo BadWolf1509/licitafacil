@@ -62,10 +62,11 @@ async function carregarEstatisticas() {
 
 async function carregarUsuariosPendentes() {
     try {
-        const usuarios = await api.get('/admin/usuarios/pendentes');
+        const response = await api.get('/admin/usuarios/pendentes');
+        const usuarios = response.items || response;
         const container = document.getElementById('listaPendentes');
 
-        if (usuarios.length === 0) {
+        if (!usuarios || usuarios.length === 0) {
             container.innerHTML = '<div class="empty-state">Nenhum usuario pendente de aprovacao.</div>';
             return;
         }
@@ -92,10 +93,11 @@ async function carregarUsuariosPendentes() {
 
 async function carregarTodosUsuarios() {
     try {
-        const usuarios = await api.get('/admin/usuarios');
+        const response = await api.get('/admin/usuarios');
+        const usuarios = response.items || response;
         const container = document.getElementById('listaTodos');
 
-        if (usuarios.length === 0) {
+        if (!usuarios || usuarios.length === 0) {
             container.innerHTML = '<div class="empty-state">Nenhum usuario cadastrado.</div>';
             return;
         }

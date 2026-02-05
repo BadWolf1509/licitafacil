@@ -54,7 +54,6 @@ def _validate_supabase_token(token: str, db: Session) -> Optional[Usuario]:
             return None
 
         supabase_id = supabase_user.get("id")
-        email = supabase_user.get("email")
 
         if not supabase_id:
             return None
@@ -63,7 +62,7 @@ def _validate_supabase_token(token: str, db: Session) -> Optional[Usuario]:
         user = get_user_by_supabase_id(db, supabase_id)
 
         if not user:
-            logger.warning(f"[AUTH] Usuário Supabase não encontrado localmente: {email}")
+            logger.warning(f"[AUTH] Usuário Supabase não encontrado localmente: sub={supabase_id}")
 
         return user
 
@@ -97,7 +96,7 @@ async def get_current_user(
     user = _validate_supabase_token(token, db)
 
     if user:
-        logger.debug(f"[AUTH] Autenticado via Supabase: {user.email}")
+        logger.debug(f"[AUTH] User {user.id} autenticado via Supabase")
     else:
         raise credentials_exception
 

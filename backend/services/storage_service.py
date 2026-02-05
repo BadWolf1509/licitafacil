@@ -68,6 +68,29 @@ class StorageBackend(ABC):
         """Retorna URL pública do arquivo."""
         pass
 
+    def upload_stream(
+        self,
+        file: BinaryIO,
+        path: str,
+        content_type: str = "application/octet-stream",
+        chunk_size: int = 1024 * 1024  # 1MB
+    ) -> str:
+        """
+        Faz upload de arquivo usando streaming para reduzir uso de memoria.
+
+        Args:
+            file: Arquivo como objeto binario
+            path: Caminho de destino
+            content_type: Tipo MIME do arquivo
+            chunk_size: Tamanho do chunk em bytes (default 1MB)
+
+        Returns:
+            URL ou caminho do arquivo salvo
+        """
+        # Implementacao padrao usa upload normal
+        # Subclasses podem otimizar se o backend suportar
+        return self.upload(file, path, content_type)
+
 
 class LocalStorageBackend(StorageBackend):
     """Backend de storage local (filesystem)."""
@@ -115,6 +138,25 @@ class LocalStorageBackend(StorageBackend):
     def get_url(self, path: str) -> str:
         # Para storage local, retorna caminho relativo
         return str(self._get_full_path(path))
+
+    def upload_stream(
+        self,
+        file: BinaryIO,
+        path: str,
+        content_type: str = "application/octet-stream",
+        chunk_size: int = 1024 * 1024
+    ) -> str:
+        """Upload usando streaming - copia em chunks sem carregar tudo em memoria."""
+        import shutil
+
+        full_path = self._get_full_path(path)
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(full_path, 'wb') as f:
+            shutil.copyfileobj(file, f, length=chunk_size)
+
+        logger.debug(f"[STORAGE] Arquivo salvo (streaming): {full_path}")
+        return str(full_path)
 
 
 class SupabaseStorageBackend(StorageBackend):

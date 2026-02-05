@@ -13,6 +13,15 @@ from passlib.context import CryptContext
 
 from database import engine, SessionLocal, Base
 from models import Usuario
+from config.defaults import (
+    DEFAULT_ADMIN_EMAIL,
+    DEFAULT_ADMIN_NAME,
+    MIN_PASSWORD_LENGTH
+)
+from utils.password_validator import validate_password
+from logging_config import get_logger
+
+logger = get_logger('seed')
 
 # Contexto de criptografia para senhas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -32,18 +41,21 @@ def create_admin():
     Base.metadata.create_all(bind=engine)
 
     # Obter dados do admin do .env
-    admin_email = os.getenv("ADMIN_EMAIL", "admin@licitafacil.com.br")
+    admin_email = os.getenv("ADMIN_EMAIL", DEFAULT_ADMIN_EMAIL)
     admin_password = os.getenv("ADMIN_PASSWORD")
-    admin_name = os.getenv("ADMIN_NAME", "Administrador")
+    admin_name = os.getenv("ADMIN_NAME", DEFAULT_ADMIN_NAME)
 
     # Validar senha - não aceitar default fraco
     if not admin_password:
-        print("[ERRO] ADMIN_PASSWORD não definida no .env")
-        print("Defina uma senha forte com pelo menos 8 caracteres.")
+        logger.error("ADMIN_PASSWORD não definida no .env")
+        logger.info(f"Defina uma senha forte com pelo menos {MIN_PASSWORD_LENGTH} caracteres.")
         return
 
-    if len(admin_password) < 8:
-        print("[ERRO] ADMIN_PASSWORD muito curta (mínimo 8 caracteres)")
+    # Validar complexidade da senha (não apenas tamanho)
+    is_valid, errors = validate_password(admin_password)
+    if not is_valid:
+        logger.error(f"ADMIN_PASSWORD inválida: {'; '.join(errors)}")
+        logger.info("A senha deve atender aos requisitos de complexidade.")
         return
 
     db: Session = SessionLocal()
@@ -51,7 +63,7 @@ def create_admin():
         # Verificar se admin já existe
         existing_admin = db.query(Usuario).filter(Usuario.email == admin_email).first()
         if existing_admin:
-            print(f"[INFO] Administrador já existe: {admin_email}")
+            logger.info(f"Administrador ja existe: {admin_email}")
             return
 
         # Criar admin
@@ -66,17 +78,12 @@ def create_admin():
         db.add(admin)
         db.commit()
 
-        print("=" * 50)
-        print("ADMINISTRADOR CRIADO COM SUCESSO!")
-        print("=" * 50)
-        print(f"Email: {admin_email}")
-        print(f"Senha: {admin_password}")
-        print("=" * 50)
-        print("IMPORTANTE: Altere a senha após o primeiro login!")
-        print("=" * 50)
+        # Log seguro - NUNCA expor senha
+        logger.info(f"Administrador criado com sucesso: {admin_email}")
+        logger.warning("IMPORTANTE: Altere a senha apos o primeiro login!")
 
     except Exception as e:
-        print(f"[ERRO] Falha ao criar administrador: {e}")
+        logger.error(f"Falha ao criar administrador: {e}")
         db.rollback()
     finally:
         db.close()

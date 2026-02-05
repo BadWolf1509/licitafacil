@@ -6,6 +6,7 @@ separando as responsabilidades de execução da fila de processamento.
 """
 
 import asyncio
+import os
 import traceback
 from datetime import datetime
 from typing import Optional, Callable, Dict, Any
@@ -78,6 +79,15 @@ class JobExecutor:
         if self._is_cancel_requested(job.id):
             return self._mark_cancelled(job)
 
+        # Verificar se o arquivo existe antes de processar
+        if not job.file_path or not os.path.exists(job.file_path):
+            logger.warning(f"Arquivo não encontrado para job {job.id}: {job.file_path}")
+            job.status = JobStatus.FAILED
+            job.completed_at = _now_iso()
+            job.error = f"Arquivo não encontrado: {job.file_path}"
+            self._save_job(job)
+            return job
+
         # Marcar como em processamento
         job.status = JobStatus.PROCESSING
         job.started_at = _now_iso()
@@ -106,7 +116,10 @@ class JobExecutor:
             error_msg = f"{str(e)}\n{traceback.format_exc()}"
             logger.error(f"Erro no job {job.id}: {error_msg}")
 
-            if job.attempts < job.max_attempts:
+            # FileNotFoundError não é retryável - falhar imediatamente
+            is_retryable = not isinstance(e, (FileNotFoundError, PermissionError))
+
+            if is_retryable and job.attempts < job.max_attempts:
                 # Retry - manter como pending
                 job.status = JobStatus.PENDING
                 job.error = f"Tentativa {job.attempts}/{job.max_attempts}: {error_msg}"
@@ -114,7 +127,10 @@ class JobExecutor:
                 # Falha definitiva
                 job.status = JobStatus.FAILED
                 job.completed_at = _now_iso()
-                job.error = f"Falhou após {job.attempts} tentativas: {error_msg}"
+                if not is_retryable:
+                    job.error = f"Erro não recuperável: {error_msg}"
+                else:
+                    job.error = f"Falhou após {job.attempts} tentativas: {error_msg}"
 
         self._save_job(job)
         return job

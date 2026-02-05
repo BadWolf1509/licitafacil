@@ -1,9 +1,16 @@
+"""
+Configuração do banco de dados PostgreSQL (Supabase).
+
+O LicitaFácil usa exclusivamente PostgreSQL via Supabase.
+"""
+
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 import os
 from dotenv import load_dotenv
 
@@ -11,47 +18,42 @@ from dotenv import load_dotenv
 env_path = Path(__file__).parent.parent / '.env'
 load_dotenv(env_path)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./licitafacil.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-# Detectar tipo de banco de dados
-IS_SQLITE = DATABASE_URL.startswith("sqlite")
-IS_POSTGRES = DATABASE_URL.startswith("postgresql")
-
-if IS_SQLITE:
-    # SQLite: check_same_thread=False e timeout para evitar locks
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={
-            "check_same_thread": False,
-            "timeout": 30.0
-        },
-        pool_pre_ping=True
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL não configurada. "
+        "Configure com uma URL PostgreSQL do Supabase no arquivo .env"
     )
 
-    # Habilitar WAL mode para melhor concorrência em SQLite
-    @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_conn, connection_record):
-        cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA busy_timeout=30000")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.close()
+if not DATABASE_URL.startswith("postgresql"):
+    raise ValueError(
+        f"DATABASE_URL inválida: deve ser PostgreSQL. "
+        f"Recebido: {DATABASE_URL[:20]}..."
+    )
 
-elif IS_POSTGRES:
-    # PostgreSQL (Supabase): connection pooling otimizado
+# Detectar se está usando Supabase Pooler (porta 6543)
+_is_supabase_pooler = ":6543/" in DATABASE_URL or "pooler.supabase.com" in DATABASE_URL
+
+if _is_supabase_pooler:
+    # Supabase Pooler (transaction mode): NullPool obrigatório
+    # para evitar double-pooling que causa problemas de commit/rollback
+    engine = create_engine(
+        DATABASE_URL,
+        poolclass=NullPool,
+        echo=False
+    )
+else:
+    # PostgreSQL direto (sem pooler externo)
     engine = create_engine(
         DATABASE_URL,
         pool_size=5,
         max_overflow=10,
         pool_timeout=30,
-        pool_recycle=1800,  # Reconectar a cada 30 min
+        pool_recycle=1800,
         pool_pre_ping=True,
         echo=False
     )
-
-else:
-    # Outros bancos
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

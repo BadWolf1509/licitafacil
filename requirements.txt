@@ -12,6 +12,7 @@ psycopg2-binary>=2.9.10  # Driver PostgreSQL para Supabase
 # Autenticação
 python-jose[cryptography]>=3.5.0
 passlib[bcrypt]>=1.7.4
+bcrypt>=4.0.0,<5.0.0  # Fixado em 4.x para compatibilidade com passlib
 
 # Supabase (Auth, Storage, Realtime)
 supabase>=2.0.0
@@ -28,6 +29,9 @@ Pillow>=12.1.0
 python-dotenv>=1.2.1
 pydantic[email]>=2.12.5
 pydantic-settings>=2.12.0
+
+# Observabilidade
+prometheus-client>=0.21.0
 
 # Processamento de imagem (pré-processamento para OCR)
 # opencv-python é instalado pelo easyocr

@@ -203,3 +203,147 @@ class PaginatedAtestadoResponse(PaginatedResponse[AtestadoResponse]):
 class PaginatedAnaliseResponse(PaginatedResponse[AnaliseResponse]):
     """Resposta paginada de análises."""
     pass
+
+
+class PaginatedUsuarioResponse(PaginatedResponse[UsuarioAdminResponse]):
+    """Resposta paginada de usuários (admin)."""
+    pass
+
+
+# ============== API RESPONSES ==============
+
+class AuthConfigResponse(BaseModel):
+    """Configuração de autenticação para o frontend."""
+    mode: str
+    supabase_enabled: bool
+    supabase_url: Optional[str] = None
+    supabase_anon_key: Optional[str] = None
+
+
+class UserStatusResponse(BaseModel):
+    """Status do usuário logado."""
+    aprovado: bool
+    admin: bool
+    nome: str
+    auth_mode: str
+
+
+class PasswordRequirementsResponse(BaseModel):
+    """Requisitos de senha."""
+    requisitos: List[str]
+
+
+class QueueInfoResponse(BaseModel):
+    """Informações da fila de processamento."""
+    is_running: bool
+    queue_size: int
+    processing_count: int
+    max_concurrent: int
+    poll_interval: Optional[float] = None
+
+
+class QueueStatusResponse(BaseModel):
+    """Status da fila de processamento."""
+    status: str = "ok"
+    queue: QueueInfoResponse
+
+
+class AIProviderStatus(BaseModel):
+    """Status de um provedor de IA."""
+    name: str
+    available: bool
+    model: Optional[str] = None
+
+
+class AIStatistics(BaseModel):
+    """Estatísticas de uso de IA."""
+    total_requests: int = 0
+    successful_requests: int = 0
+    failed_requests: int = 0
+
+
+class AIStatusResponse(BaseModel):
+    """Status dos serviços de IA."""
+    status: str = "ok"
+    providers: dict
+    statistics: dict
+
+
+class ProcessingJobDetail(BaseModel):
+    """Detalhes de um job de processamento."""
+    id: str
+    status: str
+    user_id: int
+    job_type: str
+    file_path: Optional[str] = None
+    original_filename: Optional[str] = None
+    progress_current: int = 0
+    progress_total: int = 0
+    progress_stage: Optional[str] = None
+    progress_message: Optional[str] = None
+    pipeline: Optional[str] = None
+    created_at: str
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    canceled_at: Optional[str] = None
+    error: Optional[str] = None
+    result: Optional[dict] = None
+
+
+class UserJobsResponse(BaseModel):
+    """Lista de jobs do usuário."""
+    status: str = "ok"
+    jobs: List[ProcessingJobDetail]
+
+
+class JobStatusResponse(BaseModel):
+    """Status de um job específico."""
+    status: str = "ok"
+    job: ProcessingJobDetail
+
+
+class JobCancelResponse(BaseModel):
+    """Resposta de cancelamento de job."""
+    status: str = "ok"
+    message: str
+    job: Optional[ProcessingJobDetail] = None
+
+
+class ProcessingStatsResponse(BaseModel):
+    """Estatísticas de processamento."""
+    total_atestados: int
+    total_servicos: int
+    total_analises: int
+    atestados_por_usuario: int
+    servicos_por_atestado: float
+    exigencias_por_analise: float
+
+
+class JobDeleteResponse(BaseModel):
+    """Resposta de exclusão de job."""
+    status: str = "ok"
+    deleted: bool
+
+
+class AdminStatsResponse(BaseModel):
+    """Estatísticas de usuários do sistema."""
+    total_usuarios: int
+    usuarios_aprovados: int
+    usuarios_pendentes: int
+    usuarios_inativos: int
+
+
+class JobCleanupResponse(BaseModel):
+    """Resposta de limpeza de jobs órfãos."""
+    status: str = "ok"
+    orphaned_files: int
+    stuck_processing: int
+    total_cleaned: int
+    message: str
+
+
+class JobBulkDeleteResponse(BaseModel):
+    """Resposta de exclusão em massa de jobs."""
+    status: str = "ok"
+    deleted: int
+    message: str

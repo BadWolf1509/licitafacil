@@ -77,26 +77,63 @@ class PDFExtractionService:
             ProcessingCancelled: Se cancelamento solicitado
         """
         images = []
-        doc = fitz.open(file_path)
-        zoom = dpi / 72
-        matrix = fitz.Matrix(zoom, zoom)
-
-        total_pages = doc.page_count
-        for page_index, page in enumerate(doc):
-            self._check_cancel(cancel_check)
-            self._notify_progress(
-                progress_callback,
-                page_index + 1,
-                total_pages,
-                stage,
-                f"Convertendo pagina {page_index + 1} de {total_pages}"
-            )
-            pix = page.get_pixmap(matrix=matrix)
-            img_bytes = pix.tobytes("png")
+        for img_bytes in self.pdf_to_images_lazy(
+            file_path, dpi, progress_callback, cancel_check, stage
+        ):
             images.append(img_bytes)
-
-        doc.close()
         return images
+
+    def pdf_to_images_lazy(
+        self,
+        file_path: str,
+        dpi: int = 300,
+        progress_callback: ProgressCallback = None,
+        cancel_check: CancelCheck = None,
+        stage: str = "vision"
+    ):
+        """
+        Converte páginas de PDF em imagens PNG usando generator.
+
+        Gera imagens uma por vez para reduzir uso de memoria.
+        Ideal para PDFs grandes onde carregar todas as imagens
+        simultaneamente excederia a memoria disponivel.
+
+        Args:
+            file_path: Caminho para o arquivo PDF
+            dpi: Resolução em DPI (300 para melhor qualidade de OCR)
+            progress_callback: Callback para progresso
+            cancel_check: Função que retorna True se deve cancelar
+            stage: Nome do estágio para o callback
+
+        Yields:
+            Imagem em bytes (PNG) de cada página
+
+        Raises:
+            ProcessingCancelled: Se cancelamento solicitado
+        """
+        doc = fitz.open(file_path)
+        try:
+            zoom = dpi / 72
+            matrix = fitz.Matrix(zoom, zoom)
+            total_pages = doc.page_count
+
+            for page_index in range(total_pages):
+                self._check_cancel(cancel_check)
+                self._notify_progress(
+                    progress_callback,
+                    page_index + 1,
+                    total_pages,
+                    stage,
+                    f"Convertendo pagina {page_index + 1} de {total_pages}"
+                )
+                page = doc[page_index]
+                pix = page.get_pixmap(matrix=matrix)
+                img_bytes = pix.tobytes("png")
+                # Liberar memoria do pixmap imediatamente
+                del pix
+                yield img_bytes
+        finally:
+            doc.close()
 
     def extract_text_with_ocr_fallback(
         self,
@@ -170,9 +207,13 @@ class PDFExtractionService:
                         page = doc[page_idx]
                         pix = page.get_pixmap(matrix=matrix)
                         img_bytes = pix.tobytes("png")
+                        # Liberar memoria do pixmap imediatamente
+                        del pix
 
                         # Aplicar OCR na página
                         ocr_text = ocr_service.extract_text_from_bytes(img_bytes)
+                        # Liberar memoria da imagem apos OCR
+                        del img_bytes
 
                         if ocr_text and len(ocr_text.strip()) > 20:
                             # Substituir placeholder pelo texto do OCR

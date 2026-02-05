@@ -21,7 +21,19 @@ load_dotenv(env_path)
 config = context.config
 
 # Obter DATABASE_URL do ambiente (não usar set_main_option devido a caracteres especiais)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./licitafacil.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL não configurada. "
+        "Configure com uma URL PostgreSQL do Supabase no arquivo .env"
+    )
+
+if not DATABASE_URL.startswith("postgresql"):
+    raise ValueError(
+        f"DATABASE_URL inválida: deve ser PostgreSQL. "
+        f"Recebido: {DATABASE_URL[:20]}..."
+    )
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -74,20 +86,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    # Configuração especial para SQLite
-    is_sqlite = DATABASE_URL.startswith("sqlite")
-
-    if is_sqlite:
-        connectable = create_engine(
-            DATABASE_URL,
-            poolclass=pool.NullPool,
-            connect_args={"check_same_thread": False},
-        )
-    else:
-        connectable = create_engine(
-            DATABASE_URL,
-            poolclass=pool.NullPool,
-        )
+    connectable = create_engine(
+        DATABASE_URL,
+        poolclass=pool.NullPool,
+    )
 
     with connectable.connect() as connection:
         context.configure(

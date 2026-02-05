@@ -4,10 +4,13 @@ Utilitários unificados para códigos de item.
 Este módulo contém funções canônicas para manipulação de códigos de item,
 substituindo implementações duplicadas em outros módulos.
 """
-from typing import Any, Optional, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 import re
+import logging
 
-from .table_processor import parse_item_tuple, item_tuple_to_str
+from .table_processor import parse_item_tuple, item_tuple_to_str, parse_quantity
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_item_code(item: Any, strip_suffixes: bool = False) -> Optional[str]:
@@ -166,3 +169,167 @@ def max_restart_prefix_index(items: list) -> int:
                 if idx > max_idx:
                     max_idx = idx
     return max_idx
+
+
+def extract_item_code(desc: str) -> str:
+    """
+    Extrai código do item da descrição.
+
+    Reconhece formatos:
+    - Numérico padrão: "1.1", "001.03.01", "10.4-A"
+    - Prefixo Sx-: "S2-1.1"
+    - Prefixo AD-: "AD-1.1", "AD-1.1-A"
+    - Espaços como separador: "1 2 3"
+
+    Args:
+        desc: Descrição que pode começar com código de item
+
+    Returns:
+        Código extraído ou string vazia se não encontrado
+
+    Examples:
+        >>> extract_item_code("001.03.01 MOBILIZAÇÃO")
+        '001.03.01'
+        >>> extract_item_code("S2-1.1 Serviço")
+        'S2-1.1'
+        >>> extract_item_code("AD-1.1-A Item")
+        'AD-1.1-A'
+        >>> extract_item_code("Sem código aqui")
+        ''
+    """
+    if not desc:
+        return ""
+
+    text = desc.strip()
+
+    # Primeiro, tentar extrair formato com prefixo Sx- (ex: S2-1.1)
+    restart_match = re.match(r'^(S\d+-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
+    if restart_match:
+        return restart_match.group(1).upper()
+
+    # Tentar extrair formato com prefixo AD- (legacy: AD-1.1, AD-1.1-A)
+    ad_match = re.match(r'^(AD-\d{1,3}(?:\.\d{1,3})+(?:-[A-Z])?)\b', text, re.IGNORECASE)
+    if ad_match:
+        return ad_match.group(1).upper()
+
+    # Formato numérico padrão (ex: 1.1, 10.4, 10.4-A)
+    match = re.match(r'^(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}(?:-[A-Z])?)\b', text)
+    if not match:
+        match = re.match(r'^(\d{1,3}(?:\s+\d{1,2}){1,3})\b', text)
+
+    if match:
+        code = re.sub(r'[\s]+', '.', match.group(1))
+        code = re.sub(r'\.{2,}', '.', code).strip('.')
+        return code
+    return ""
+
+
+def split_item_description(desc: str) -> Tuple[str, str]:
+    """
+    Separa o código do item da descrição, se presente.
+
+    Args:
+        desc: Texto com possível código no início
+
+    Returns:
+        Tupla (código, descrição_limpa). Código vazio se não encontrado.
+
+    Examples:
+        >>> split_item_description("1.2.3 Serviço de teste")
+        ('1.2.3', 'Serviço de teste')
+        >>> split_item_description("Sem código aqui")
+        ('', 'Sem código aqui')
+        >>> split_item_description("")
+        ('', '')
+    """
+    if not desc:
+        return "", ""
+
+    code = extract_item_code(desc)
+    if not code:
+        return "", desc.strip()
+
+    cleaned = re.sub(
+        r"^(S\d+-)?(\d{1,3}(?:\s*\.\s*\d{1,3}){1,4}|\d{1,3}(?:\s+\d{1,2}){1,3})\s*[-.]?\s*",
+        "",
+        desc
+    ).strip()
+    return code, cleaned or desc.strip()
+
+
+def item_qty_matches_code(item_code: str, qty: float) -> bool:
+    """
+    Verifica se a quantidade é na verdade o código do item (vazamento de coluna).
+
+    Quando a extração de tabela falha, a coluna de código pode vazar
+    para a coluna de quantidade, resultando em qty == float(código_numérico).
+
+    Args:
+        item_code: Código do item
+        qty: Quantidade extraída
+
+    Returns:
+        True se a quantidade parece ser o código do item
+
+    Examples:
+        >>> item_qty_matches_code("1.2", 12.0)
+        True
+        >>> item_qty_matches_code("1.2", 50.0)
+        False
+    """
+    if not item_code or qty is None:
+        return False
+    digits = re.sub(r'\D', '', item_code)
+    if not digits:
+        return False
+    try:
+        return float(digits) == float(qty)
+    except (TypeError, ValueError):
+        return False
+
+
+def clear_item_code_quantities(
+    servicos: List[Dict[str, Any]],
+    min_ratio: float = 0.7,
+    min_samples: int = 10
+) -> int:
+    """
+    Remove quantidades que são na verdade códigos de item (vazamento de coluna).
+
+    Quando >= min_ratio dos itens têm qty == float(código), limpa todas
+    essas quantidades pois provavelmente houve vazamento de coluna na tabela.
+
+    Args:
+        servicos: Lista de serviços
+        min_ratio: Proporção mínima de matches para ativar limpeza
+        min_samples: Mínimo de amostras para ativar limpeza
+
+    Returns:
+        Número de quantidades limpas
+    """
+    if not servicos:
+        return 0
+    total = 0
+    matches = 0
+    for s in servicos:
+        code = normalize_item_code(s.get("item"))
+        qty = parse_quantity(s.get("quantidade"))
+        if not code or qty is None:
+            continue
+        total += 1
+        if item_qty_matches_code(code, qty):
+            matches += 1
+    ratio = (matches / total) if total else 0.0
+    if total < min_samples or ratio < min_ratio:
+        return 0
+
+    cleared = 0
+    for s in servicos:
+        code = normalize_item_code(s.get("item"))
+        qty = parse_quantity(s.get("quantidade"))
+        if code and qty is not None and item_qty_matches_code(code, qty):
+            s["quantidade"] = None
+            cleared += 1
+    if cleared:
+        logger.info(f"[QTY] Quantidades removidas por vazamento de coluna: {cleared} (ratio={ratio:.0%})")
+    return cleared

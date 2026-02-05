@@ -39,6 +39,7 @@ class AuditAction:
 
     # Acoes de sistema
     CONFIG_CHANGED = "config_changed"
+    SYSTEM_CLEANUP = "system_cleanup"
 
 
 class AuditService:

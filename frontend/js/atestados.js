@@ -594,8 +594,10 @@ const AtestadosModule = {
             const data = await api.delete(`/ai/queue/jobs/${jobId}`);
             if (data.deleted) {
                 this.removeJob(jobId);
+                ui.showAlert('Job removido permanentemente.', 'success');
+            } else {
+                ui.showAlert('Falha ao remover job do banco de dados.', 'error');
             }
-            ui.showAlert('Job removido da lista.', 'success');
         } catch (error) {
             ui.showAlert(error.message || 'Erro ao remover job', 'error');
         }

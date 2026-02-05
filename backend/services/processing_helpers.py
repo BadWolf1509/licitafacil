@@ -25,35 +25,6 @@ from .extraction import (
 )
 
 
-def item_qty_matches_code(item_code: str, qty: float) -> bool:
-    """
-    Verifica se a quantidade é igual aos dígitos do código do item.
-
-    Isso indica que a quantidade foi extraída incorretamente
-    (vazamento de coluna no OCR/tabela).
-
-    Args:
-        item_code: Código do item (ex: "1.2.3")
-        qty: Quantidade
-
-    Returns:
-        True se a quantidade corresponde aos dígitos do código
-    """
-    if not item_code or qty is None:
-        return False
-    digits = re.sub(r'\D', '', item_code)
-    if not digits:
-        return False
-    try:
-        return float(digits) == float(qty)
-    except (TypeError, ValueError):
-        return False
-
-
-# Funções importadas de services.extraction.item_utils:
-# normalize_item_code, item_code_in_text, split_restart_prefix
-
-
 def is_section_header_desc(desc: str) -> bool:
     """
     Verifica se a descrição é um cabeçalho de seção.
@@ -218,45 +189,5 @@ def count_item_codes_in_text(texto: str) -> int:
     return len(codes)
 
 
-def clear_item_code_quantities(servicos: list, min_ratio: float = 0.7, min_samples: int = 10) -> int:
-    """
-    Limpa quantidades que parecem ser códigos de item vazados.
 
-    Quando muitas quantidades correspondem aos dígitos do código do item,
-    é provável que seja um erro de extração de tabela.
-
-    Args:
-        servicos: Lista de serviços (modificada in-place)
-        min_ratio: Proporção mínima de matches para ativar limpeza
-        min_samples: Número mínimo de amostras para considerar
-
-    Returns:
-        Número de quantidades limpas
-    """
-    if not servicos:
-        return 0
-
-    total = 0
-    matches = 0
-    for s in servicos:
-        item_code = normalize_item_code(s.get("item"))
-        qty = parse_quantity(s.get("quantidade"))
-        if not item_code or qty is None:
-            continue
-        total += 1
-        if item_qty_matches_code(item_code, qty):
-            matches += 1
-
-    ratio = (matches / total) if total else 0.0
-    if total < min_samples or ratio < min_ratio:
-        return 0
-
-    cleared = 0
-    for s in servicos:
-        item_code = normalize_item_code(s.get("item"))
-        qty = parse_quantity(s.get("quantidade"))
-        if item_code and qty is not None and item_qty_matches_code(item_code, qty):
-            s["quantidade"] = None
-            cleared += 1
-
-    return cleared
+# clear_item_code_quantities and item_qty_matches_code re-exported from extraction.item_utils

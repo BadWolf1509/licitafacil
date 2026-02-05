@@ -3,31 +3,39 @@ Configuracoes de seguranca do LicitaFacil.
 SECRET_KEY, JWT e validacoes de seguranca.
 """
 import os
+import secrets
 from .base import ENVIRONMENT
 
 # === Seguranca ===
 SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    if ENVIRONMENT == "production":
+
+if ENVIRONMENT == "production":
+    # Producao: SECRET_KEY obrigatoria e segura
+    if not SECRET_KEY:
         raise ValueError(
             "CRITICO: SECRET_KEY nao definida em producao! "
             "Defina a variavel de ambiente SECRET_KEY com uma chave segura de pelo menos 32 caracteres."
         )
-    # Em desenvolvimento, usar chave padrao com aviso
-    import warnings
-    warnings.warn(
-        "SECRET_KEY nao definida! Usando chave de desenvolvimento. "
-        "Defina SECRET_KEY em producao.",
-        RuntimeWarning
-    )
-    SECRET_KEY = "dev-only-insecure-key-do-not-use-in-production"
-
-# Validar comprimento minimo da chave
-if len(SECRET_KEY) < 32 and ENVIRONMENT == "production":
-    raise ValueError(
-        f"SECRET_KEY muito curta ({len(SECRET_KEY)} chars). "
-        "Use pelo menos 32 caracteres em producao."
-    )
+    if SECRET_KEY.startswith("dev-"):
+        raise ValueError(
+            "CRITICO: SECRET_KEY de desenvolvimento detectada em producao! "
+            "Gere uma nova chave com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+        )
+    if len(SECRET_KEY) < 32:
+        raise ValueError(
+            f"SECRET_KEY muito curta ({len(SECRET_KEY)} chars). "
+            "Use pelo menos 32 caracteres em producao."
+        )
+else:
+    # Desenvolvimento: gerar chave dinamica se nao definida
+    if not SECRET_KEY:
+        import warnings
+        SECRET_KEY = secrets.token_urlsafe(32)
+        warnings.warn(
+            "SECRET_KEY nao definida! Gerada dinamicamente para esta sessao. "
+            "Defina SECRET_KEY em producao.",
+            RuntimeWarning
+        )
 
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
@@ -44,4 +52,4 @@ PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
 PASSWORD_REQUIRE_UPPERCASE = os.getenv("PASSWORD_REQUIRE_UPPERCASE", "true").lower() == "true"
 PASSWORD_REQUIRE_LOWERCASE = os.getenv("PASSWORD_REQUIRE_LOWERCASE", "true").lower() == "true"
 PASSWORD_REQUIRE_DIGIT = os.getenv("PASSWORD_REQUIRE_DIGIT", "true").lower() == "true"
-PASSWORD_REQUIRE_SPECIAL = os.getenv("PASSWORD_REQUIRE_SPECIAL", "false").lower() == "true"
+PASSWORD_REQUIRE_SPECIAL = os.getenv("PASSWORD_REQUIRE_SPECIAL", "true").lower() == "true"

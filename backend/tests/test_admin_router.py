@@ -158,7 +158,11 @@ class TestAdminOperations:
 
                 if response.status_code == 200:
                     data = response.json()
-                    assert isinstance(data, list)
+                    # Resposta agora é paginada
+                    assert "items" in data
+                    assert "total" in data
+                    assert "page" in data
+                    assert isinstance(data["items"], list)
         finally:
             db_session.delete(admin)
             db_session.commit()

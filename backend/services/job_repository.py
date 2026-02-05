@@ -4,14 +4,16 @@ Repositório de Jobs de Processamento.
 Encapsula toda a lógica de persistência de jobs,
 separando as preocupações de armazenamento da lógica de processamento.
 
-Usa SQLAlchemy para compatibilidade com SQLite e PostgreSQL.
+Usa SQLAlchemy com PostgreSQL (Supabase).
 """
 
+import os
 from datetime import datetime
 from typing import List, Optional
 
+from sqlalchemy import text
 
-from database import get_db_session
+from database import get_db_session, engine
 from models import ProcessingJobModel
 from .models import JobStatus, ProcessingJob
 from logging_config import get_logger
@@ -28,7 +30,7 @@ class JobRepository:
     """
     Repositório para persistência de jobs de processamento.
 
-    Usa SQLAlchemy ORM para compatibilidade com SQLite e PostgreSQL.
+    Usa SQLAlchemy com PostgreSQL (Supabase).
     """
 
     def _model_to_job(self, model: ProcessingJobModel) -> ProcessingJob:
@@ -144,7 +146,10 @@ class JobRepository:
 
     def delete(self, job_id: str) -> bool:
         """
-        Remove um job do banco.
+        Remove um job do banco usando conexão direta com AUTOCOMMIT.
+
+        Usa engine.connect() com AUTOCOMMIT para garantir que o DELETE
+        persista no Supabase (bypass do Session e transaction pooling).
 
         Args:
             job_id: ID do job
@@ -152,12 +157,36 @@ class JobRepository:
         Returns:
             True se removido, False se não encontrado
         """
-        with get_db_session() as db:
-            result = db.query(ProcessingJobModel).filter(
-                ProcessingJobModel.id == job_id
-            ).delete()
-            db.commit()
-            return result > 0
+        logger.info(f"Tentando excluir job {job_id} do banco...")
+
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            result = conn.execute(
+                text("DELETE FROM processing_jobs WHERE id = :job_id"),
+                {"job_id": job_id}
+            )
+            deleted_count = result.rowcount
+            logger.info(f"DELETE executado para job {job_id}: rowcount={deleted_count}")
+
+            # Verificação pós-delete
+            verify = conn.execute(
+                text("SELECT COUNT(*) FROM processing_jobs WHERE id = :job_id"),
+                {"job_id": job_id}
+            )
+            still_exists = verify.scalar() or 0
+
+            if still_exists > 0:
+                logger.error(
+                    f"FALHA: Job {job_id} ainda existe após DELETE! "
+                    f"rowcount foi {deleted_count} mas registro persiste."
+                )
+                return False
+
+            if deleted_count > 0:
+                logger.info(f"Job {job_id} excluído e verificado com sucesso")
+                return True
+            else:
+                logger.warning(f"Job {job_id} não encontrado para exclusão (rowcount=0)")
+                return False
 
     def update_status(
         self,
@@ -286,3 +315,79 @@ class JobRepository:
                 "failed": counts.get("failed", 0),
                 "cancelled": counts.get("cancelled", 0)
             }
+
+    def cleanup_orphaned_jobs(self) -> dict:
+        """
+        Identifica e marca como FAILED jobs cujos arquivos não existem mais.
+
+        Também marca como FAILED jobs stuck em 'processing' (sem worker ativo).
+
+        Returns:
+            Dicionário com contagem de jobs limpos por categoria.
+        """
+        now = _now_iso()
+        result = {"orphaned_files": 0, "stuck_processing": 0, "total_cleaned": 0}
+
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            # 1. Jobs pendentes/processando com arquivos ausentes
+            active_rows = conn.execute(
+                text("SELECT id, file_path FROM processing_jobs WHERE status IN ('pending', 'processing')")
+            ).fetchall()
+
+            for row in active_rows:
+                job_id, file_path = row[0], row[1]
+                if not file_path or not os.path.exists(file_path):
+                    conn.execute(
+                        text(
+                            "UPDATE processing_jobs SET status = 'failed', "
+                            "completed_at = :now, "
+                            "error = :error "
+                            "WHERE id = :job_id"
+                        ),
+                        {
+                            "now": now,
+                            "error": f"Arquivo não encontrado (cleanup): {file_path}",
+                            "job_id": job_id
+                        }
+                    )
+                    result["orphaned_files"] += 1
+                    logger.info(f"Job órfão limpo: {job_id}")
+
+            # 2. Jobs stuck em 'processing' (sem worker ativo)
+            stuck_result = conn.execute(
+                text(
+                    "UPDATE processing_jobs SET status = 'failed', "
+                    "completed_at = :now, "
+                    "error = 'Job stuck em processamento (cleanup automático)' "
+                    "WHERE status = 'processing'"
+                ),
+                {"now": now}
+            )
+            result["stuck_processing"] = stuck_result.rowcount
+
+        result["total_cleaned"] = result["orphaned_files"] + result["stuck_processing"]
+        return result
+
+    def delete_by_statuses(self, statuses: List[str]) -> int:
+        """
+        Remove jobs em determinados status usando conexão direta com AUTOCOMMIT.
+
+        Args:
+            statuses: Lista de status para deletar (ex: ['failed', 'cancelled'])
+
+        Returns:
+            Número de jobs removidos.
+        """
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            # Construir placeholders para IN clause
+            placeholders = ", ".join(f":s{i}" for i in range(len(statuses)))
+            params = {f"s{i}": s for i, s in enumerate(statuses)}
+
+            result = conn.execute(
+                text(f"DELETE FROM processing_jobs WHERE status IN ({placeholders})"),
+                params
+            )
+            count = result.rowcount
+
+            logger.info(f"Bulk delete: {count} jobs removidos (statuses={statuses})")
+            return count
