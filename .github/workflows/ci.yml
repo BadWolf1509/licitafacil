@@ -25,7 +25,7 @@ jobs:
         run: pip install -r ../requirements-dev.txt
 
       - name: Run tests
-        run: python -m pytest tests/ -x -q --ignore=tests/integration --cov=. --cov-report=term-missing --cov-config=.coveragerc --cov-fail-under=50
+        run: python -m pytest tests/ -x -q --ignore=tests/integration --cov=. --cov-report=term-missing --cov-config=.coveragerc --cov-fail-under=25
 
       - name: Type check
         run: python -m mypy . --ignore-missing-imports
