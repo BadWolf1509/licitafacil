@@ -11,6 +11,7 @@ from repositories import usuario_repository
 from routers.base import AdminRouter
 from services.audit_service import audit_service, AuditAction
 from services.processing_queue import processing_queue
+from services.cache import cached, invalidate_prefix
 from utils.http_helpers import get_client_ip_safe
 from utils.pagination import PaginationParams, paginate_query
 
@@ -110,6 +111,8 @@ def approve_user(
     usuario.approved_by = current_user.id
     db.commit()
 
+    invalidate_prefix("admin_stats")
+
     # Registrar auditoria
     audit_service.log_action(
         db=db,
@@ -167,6 +170,8 @@ def deactivate_user(
     usuario.is_active = False
     db.commit()
 
+    invalidate_prefix("admin_stats")
+
     # Registrar auditoria
     audit_service.log_action(
         db=db,
@@ -222,6 +227,8 @@ def reactivate_user(
 
     usuario.is_active = True
     db.commit()
+
+    invalidate_prefix("admin_stats")
 
     # Registrar auditoria
     audit_service.log_action(
@@ -292,6 +299,8 @@ def delete_user(
     db.delete(usuario)
     db.commit()
 
+    invalidate_prefix("admin_stats")
+
     # Registrar auditoria
     audit_service.log_action(
         db=db,
@@ -331,7 +340,13 @@ def get_statistics(
     - Total de atestados cadastrados
     - Total de análises realizadas
     """
-    return AdminStatsResponse(**usuario_repository.get_stats(db))
+    return AdminStatsResponse(**_get_cached_stats(db))
+
+
+@cached(ttl=60, prefix="admin_stats")
+def _get_cached_stats(db: Session) -> dict:
+    """Retorna estatisticas com cache de 60s."""
+    return usuario_repository.get_stats(db)
 
 
 @router.post(

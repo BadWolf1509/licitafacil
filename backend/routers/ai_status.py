@@ -56,6 +56,7 @@ def _get_job_with_permission(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=Messages.JOB_NOT_FOUND)
 
     if job.user_id != user.id and not user.is_admin:
+        logger.warning(f"[SECURITY] Acesso negado: user {user.id} tentou acessar job {job_id} de outro usuario")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=Messages.ACCESS_DENIED)
 
     if allowed_statuses and job.status not in allowed_statuses:

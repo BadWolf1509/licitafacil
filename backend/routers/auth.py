@@ -247,6 +247,7 @@ def supabase_login(credentials: UsuarioLogin, db: Session = Depends(get_db)):
 
     result = sign_in_with_password(credentials.email, credentials.senha)
     if not result:
+        logger.warning("[AUTH] Login falhou: credenciais invalidas")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=INVALID_CREDENTIALS,
@@ -256,7 +257,7 @@ def supabase_login(credentials: UsuarioLogin, db: Session = Depends(get_db)):
     # Verificar se usuário existe localmente e está ativo
     user = get_user_by_email(db, credentials.email)
     if not user:
-        # Usar mesma mensagem genérica para não revelar existência do usuário
+        logger.warning("[AUTH] Login falhou: usuario nao encontrado localmente")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=INVALID_CREDENTIALS

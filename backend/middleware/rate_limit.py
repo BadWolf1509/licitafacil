@@ -20,6 +20,8 @@ from config import (
     RATE_LIMIT_AUTH_LOGIN,
     RATE_LIMIT_AUTH_REGISTER,
     RATE_LIMIT_AUTH_WINDOW,
+    RATE_LIMIT_UPLOAD,
+    RATE_LIMIT_UPLOAD_WINDOW,
     Messages,
 )
 from logging_config import get_logger
@@ -48,6 +50,8 @@ PATH_SPECIFIC_LIMITS: List[Tuple[str, int, int]] = [
     ("/auth/login", RATE_LIMIT_AUTH_LOGIN, RATE_LIMIT_AUTH_WINDOW),
     # Endpoint de registro - ainda mais restritivo
     ("/auth/registrar", RATE_LIMIT_AUTH_REGISTER, RATE_LIMIT_AUTH_WINDOW),
+    # Upload de atestados - limitar processamento pesado
+    ("/atestados/upload", RATE_LIMIT_UPLOAD, RATE_LIMIT_UPLOAD_WINDOW),
 ]
 
 

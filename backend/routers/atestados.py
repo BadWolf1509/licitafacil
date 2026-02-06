@@ -1,6 +1,5 @@
 import os
 import uuid
-import tempfile
 from fastapi import Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Union
@@ -25,7 +24,7 @@ from utils.router_helpers import (
     save_temp_file_from_storage
 )
 from utils.http_helpers import get_user_resource_or_404
-from utils.file_helpers import cleanup_temp_file
+from utils.file_helpers import cleanup_temp_file, temp_file_from_storage
 from routers.base import AuthenticatedRouter
 
 from logging_config import get_logger, log_action
@@ -243,18 +242,7 @@ async def _process_sync(
     """Processa atestado de forma síncrona (serverless)."""
     from services.sync_processor import get_sync_processor
 
-    # Baixar arquivo do storage para arquivo temporário
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
-    temp_path = temp_file.name
-    temp_file.close()
-
-    try:
-        if not save_temp_file_from_storage(storage_path, temp_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao baixar arquivo do storage"
-            )
-
+    with temp_file_from_storage(storage_path, save_temp_file_from_storage, suffix=file_ext) as temp_path:
         processor = get_sync_processor()
         result = processor.process_atestado(
             db=db,
@@ -278,9 +266,6 @@ async def _process_sync(
                 detail="Erro interno: atestado não encontrado após processamento"
             )
         return atestado
-
-    finally:
-        cleanup_temp_file(temp_path)
 
 
 def _enqueue_processing(

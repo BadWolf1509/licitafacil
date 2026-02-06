@@ -113,7 +113,9 @@ class ProcessingJobModel(Base):
     __tablename__ = "processing_jobs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("usuarios.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     original_filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

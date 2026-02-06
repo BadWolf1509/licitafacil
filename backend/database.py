@@ -61,10 +61,12 @@ elif _is_supabase_pooler:
     )
 else:
     # PostgreSQL direto (sem pooler externo)
+    _pool_size = int(os.getenv("DB_POOL_SIZE", "5"))
+    _max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))
     engine = create_engine(
         DATABASE_URL,
-        pool_size=5,
-        max_overflow=10,
+        pool_size=_pool_size,
+        max_overflow=_max_overflow,
         pool_timeout=30,
         pool_recycle=1800,
         pool_pre_ping=True,

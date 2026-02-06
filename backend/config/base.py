@@ -114,6 +114,10 @@ RATE_LIMIT_AUTH_LOGIN = env_int("RATE_LIMIT_AUTH_LOGIN", 5)  # 5 tentativas
 RATE_LIMIT_AUTH_REGISTER = env_int("RATE_LIMIT_AUTH_REGISTER", 3)  # 3 registros
 RATE_LIMIT_AUTH_WINDOW = env_int("RATE_LIMIT_AUTH_WINDOW", 60)  # por minuto
 
+# Rate Limiting especifico para upload (evitar abuso de processamento)
+RATE_LIMIT_UPLOAD = env_int("RATE_LIMIT_UPLOAD", 10)  # 10 uploads
+RATE_LIMIT_UPLOAD_WINDOW = env_int("RATE_LIMIT_UPLOAD_WINDOW", 300)  # por 5 minutos
+
 
 # === Ambiente ===
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")

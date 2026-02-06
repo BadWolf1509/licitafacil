@@ -1,6 +1,5 @@
 import os
 import uuid
-import tempfile
 from decimal import Decimal
 from typing import Dict, Any
 from fastapi import Depends, HTTPException, status, UploadFile, File, Form
@@ -23,7 +22,7 @@ from utils.router_helpers import (
     save_temp_file_from_storage
 )
 from utils.http_helpers import get_user_resource_or_404
-from utils.file_helpers import cleanup_temp_file
+from utils.file_helpers import cleanup_temp_file, temp_file_from_storage
 from routers.base import AuthenticatedRouter
 from logging_config import get_logger, log_action
 from utils import handle_exception
@@ -172,68 +171,53 @@ async def create_analysis(
         content_type="application/pdf"
     )
 
-    # Criar arquivo temporário para processamento
-    temp_file = None
+    # Processar arquivo temporário
     try:
-        # Baixar arquivo do storage para arquivo temporário
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
-        temp_path = temp_file.name
-        temp_file.close()
+        with temp_file_from_storage(storage_path, save_temp_file_from_storage, suffix=file_ext) as temp_path:
+            # Processar edital (extrair texto e exigências)
+            resultado_edital = services.document_processor.process_edital(temp_path)
+            exigencias = resultado_edital.get("exigencias", [])
 
-        if not save_temp_file_from_storage(storage_path, temp_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao preparar arquivo para processamento"
+            # Buscar atestados do usuário usando repository
+            atestados = atestado_repository.get_all_with_services(db, current_user.id)
+
+            # Converter atestados para formato de análise
+            atestados_dict = atestados_to_dict(atestados)
+
+            # Fazer matching se houver exigências e atestados
+            resultado_matching = []
+            if exigencias and atestados_dict:
+                resultado_matching = services.document_processor.analyze_qualification(
+                    exigencias, atestados_dict
+                )
+
+            # Criar análise (salva o path do storage, não o path local)
+            nova_analise = Analise(
+                user_id=current_user.id,
+                nome_licitacao=nome_licitacao,
+                arquivo_path=storage_path,  # Caminho no storage
+                exigencias_json=exigencias,
+                resultado_json=resultado_matching
+            )
+            db.add(nova_analise)
+            db.commit()
+            db.refresh(nova_analise)
+
+            log_action(
+                logger, "analise_created",
+                user_id=current_user.id,
+                resource_type="analise",
+                resource_id=nova_analise.id,
+                exigencias_count=len(exigencias),
+                matches_count=len(resultado_matching)
             )
 
-        # Processar edital (extrair texto e exigências)
-        resultado_edital = services.document_processor.process_edital(temp_path)
-        exigencias = resultado_edital.get("exigencias", [])
-
-        # Buscar atestados do usuário usando repository
-        atestados = atestado_repository.get_all_with_services(db, current_user.id)
-
-        # Converter atestados para formato de análise
-        atestados_dict = atestados_to_dict(atestados)
-
-        # Fazer matching se houver exigências e atestados
-        resultado_matching = []
-        if exigencias and atestados_dict:
-            resultado_matching = services.document_processor.analyze_qualification(
-                exigencias, atestados_dict
-            )
-
-        # Criar análise (salva o path do storage, não o path local)
-        nova_analise = Analise(
-            user_id=current_user.id,
-            nome_licitacao=nome_licitacao,
-            arquivo_path=storage_path,  # Caminho no storage
-            exigencias_json=exigencias,
-            resultado_json=resultado_matching
-        )
-        db.add(nova_analise)
-        db.commit()
-        db.refresh(nova_analise)
-
-        log_action(
-            logger, "analise_created",
-            user_id=current_user.id,
-            resource_type="analise",
-            resource_id=nova_analise.id,
-            exigencias_count=len(exigencias),
-            matches_count=len(resultado_matching)
-        )
-
-        return nova_analise
+            return nova_analise
 
     except Exception as e:
         # Em caso de erro, remover arquivo do storage
         safe_delete_file(storage_path)
         raise handle_exception(e, logger, "ao processar edital")
-
-    finally:
-        if temp_file:
-            cleanup_temp_file(temp_path)
 
 
 @router.post(
@@ -280,21 +264,29 @@ async def create_manual_analysis(
     atestados_dict = atestados_to_dict(atestados)
     logger.info(f"[ANALISE_MANUAL] Atestados com servicos: {len(atestados_dict) if atestados_dict else 0}")
 
-    # Fazer matching se houver atestados
+    # Fazer matching
     resultado_matching = []
-    if atestados_dict:
-        try:
-            logger.info("[ANALISE_MANUAL] Iniciando matching...")
-            resultado_matching = services.document_processor.analyze_qualification(
-                exigencias, atestados_dict
-            )
-            logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching) if resultado_matching else 0} resultados")
-            # Serializar resultado (Decimal -> float)
-            resultado_matching = _serialize_for_json(resultado_matching)
-        except Exception as e:
-            logger.error(f"[ANALISE_MANUAL] Erro no matching: {e}", exc_info=True)
-    else:
-        logger.warning("[ANALISE_MANUAL] Nenhum atestado com servicos para fazer matching")
+    try:
+        logger.info("[ANALISE_MANUAL] Iniciando matching...")
+        resultado_matching = services.document_processor.analyze_qualification(
+            exigencias, atestados_dict
+        )
+        logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching)} resultados")
+        # Serializar resultado (Decimal -> float)
+        resultado_matching = _serialize_for_json(resultado_matching)
+    except Exception as e:
+        logger.error(f"[ANALISE_MANUAL] Erro no matching: {e}", exc_info=True)
+        # Gerar resultados nao_atende como fallback em caso de erro
+        resultado_matching = [
+            {
+                "exigencia": _serialize_for_json(exig),
+                "status": "nao_atende",
+                "atestados_recomendados": [],
+                "soma_quantidades": 0.0,
+                "percentual_total": 0.0,
+            }
+            for exig in exigencias
+        ]
 
     # Criar análise
     nova_analise = Analise(
@@ -379,49 +371,35 @@ async def reprocess_analysis(
         )
 
     # Baixar arquivo do storage para arquivo temporário
-    temp_file = None
+    file_ext = os.path.splitext(analise.arquivo_path)[1] or ".pdf"
     try:
-        file_ext = os.path.splitext(analise.arquivo_path)[1] or ".pdf"
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
-        temp_path = temp_file.name
-        temp_file.close()
+        with temp_file_from_storage(analise.arquivo_path, save_temp_file_from_storage, suffix=file_ext) as temp_path:
+            # Reprocessar edital
+            resultado_edital = services.document_processor.process_edital(temp_path)
+            exigencias = resultado_edital.get("exigencias", [])
 
-        if not save_temp_file_from_storage(analise.arquivo_path, temp_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao baixar arquivo do storage"
-            )
+            # Converter atestados para formato de análise
+            atestados_dict = atestados_to_dict(atestados)
 
-        # Reprocessar edital
-        resultado_edital = services.document_processor.process_edital(temp_path)
-        exigencias = resultado_edital.get("exigencias", [])
+            # Fazer matching
+            resultado_matching = []
+            if exigencias and atestados_dict:
+                resultado_matching = services.document_processor.analyze_qualification(
+                    exigencias, atestados_dict
+                )
 
-        # Converter atestados para formato de análise
-        atestados_dict = atestados_to_dict(atestados)
+            # Atualizar análise
+            analise.exigencias_json = exigencias
+            analise.resultado_json = resultado_matching
+            db.commit()
+            db.refresh(analise)
 
-        # Fazer matching
-        resultado_matching = []
-        if exigencias and atestados_dict:
-            resultado_matching = services.document_processor.analyze_qualification(
-                exigencias, atestados_dict
-            )
-
-        # Atualizar análise
-        analise.exigencias_json = exigencias
-        analise.resultado_json = resultado_matching
-        db.commit()
-        db.refresh(analise)
-
-        return analise
+            return analise
 
     except HTTPException:
         raise
     except Exception as e:
         raise handle_exception(e, logger, f"ao reprocessar análise {analise_id}")
-
-    finally:
-        if temp_file:
-            cleanup_temp_file(temp_path)
 
 
 @router.delete(

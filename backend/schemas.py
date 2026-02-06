@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional, List, Generic, TypeVar, Any, Sequence
 from datetime import datetime
 from decimal import Decimal
@@ -56,10 +56,16 @@ class Token(BaseModel):
 
 class ServicoAtestado(BaseModel):
     """Representa um serviço individual dentro de um atestado."""
-    item: Optional[str] = None
-    descricao: Optional[str] = None
+    item: Optional[str] = Field(None, max_length=50)
+    descricao: Optional[str] = Field(None, max_length=1000)
     quantidade: Optional[float] = None
-    unidade: Optional[str] = None
+    unidade: Optional[str] = Field(None, max_length=50)
+
+    @model_validator(mode="after")
+    def validate_descricao_not_empty(self) -> "ServicoAtestado":
+        if self.descricao is not None and not self.descricao.strip():
+            raise ValueError("descricao nao pode ser uma string vazia")
+        return self
 
 
 
