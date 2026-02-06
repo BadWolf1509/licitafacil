@@ -68,23 +68,20 @@ class AIServiceProtocol(Protocol):
 
 
 class DocumentProcessorProtocol(Protocol):
-    """Protocolo para processador de documentos."""
+    """
+    Protocolo completo do DocumentProcessor.
+
+    Inclui metodos publicos e internos usados por AtestadoPipeline e AtestadoProcessor.
+    """
 
     def process_atestado(
         self,
         file_path: str,
-        **kwargs
+        use_vision: bool = True,
+        progress_callback: Optional[Any] = None,
+        cancel_check: Optional[Any] = None,
     ) -> Dict[str, Any]:
-        """
-        Processa um atestado de capacidade tecnica.
-
-        Args:
-            file_path: Caminho do arquivo
-            **kwargs: Opcoes adicionais
-
-        Returns:
-            Dados extraidos do atestado
-        """
+        """Processa um atestado de capacidade tecnica."""
         ...
 
     def process_edital(
@@ -92,16 +89,7 @@ class DocumentProcessorProtocol(Protocol):
         file_path: str,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Processa um edital de licitacao.
-
-        Args:
-            file_path: Caminho do arquivo
-            **kwargs: Opcoes adicionais
-
-        Returns:
-            Exigencias extraidas do edital
-        """
+        """Processa um edital de licitacao."""
         ...
 
     def analyze_qualification(
@@ -109,20 +97,42 @@ class DocumentProcessorProtocol(Protocol):
         exigencias: List[Dict],
         atestados: List[Dict]
     ) -> List[Dict]:
-        """
-        Analisa qualificacao tecnica.
-
-        Args:
-            exigencias: Lista de exigencias do edital
-            atestados: Lista de atestados disponiveis
-
-        Returns:
-            Resultado do matching exigencias x atestados
-        """
+        """Analisa qualificacao tecnica."""
         ...
 
     def get_status(self) -> Dict[str, Any]:
         """Retorna status dos servicos de processamento."""
+        ...
+
+    def _postprocess_servicos(
+        self,
+        servicos: list,
+        use_ai: bool,
+        table_used: bool,
+        servicos_table: list,
+        texto: str,
+        strict_item_gate: bool = False,
+        skip_no_code_dedupe: bool = False,
+    ) -> list:
+        """Aplica pos-processamento nos servicos extraidos."""
+        ...
+
+    def _build_restart_prefix_maps(
+        self, servicos: list
+    ) -> tuple:
+        """Constroi mapas de prefixos de restart."""
+        ...
+
+    def _build_text_item_map(self, items: list) -> dict:
+        """Constroi mapa de itens de texto."""
+        ...
+
+    def _apply_text_descriptions(self, servicos: list, text_map: dict) -> int:
+        """Aplica descricoes de texto aos servicos."""
+        ...
+
+    def _should_replace_desc(self, current_desc: str, candidate_desc: str) -> bool:
+        """Verifica se a descricao candidata deve substituir a atual."""
         ...
 
 

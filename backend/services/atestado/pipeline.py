@@ -12,7 +12,7 @@ from logging_config import get_logger
 from config import AtestadoProcessingConfig as APC
 
 if TYPE_CHECKING:
-    from services.interfaces import DocumentProcessorProtocol
+    from services.protocols import DocumentProcessorProtocol
 
 logger = get_logger('services.atestado.pipeline')
 

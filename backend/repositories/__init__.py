@@ -6,6 +6,7 @@ from .base import BaseRepository
 from .atestado_repository import atestado_repository, AtestadoRepository
 from .analise_repository import analise_repository, AnaliseRepository
 from .usuario_repository import usuario_repository, UsuarioRepository
+from .job_repository import JobRepository
 
 __all__ = [
     'BaseRepository',
@@ -15,4 +16,5 @@ __all__ = [
     'AnaliseRepository',
     'usuario_repository',
     'UsuarioRepository',
+    'JobRepository',
 ]

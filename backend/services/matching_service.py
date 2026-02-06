@@ -209,8 +209,12 @@ class MatchingService:
         exigencias: List[Dict[str, Any]],
         atestados: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        if not exigencias or not atestados:
+        if not exigencias:
             return []
+
+        if not atestados:
+            logger.warning("match_exigencias chamado sem atestados - gerando resultados nao_atende")
+            return self._build_empty_results(exigencias)
 
         atestados_prepared = _build_atestado_entries(atestados)
         results: List[Dict[str, Any]] = []
@@ -368,6 +372,38 @@ class MatchingService:
             }
             logger.info(json.dumps(audit_payload, ensure_ascii=True))
 
+        return results
+
+    def _build_empty_results(
+        self, exigencias: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Gera resultados nao_atende para cada exigencia quando nao ha atestados."""
+        results: List[Dict[str, Any]] = []
+        for exig in exigencias:
+            req_desc_raw = (exig.get("descricao") or exig.get("exigencia") or "").strip()
+            req_qty = _coerce_quantity(
+                exig.get("quantidade_minima")
+                or exig.get("quantidade")
+                or exig.get("quantidade_exigida")
+                or exig.get("qtd")
+            )
+            req_unit_raw = (exig.get("unidade") or "").strip()
+            req_unit = normalize_unit(req_unit_raw)
+            allow_sum = _resolve_allow_sum(exig)
+
+            results.append({
+                "exigencia": {
+                    "descricao": req_desc_raw,
+                    "quantidade_minima": req_qty,
+                    "unidade": req_unit or req_unit_raw,
+                    "permitir_soma": allow_sum,
+                    "exige_unico": not allow_sum,
+                },
+                "status": "nao_atende",
+                "atestados_recomendados": [],
+                "soma_quantidades": 0.0,
+                "percentual_total": 0.0,
+            })
         return results
 
 
