@@ -528,3 +528,26 @@ class TestIntegrationAllImprovements:
         assert 1 not in ids_recomendados
         # Atestados #2 e #3 (verticais) devem estar
         assert 2 in ids_recomendados
+
+
+def test_matching_no_atestados_returns_nao_atende():
+    """Quando nao ha atestados, deve retornar nao_atende para cada exigencia."""
+    exigencias = [
+        {"descricao": "Pavimentacao asfaltica", "quantidade_minima": 500, "unidade": "M2"},
+        {"descricao": "Drenagem pluvial", "quantidade_minima": 200, "unidade": "M"},
+    ]
+    results = matching_service.match_exigencias(exigencias, [])
+    assert len(results) == 2
+    assert results[0]["status"] == "nao_atende"
+    assert results[0]["soma_quantidades"] == 0.0
+    assert results[0]["atestados_recomendados"] == []
+    assert results[0]["exigencia"]["descricao"] == "Pavimentacao asfaltica"
+    assert results[1]["status"] == "nao_atende"
+    assert results[1]["exigencia"]["descricao"] == "Drenagem pluvial"
+
+
+def test_matching_no_exigencias_returns_empty():
+    """Quando nao ha exigencias, deve retornar lista vazia."""
+    atestados = [{"id": 1, "descricao_servico": "Atestado", "servicos_json": []}]
+    results = matching_service.match_exigencias([], atestados)
+    assert results == []

@@ -3,6 +3,7 @@ Testes de segurança para o LicitaFácil.
 
 Verifica CORS, autenticação, rate limiting e validação de uploads.
 """
+import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
@@ -312,3 +313,74 @@ class TestSupabaseAuthConfig:
         data = response.json()
         assert "mode" in data
         assert "supabase_enabled" in data
+
+
+class TestPathTraversalProtection:
+    """Testes de protecao contra path traversal em storage paths."""
+
+    def test_validate_storage_path_valid(self):
+        from utils.router_helpers import _validate_storage_path
+        result = _validate_storage_path("users/1/atestados/file.pdf")
+        assert result == "users/1/atestados/file.pdf"
+
+    def test_validate_storage_path_rejects_dotdot(self):
+        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        with pytest.raises(PathTraversalError):
+            _validate_storage_path("users/1/../../etc/passwd")
+
+    def test_validate_storage_path_rejects_dotdot_middle(self):
+        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        with pytest.raises(PathTraversalError):
+            _validate_storage_path("users/1/atestados/../../../secrets")
+
+    def test_validate_storage_path_rejects_outside_users(self):
+        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        with pytest.raises(PathTraversalError):
+            _validate_storage_path("tmp/malicious/file.pdf")
+
+    def test_validate_storage_path_normalizes_slashes(self):
+        from utils.router_helpers import _validate_storage_path
+        result = _validate_storage_path("users/1//atestados///file.pdf")
+        assert result == "users/1/atestados/file.pdf"
+
+
+class TestUploadRateLimitConfig:
+    """Testes de configuracao de rate limit para uploads."""
+
+    def test_upload_rate_limit_config_exists(self):
+        from config import RATE_LIMIT_UPLOAD, RATE_LIMIT_UPLOAD_WINDOW
+        assert RATE_LIMIT_UPLOAD > 0
+        assert RATE_LIMIT_UPLOAD_WINDOW > 0
+
+    def test_upload_rate_limit_in_path_specific_limits(self):
+        from middleware.rate_limit import PATH_SPECIFIC_LIMITS
+        upload_limits = [p for p in PATH_SPECIFIC_LIMITS if "upload" in p[0]]
+        assert len(upload_limits) >= 1
+
+    def test_upload_rate_limit_more_restrictive_than_global(self):
+        from config import RATE_LIMIT_REQUESTS, RATE_LIMIT_UPLOAD
+        assert RATE_LIMIT_UPLOAD < RATE_LIMIT_REQUESTS
+
+
+class TestServicoAtestadoValidation:
+    """Testes de validacao do schema ServicoAtestado."""
+
+    def test_valid_servico(self):
+        from schemas import ServicoAtestado
+        s = ServicoAtestado(descricao="Pavimentacao asfaltica", quantidade=100.0, unidade="M2")
+        assert s.descricao == "Pavimentacao asfaltica"
+
+    def test_empty_descricao_rejected(self):
+        from schemas import ServicoAtestado
+        with pytest.raises(ValueError, match="descricao nao pode ser uma string vazia"):
+            ServicoAtestado(descricao="   ", quantidade=100.0)
+
+    def test_descricao_max_length(self):
+        from schemas import ServicoAtestado
+        with pytest.raises(ValueError):
+            ServicoAtestado(descricao="A" * 1001, quantidade=100.0)
+
+    def test_none_descricao_allowed(self):
+        from schemas import ServicoAtestado
+        s = ServicoAtestado(quantidade=100.0, unidade="M2")
+        assert s.descricao is None

@@ -16,7 +16,7 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock, PropertyMock
 from contextlib import contextmanager
 
-from services.job_repository import JobRepository, _now_iso
+from repositories.job_repository import JobRepository, _now_iso
 from services.models import JobStatus, ProcessingJob
 from models import ProcessingJobModel
 
@@ -117,7 +117,7 @@ def mock_engine():
 class TestJobRepositorySave:
     """Testes para salvar e recuperar jobs no repositorio."""
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_save_calls_merge_and_commit(self, mock_get_db, repo):
         """Salvar job chama merge e commit na sessao."""
         mock_db = MagicMock()
@@ -129,7 +129,7 @@ class TestJobRepositorySave:
         mock_db.merge.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_save_converts_job_to_model(self, mock_get_db, repo):
         """Salvar job converte ProcessingJob para ProcessingJobModel."""
         mock_db = MagicMock()
@@ -146,7 +146,7 @@ class TestJobRepositorySave:
         assert saved_model.user_id == 42
         assert saved_model.status == "pending"
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_save_preserves_all_fields(self, mock_get_db, repo):
         """Salvar preserva todos os campos do job."""
         mock_db = MagicMock()
@@ -176,7 +176,7 @@ class TestJobRepositorySave:
         assert saved_model.original_filename == "edital.pdf"
         assert saved_model.pipeline == "NATIVE_TEXT"
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_by_id_returns_job(self, mock_get_db, repo):
         """get_by_id retorna ProcessingJob quando encontrado."""
         mock_db = MagicMock()
@@ -193,7 +193,7 @@ class TestJobRepositorySave:
         assert result.user_id == 5
         assert result.status == JobStatus.PENDING
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_by_id_returns_none_when_not_found(self, mock_get_db, repo):
         """get_by_id retorna None quando job nao existe."""
         mock_db = MagicMock()
@@ -211,7 +211,7 @@ class TestJobRepositorySave:
 class TestJobRepositoryUpdate:
     """Testes para atualizacao de status e progresso de jobs."""
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_status_to_processing(self, mock_get_db, repo):
         """Atualizar status para PROCESSING define started_at."""
         mock_db = MagicMock()
@@ -226,7 +226,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.started_at is not None
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_status_to_completed(self, mock_get_db, repo):
         """Atualizar status para COMPLETED define completed_at e result."""
         mock_db = MagicMock()
@@ -243,7 +243,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.result == result_data
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_status_to_failed(self, mock_get_db, repo):
         """Atualizar status para FAILED define completed_at e error."""
         mock_db = MagicMock()
@@ -259,7 +259,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.error == "Arquivo corrompido"
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_status_to_cancelled(self, mock_get_db, repo):
         """Atualizar status para CANCELLED define canceled_at."""
         mock_db = MagicMock()
@@ -274,7 +274,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.canceled_at is not None
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_status_not_found_does_nothing(self, mock_get_db, repo):
         """Atualizar status de job inexistente nao faz nada."""
         mock_db = MagicMock()
@@ -286,7 +286,7 @@ class TestJobRepositoryUpdate:
 
         mock_db.commit.assert_not_called()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_progress(self, mock_get_db, repo):
         """Atualizar progresso define campos corretamente."""
         mock_db = MagicMock()
@@ -309,7 +309,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.progress_message == "Processando pagina 5 de 10"
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_progress_with_pipeline(self, mock_get_db, repo):
         """Atualizar progresso pode definir pipeline."""
         mock_db = MagicMock()
@@ -328,7 +328,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.pipeline == "OCR_LOCAL"
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_update_progress_not_found_does_nothing(self, mock_get_db, repo):
         """Atualizar progresso de job inexistente nao faz nada."""
         mock_db = MagicMock()
@@ -340,7 +340,7 @@ class TestJobRepositoryUpdate:
 
         mock_db.commit.assert_not_called()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_increment_attempts(self, mock_get_db, repo):
         """Incrementar tentativas incrementa corretamente."""
         mock_db = MagicMock()
@@ -355,7 +355,7 @@ class TestJobRepositoryUpdate:
         assert mock_model.attempts == 2
         mock_db.commit.assert_called_once()
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_increment_attempts_from_zero(self, mock_get_db, repo):
         """Incrementar tentativas de zero para um."""
         mock_db = MagicMock()
@@ -369,7 +369,7 @@ class TestJobRepositoryUpdate:
         assert result == 1
         assert mock_model.attempts == 1
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_increment_attempts_from_none(self, mock_get_db, repo):
         """Incrementar tentativas quando attempts e None."""
         mock_db = MagicMock()
@@ -384,7 +384,7 @@ class TestJobRepositoryUpdate:
         assert result == 1
         assert mock_model.attempts == 1
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_increment_attempts_not_found(self, mock_get_db, repo):
         """Incrementar tentativas de job inexistente retorna 0."""
         mock_db = MagicMock()
@@ -402,7 +402,7 @@ class TestJobRepositoryUpdate:
 class TestJobRepositoryDelete:
     """Testes para exclusao de jobs usando AUTOCOMMIT."""
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_existing_job(self, mock_engine, repo):
         """Deletar job existente retorna True."""
         mock_conn = MagicMock()
@@ -426,7 +426,7 @@ class TestJobRepositoryDelete:
         assert result is True
         assert mock_conn.execute.call_count == 2
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_nonexistent_job(self, mock_engine, repo):
         """Deletar job inexistente retorna False."""
         mock_conn = MagicMock()
@@ -449,7 +449,7 @@ class TestJobRepositoryDelete:
 
         assert result is False
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_fails_if_still_exists(self, mock_engine, repo):
         """Delete retorna False se job ainda existe apos DELETE."""
         mock_conn = MagicMock()
@@ -472,7 +472,7 @@ class TestJobRepositoryDelete:
 
         assert result is False
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_uses_autocommit(self, mock_engine, repo):
         """Delete usa execution_options com AUTOCOMMIT."""
         mock_conn = MagicMock()
@@ -491,7 +491,7 @@ class TestJobRepositoryDelete:
 
         mock_conn.execution_options.assert_called_once_with(isolation_level="AUTOCOMMIT")
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_by_statuses(self, mock_engine, repo):
         """delete_by_statuses remove jobs pelos status informados."""
         mock_conn = MagicMock()
@@ -509,7 +509,7 @@ class TestJobRepositoryDelete:
         assert result == 5
         mock_conn.execute.assert_called_once()
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_by_statuses_single_status(self, mock_engine, repo):
         """delete_by_statuses funciona com status unico."""
         mock_conn = MagicMock()
@@ -526,7 +526,7 @@ class TestJobRepositoryDelete:
 
         assert result == 3
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_by_statuses_none_found(self, mock_engine, repo):
         """delete_by_statuses retorna 0 quando nenhum job encontrado."""
         mock_conn = MagicMock()
@@ -543,7 +543,7 @@ class TestJobRepositoryDelete:
 
         assert result == 0
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_delete_by_statuses_uses_autocommit(self, mock_engine, repo):
         """delete_by_statuses usa AUTOCOMMIT."""
         mock_conn = MagicMock()
@@ -566,7 +566,7 @@ class TestJobRepositoryDelete:
 class TestJobRepositoryQuery:
     """Testes para consultas de jobs."""
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_by_user(self, mock_get_db, repo):
         """get_by_user retorna lista de jobs do usuario."""
         mock_db = MagicMock()
@@ -585,7 +585,7 @@ class TestJobRepositoryQuery:
         assert results[0].id == "user-job-1"
         assert results[1].id == "user-job-2"
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_by_user_empty(self, mock_get_db, repo):
         """get_by_user retorna lista vazia quando usuario nao tem jobs."""
         mock_db = MagicMock()
@@ -597,7 +597,7 @@ class TestJobRepositoryQuery:
 
         assert results == []
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_by_user_with_custom_limit(self, mock_get_db, repo):
         """get_by_user aceita limite personalizado."""
         mock_db = MagicMock()
@@ -610,7 +610,7 @@ class TestJobRepositoryQuery:
         # Verificar que limit foi chamado (a chain de calls)
         mock_db.query.return_value.filter.return_value.order_by.return_value.limit.assert_called_once_with(5)
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_pending(self, mock_get_db, repo):
         """get_pending retorna jobs pendentes e em processamento."""
         mock_db = MagicMock()
@@ -628,7 +628,7 @@ class TestJobRepositoryQuery:
         assert results[0].status == JobStatus.PENDING
         assert results[1].status == JobStatus.PROCESSING
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_pending_empty(self, mock_get_db, repo):
         """get_pending retorna lista vazia quando nao ha jobs pendentes."""
         mock_db = MagicMock()
@@ -640,7 +640,7 @@ class TestJobRepositoryQuery:
 
         assert results == []
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_stats(self, mock_get_db, repo):
         """get_stats retorna estatisticas corretas."""
         mock_db = MagicMock()
@@ -666,7 +666,7 @@ class TestJobRepositoryQuery:
         assert stats["failed"] == 1
         assert stats["cancelled"] == 0  # Nao presente nos dados, default 0
 
-    @patch('services.job_repository.get_db_session')
+    @patch('repositories.job_repository.get_db_session')
     def test_get_stats_empty_database(self, mock_get_db, repo):
         """get_stats retorna zeros quando banco esta vazio."""
         mock_db = MagicMock()
@@ -690,8 +690,8 @@ class TestJobRepositoryQuery:
 class TestJobRepositoryCleanup:
     """Testes para limpeza de jobs orfaos."""
 
-    @patch('services.job_repository.os.path.exists')
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.os.path.exists')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_orphaned_files(self, mock_engine, mock_exists, repo):
         """cleanup_orphaned_jobs marca jobs sem arquivo como FAILED."""
         mock_conn = MagicMock()
@@ -725,8 +725,8 @@ class TestJobRepositoryCleanup:
         assert result["stuck_processing"] == 0
         assert result["total_cleaned"] == 2
 
-    @patch('services.job_repository.os.path.exists')
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.os.path.exists')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_stuck_processing(self, mock_engine, mock_exists, repo):
         """cleanup_orphaned_jobs marca jobs stuck em processing como FAILED."""
         mock_conn = MagicMock()
@@ -750,8 +750,8 @@ class TestJobRepositoryCleanup:
         assert result["stuck_processing"] == 3
         assert result["total_cleaned"] == 3
 
-    @patch('services.job_repository.os.path.exists')
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.os.path.exists')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_mixed(self, mock_engine, mock_exists, repo):
         """cleanup_orphaned_jobs limpa orfaos e stuck simultaneamente."""
         mock_conn = MagicMock()
@@ -783,8 +783,8 @@ class TestJobRepositoryCleanup:
         assert result["stuck_processing"] == 2
         assert result["total_cleaned"] == 3
 
-    @patch('services.job_repository.os.path.exists')
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.os.path.exists')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_nothing_to_clean(self, mock_engine, mock_exists, repo):
         """cleanup_orphaned_jobs retorna zeros quando nao ha nada para limpar."""
         mock_conn = MagicMock()
@@ -807,8 +807,8 @@ class TestJobRepositoryCleanup:
         assert result["stuck_processing"] == 0
         assert result["total_cleaned"] == 0
 
-    @patch('services.job_repository.os.path.exists')
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.os.path.exists')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_null_file_path(self, mock_engine, mock_exists, repo):
         """cleanup_orphaned_jobs trata file_path None como orfao."""
         mock_conn = MagicMock()
@@ -834,7 +834,7 @@ class TestJobRepositoryCleanup:
 
         assert result["orphaned_files"] == 1
 
-    @patch('services.job_repository.engine')
+    @patch('repositories.job_repository.engine')
     def test_cleanup_uses_autocommit(self, mock_engine, repo):
         """cleanup_orphaned_jobs usa AUTOCOMMIT."""
         mock_conn = MagicMock()
