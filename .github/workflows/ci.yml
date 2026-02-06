@@ -24,8 +24,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r ../requirements-dev.txt
 
+      - name: Lint with ruff
+        run: python -m ruff check .
+        continue-on-error: true
+
+      - name: Security scan with bandit
+        run: python -m bandit -r . -x ./tests,./alembic -q
+        continue-on-error: true
+
+      - name: Dependency audit
+        run: python -m pip_audit
+        continue-on-error: true
+
       - name: Run tests
-        run: python -m pytest tests/ -x -q --ignore=tests/integration --cov=. --cov-report=term-missing --cov-config=.coveragerc --cov-fail-under=25
+        run: python -m pytest tests/ -x -q --ignore=tests/integration --cov=. --cov-report=term-missing --cov-config=.coveragerc --cov-fail-under=35
 
       - name: Type check
         run: python -m mypy . --ignore-missing-imports

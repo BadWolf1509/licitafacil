@@ -11,3 +11,10 @@ httpx~=0.24.0
 
 # Type checking
 mypy~=1.8.0
+
+# Linting
+ruff~=0.8.0
+
+# Security scanning
+bandit~=1.8.0
+pip-audit~=2.7.0

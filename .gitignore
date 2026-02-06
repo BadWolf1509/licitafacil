@@ -2,7 +2,12 @@
 venv/
 .venv/
 env/
+
+# Variaveis de ambiente
 .env
+.env.local
+.env.production
+.env.tmp
 
 # Cache Python
 __pycache__/
@@ -17,7 +22,7 @@ __pycache__/
 *.db-journal
 *.sqlite3
 
-# Uploads de usuários
+# Uploads de usuarios
 uploads/
 
 # IDEs
@@ -33,12 +38,6 @@ Thumbs.db
 # Logs
 *.log
 
-# Variáveis de ambiente
-.env
-.env.local
-.env.production
-.env.tmp
-
 # Debug
 debug_images/
 
@@ -46,7 +45,7 @@ debug_images/
 nul
 .secrets/
 
-# Arquivos temporários de teste/debug
+# Arquivos temporarios de teste/debug
 backend/tmp_*.py
 backend/.tmp_*
 backend/relatorio_*.json
@@ -55,7 +54,9 @@ backend/scripts/consulta_*.py
 # Vercel
 .vercel
 
-.vercel
-backend/dump.sql
+# Dependencies
 frontend/node_modules/
 supabase/functions/node_modules/
+
+# Database dumps
+backend/dump.sql

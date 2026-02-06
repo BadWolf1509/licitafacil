@@ -5,7 +5,7 @@ python-multipart~=0.0.22
 
 # Banco de dados
 sqlalchemy~=2.0.46
-alembic~=1.18.3
+alembic==1.18.3
 aiosqlite~=0.22.1
 psycopg2-binary~=2.9.10  # Driver PostgreSQL para Supabase
 
@@ -19,10 +19,10 @@ supabase~=2.0.0
 
 # Extração de PDF (processamento local)
 pdfplumber~=0.11.9
-PyMuPDF~=1.26.7
+PyMuPDF==1.26.7
 
 # OCR local
-easyocr~=1.7.2
+easyocr==1.7.2
 Pillow~=12.1.0
 
 # Utilitários
