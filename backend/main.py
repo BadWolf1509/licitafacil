@@ -29,6 +29,7 @@ from exceptions import (
     ValidationError,
     ProcessingError
 )
+from utils.router_helpers import PathTraversalError
 
 from logging_config import get_logger, set_correlation_id, clear_correlation_id
 logger = get_logger('main')
@@ -80,12 +81,16 @@ async def lifespan(app: FastAPI):
 
 
 # Criar aplicação FastAPI
+# Desabilitar docs em producao
+_docs_url = "/docs" if ENVIRONMENT != "production" else None
+_redoc_url = "/redoc" if ENVIRONMENT != "production" else None
+
 app = FastAPI(
     title="LicitaFácil",
     description="Sistema de Análise de Capacidade Técnica para Licitações de Obras Públicas",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=_docs_url,
+    redoc_url=_redoc_url,
     lifespan=lifespan
 )
 
@@ -258,6 +263,16 @@ async def licitafacil_error_handler(request: Request, exc: LicitaFacilError):
     return JSONResponse(
         status_code=500,
         content={"detail": exc.message}
+    )
+
+
+@app.exception_handler(PathTraversalError)
+async def path_traversal_handler(request: Request, exc: PathTraversalError):
+    """Handler para tentativas de path traversal."""
+    logger.warning(f"[SECURITY] Path traversal attempt: {exc}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Caminho de arquivo invalido"}
     )
 
 

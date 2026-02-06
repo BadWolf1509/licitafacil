@@ -98,6 +98,50 @@ const ErrorHandler = {
     },
 
     /**
+     * Wrapper completo com loading em container + error handling
+     * Ideal para substituir blocos try/catch repetitivos em carregamentos de pagina
+     * @param {Function} asyncFn - Funcao assincrona a executar
+     * @param {string} errorMessage - Mensagem de erro padrao
+     * @param {Object} options - Opcoes adicionais
+     * @param {HTMLElement|string} options.container - Container para loading spinner (element ou ID)
+     * @param {string} options.loadingText - Texto alternativo do spinner
+     * @param {HTMLButtonElement} options.button - Botao para desabilitar durante execucao
+     * @returns {Promise} Resultado da funcao ou null em caso de erro
+     */
+    async withErrorHandling(asyncFn, errorMessage = 'Erro na operacao', options = {}) {
+        const { container, loadingText, button } = options;
+        const containerEl = typeof container === 'string' ? document.getElementById(container) : container;
+
+        // Mostrar loading no container
+        if (containerEl) {
+            containerEl.innerHTML = `<div class="loading-spinner" aria-label="${Sanitize.escapeHtml(loadingText || 'Carregando...')}"></div>`;
+        }
+
+        // Desabilitar botao
+        if (button) {
+            button.disabled = true;
+            button._originalText = button.textContent;
+            button.textContent = loadingText || 'Carregando...';
+        }
+
+        try {
+            return await asyncFn();
+        } catch (error) {
+            console.error(errorMessage, error);
+            ui.showAlert(error.message || errorMessage, 'error');
+            if (containerEl) {
+                containerEl.innerHTML = `<div class="empty-state"><p>${Sanitize.escapeHtml(errorMessage)}</p></div>`;
+            }
+            return null;
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = button._originalText || 'Enviar';
+            }
+        }
+    },
+
+    /**
      * Formata mensagem de erro da API
      * @param {Error|Object} error - Erro capturado
      * @returns {string} Mensagem formatada

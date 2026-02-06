@@ -18,6 +18,42 @@ from logging_config import get_logger
 logger = get_logger('utils.router_helpers')
 
 
+class PathTraversalError(ValueError):
+    """Raised when a storage path contains traversal sequences."""
+    pass
+
+
+def _validate_storage_path(filepath: str) -> str:
+    """
+    Valida que um path de storage nao contem sequencias de travessia.
+
+    Rejeita '..' em qualquer segmento e verifica que o path normalizado
+    ainda comeca com 'users/'.
+
+    Args:
+        filepath: Caminho de storage a validar
+
+    Returns:
+        O filepath validado
+
+    Raises:
+        PathTraversalError: Se o path contem sequencias de travessia
+    """
+    # Rejeitar '..' em qualquer segmento
+    segments = filepath.replace("\\", "/").split("/")
+    if ".." in segments:
+        logger.warning(f"[SECURITY] Path traversal bloqueado: {filepath}")
+        raise PathTraversalError(f"Path contains traversal sequence: {filepath}")
+
+    # Normalizar e verificar prefixo
+    normalized = "/".join(s for s in segments if s)
+    if not normalized.startswith("users/"):
+        logger.warning(f"[SECURITY] Path fora do escopo users/: {filepath}")
+        raise PathTraversalError(f"Path outside allowed scope: {filepath}")
+
+    return normalized
+
+
 def get_storage_path(user_id: int, subfolder: str, filename: str) -> str:
     """
     Retorna o caminho de storage para um arquivo.
@@ -71,6 +107,7 @@ def safe_delete_file(filepath: str) -> bool:
 
     # Se parece ser um path de storage (users/...)
     if filepath.startswith("users/"):
+        filepath = _validate_storage_path(filepath)
         return storage.delete(filepath)
 
     # Path local
@@ -157,6 +194,7 @@ def get_file_from_storage(storage_path: str) -> Optional[bytes]:
     Returns:
         Conteúdo do arquivo em bytes ou None se não existir
     """
+    storage_path = _validate_storage_path(storage_path)
     storage = get_storage()
     return storage.download(storage_path)
 
@@ -171,6 +209,7 @@ def file_exists_in_storage(storage_path: str) -> bool:
     Returns:
         True se existe, False caso contrário
     """
+    storage_path = _validate_storage_path(storage_path)
     storage = get_storage()
     return storage.exists(storage_path)
 
@@ -257,6 +296,7 @@ def save_temp_file_from_storage(
     Returns:
         True se baixou com sucesso, False caso contrário
     """
+    storage_path = _validate_storage_path(storage_path)
     content = get_file_from_storage(storage_path)
     if content is None:
         logger.warning(f"[STORAGE] Arquivo não encontrado: {storage_path}")

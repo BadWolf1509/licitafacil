@@ -62,17 +62,17 @@ export function renderJobHtml(job, moduleName = 'AtestadosModule') {
     ].filter(Boolean).join('');
 
     const fileName = getJobFileName(job);
-    const syncError = job.poll_error ? `<div class="processing-job-error">${job.poll_error}</div>` : '';
+    const syncError = job.poll_error ? `<div class="processing-job-error">${Sanitize.escapeHtml(job.poll_error)}</div>` : '';
     const errorMessage = formatJobError(job);
     const errorHtml = displayStatus === 'failed' && errorMessage
-        ? `<div class="processing-job-error">${errorMessage}</div>`
+        ? `<div class="processing-job-error">${Sanitize.escapeHtml(errorMessage)}</div>`
         : '';
     const actionHtml = displayStatus === 'failed' || displayStatus === 'cancelled'
         ? `
-            <button class="btn btn-outline btn-sm" onclick="${moduleName}.reprocessarJob('${job.id}')">Tentar novamente</button>
-            <button class="btn btn-outline btn-sm" onclick="${moduleName}.excluirJob('${job.id}')">Remover</button>
+            <button class="btn btn-outline btn-sm" data-action="reprocessar-job" data-id="${job.id}">Tentar novamente</button>
+            <button class="btn btn-outline btn-sm" data-action="excluir-job" data-id="${job.id}">Remover</button>
         `
-        : `<button class="btn btn-outline btn-sm" onclick="${moduleName}.cancelarJob('${job.id}')">Cancelar</button>`;
+        : `<button class="btn btn-outline btn-sm" data-action="cancelar-job" data-id="${job.id}">Cancelar</button>`;
 
     return `
         <div class="processing-job-info">
