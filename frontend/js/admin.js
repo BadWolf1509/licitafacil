@@ -66,6 +66,9 @@ function setupTabs() {
 }
 
 async function carregarEstatisticas() {
+    const statIds = ['statTotal', 'statAprovados', 'statPendentes', 'statInativos'];
+    statIds.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '...'; });
+
     try {
         const stats = await api.get('/admin/estatisticas');
         document.getElementById('statTotal').textContent = stats.total_usuarios;
@@ -74,11 +77,12 @@ async function carregarEstatisticas() {
         document.getElementById('statInativos').textContent = stats.usuarios_inativos;
     } catch (error) {
         console.error('Erro ao carregar estatisticas:', error);
+        statIds.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '-'; });
     }
 }
 
 async function carregarUsuariosPendentes() {
-    try {
+    await ErrorHandler.withErrorHandling(async () => {
         const response = await api.get('/admin/usuarios/pendentes');
         const usuarios = response.items || response;
         const container = document.getElementById('listaPendentes');
@@ -102,14 +106,11 @@ async function carregarUsuariosPendentes() {
                 </div>
             </div>
         `).join('');
-
-    } catch (error) {
-        ui.showAlert('Erro ao carregar usuarios pendentes', 'error');
-    }
+    }, 'Erro ao carregar usuarios pendentes', { container: 'listaPendentes' });
 }
 
 async function carregarTodosUsuarios() {
-    try {
+    await ErrorHandler.withErrorHandling(async () => {
         const response = await api.get('/admin/usuarios');
         const usuarios = response.items || response;
         const container = document.getElementById('listaTodos');
@@ -166,10 +167,7 @@ async function carregarTodosUsuarios() {
                 </div>
             `;
         }).join('');
-
-    } catch (error) {
-        ui.showAlert('Erro ao carregar usuarios', 'error');
-    }
+    }, 'Erro ao carregar usuarios', { container: 'listaTodos' });
 }
 
 async function aprovarUsuario(id) {
@@ -185,7 +183,7 @@ async function aprovarUsuario(id) {
 }
 
 async function rejeitarUsuario(id) {
-    if (!confirm('Tem certeza que deseja desativar este usuario?')) return;
+    if (!await confirmAction('Tem certeza que deseja desativar este usuario?', { type: 'danger', confirmText: 'Desativar' })) return;
 
     try {
         await api.post(`/admin/usuarios/${id}/rejeitar`);
@@ -210,7 +208,7 @@ async function reativarUsuario(id) {
 }
 
 async function excluirUsuario(id, nome) {
-    if (!confirm(`ATENCAO: Esta acao e irreversivel!\n\nDeseja excluir permanentemente o usuario "${nome}"?\n\nTodos os dados associados a esta conta serao perdidos.`)) return;
+    if (!await confirmAction(`Deseja excluir permanentemente o usuario "${nome}"? Todos os dados associados serao perdidos.`, { title: 'Excluir usuario', type: 'danger', confirmText: 'Excluir' })) return;
 
     try {
         await api.delete(`/admin/usuarios/${id}`);

@@ -336,6 +336,7 @@ const ui = {
 
         const alert = document.createElement('div');
         alert.className = `alert alert-${type}`;
+        alert.setAttribute('role', 'alert');
 
         // Usar textContent para prevenir XSS
         const span = document.createElement('span');
@@ -345,7 +346,7 @@ const ui = {
         const button = document.createElement('button');
         button.textContent = '\u2715';
         button.style.cssText = 'background:none;border:none;cursor:pointer;margin-left:auto;';
-        button.onclick = function() { this.parentElement.remove(); };
+        button.addEventListener('click', function() { this.parentElement.remove(); });
         alert.appendChild(button);
 
         container.appendChild(alert);
@@ -403,6 +404,20 @@ const theme = {
 
 // Inicializar tema
 theme.init();
+
+/**
+ * Cria uma versao debounced de uma funcao
+ * @param {Function} fn - Funcao a debounce
+ * @param {number} delay - Delay em ms (default: CONFIG.TIMEOUTS.DEBOUNCE_INPUT)
+ * @returns {Function} Funcao debounced
+ */
+ui.debounce = function(fn, delay) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay || CONFIG.TIMEOUTS.DEBOUNCE_INPUT);
+    };
+};
 
 // Deteccao de conectividade
 window.addEventListener('online', () => ui.showAlert('Conexao restaurada!', 'success'));

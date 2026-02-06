@@ -52,7 +52,7 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
                            id="filtroResultadoInput"
                            class="form-input"
                            placeholder="Filtrar por descricao do servico..."
-                           oninput="AtestadosModule.filtrarServicosResultado(this.value)">
+                           data-action="filtrar-resultado">
                 </div>
             ` : ''}
             <h4 class="relatorio-section-title">Servicos Consolidados (agrupados por descricao)</h4>
@@ -110,7 +110,7 @@ export function gerarRelatorioGeral(dados) {
                        id="filtroServicosInput"
                        class="form-input"
                        placeholder="Filtrar por descricao do servico..."
-                       oninput="AtestadosModule.filtrarServicosConsolidados(this.value)">
+                       data-action="filtrar-consolidados">
             </div>
             <h4 class="relatorio-section-title">Servicos Consolidados de Todos os Atestados</h4>
             <p class="text-muted" style="font-size: 0.85em; margin-bottom: 10px;">Clique em um servico para ver quais atestados compoem o total.</p>
@@ -127,7 +127,7 @@ export function gerarRelatorioGeral(dados) {
                     </thead>
                     <tbody id="tabelaServicosConsolidados">
                         ${servicosConsolidados.map((s, i) => `
-                            <tr class="clickable-row" data-servico-idx="${i}" onclick="AtestadosModule.mostrarDetalhesServico(${i})">
+                            <tr class="clickable-row" data-servico-idx="${i}" data-action="mostrar-detalhes-servico" data-index="${i}">
                                 <td>${i + 1}</td>
                                 <td>${s.descricao}</td>
                                 <td>${s.unidade}</td>
@@ -168,7 +168,7 @@ export function gerarDetalhesServico(servico, formatarDataFn = formatarDataSemHo
                 ${atestadosOrdenados.map((a, i) => {
                     const percentual = servico.quantidade > 0 ? (a.quantidade / servico.quantidade * 100) : 0;
                     return `
-                        <tr class="clickable-row" onclick="AtestadosModule.verAtestado(${a.id})">
+                        <tr class="clickable-row" data-action="ver-atestado" data-id="${a.id}">
                             <td>${i + 1}</td>
                             <td>${Sanitize.escapeHtml(a.contratante || '')}</td>
                             <td>${a.data_emissao ? formatarDataFn(a.data_emissao) : 'N/A'}</td>

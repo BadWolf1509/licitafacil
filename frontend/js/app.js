@@ -279,7 +279,32 @@ async function carregarDashboard() {
  */
 function abrirModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.classList.add('active');
+    if (!modal) return;
+    modal.classList.add('active');
+
+    // Focus first input/button inside modal
+    requestAnimationFrame(() => {
+        const focusable = modal.querySelector('input:not([type="hidden"]), textarea, select, button:not(.modal-close)');
+        if (focusable) focusable.focus();
+    });
+
+    // Focus trap: Tab/Shift+Tab cycles within modal
+    const trapHandler = (e) => {
+        if (e.key !== 'Tab') return;
+        const focusableEls = modal.querySelectorAll(
+            'input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableEls.length === 0) return;
+        const first = focusableEls[0];
+        const last = focusableEls[focusableEls.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    };
+    modal._focusTrapHandler = trapHandler;
+    modal.addEventListener('keydown', trapHandler);
 }
 
 /**
@@ -294,7 +319,12 @@ function abrirModalAtestado() {
  */
 function fecharModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.classList.remove('active');
+    if (!modal) return;
+    modal.classList.remove('active');
+    if (modal._focusTrapHandler) {
+        modal.removeEventListener('keydown', modal._focusTrapHandler);
+        delete modal._focusTrapHandler;
+    }
 }
 
 /**
@@ -330,6 +360,81 @@ function formatarNumero(numero, decimais = 2) {
         minimumFractionDigits: decimais,
         maximumFractionDigits: decimais
     }).format(parsed);
+}
+
+/**
+ * Exibe um modal de confirmacao customizado (substitui window.confirm)
+ * @param {string} message - Mensagem de confirmacao
+ * @param {Object} options - Opcoes opcionais
+ * @param {string} options.title - Titulo do modal (default: 'Confirmar')
+ * @param {string} options.confirmText - Texto do botao confirmar (default: 'Confirmar')
+ * @param {string} options.cancelText - Texto do botao cancelar (default: 'Cancelar')
+ * @param {string} options.type - Tipo: 'warning', 'danger' (default: 'warning')
+ * @returns {Promise<boolean>} True se confirmado, False se cancelado
+ */
+function confirmAction(message, options = {}) {
+    const {
+        title = 'Confirmar',
+        confirmText = 'Confirmar',
+        cancelText = 'Cancelar',
+        type = 'warning'
+    } = options;
+
+    return new Promise((resolve) => {
+        const modalId = 'modalConfirmAction';
+
+        // Remover modal anterior se existir
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const btnClass = type === 'danger' ? 'btn-danger' : 'btn-primary';
+
+        const modal = document.createElement('div');
+        modal.id = modalId;
+        modal.className = 'modal active';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 420px;">
+                <div class="modal-header">
+                    <h3>${Sanitize.escapeHtml(title)}</h3>
+                    <button class="modal-close" aria-label="Fechar">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p>${Sanitize.escapeHtml(message)}</p>
+                </div>
+                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end;">
+                    <button class="btn btn-outline" data-confirm="cancel">${Sanitize.escapeHtml(cancelText)}</button>
+                    <button class="btn ${btnClass}" data-confirm="ok">${Sanitize.escapeHtml(confirmText)}</button>
+                </div>
+            </div>
+        `;
+
+        const cleanup = (result) => {
+            modal.remove();
+            document.removeEventListener('keydown', escHandler);
+            resolve(result);
+        };
+
+        const escHandler = (e) => {
+            if (e.key === 'Escape') cleanup(false);
+        };
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) cleanup(false);
+            const btn = e.target.closest('[data-confirm]');
+            if (!btn) {
+                if (e.target.closest('.modal-close')) cleanup(false);
+                return;
+            }
+            cleanup(btn.dataset.confirm === 'ok');
+        });
+
+        document.addEventListener('keydown', escHandler);
+        document.body.appendChild(modal);
+
+        // Focus no botao de cancelar (mais seguro)
+        const cancelBtn = modal.querySelector('[data-confirm="cancel"]');
+        if (cancelBtn) cancelBtn.focus();
+    });
 }
 
 // Fechar modal ao clicar fora

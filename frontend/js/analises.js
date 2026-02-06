@@ -24,7 +24,7 @@ const AnalisesModule = {
     // === LISTAGEM E DETALHES ===
 
     async carregarAnalises() {
-        try {
+        await ErrorHandler.withErrorHandling(async () => {
             const response = await api.get('/analises/');
             const analises = response.items || [];
             const container = document.getElementById('listaAnalises');
@@ -41,7 +41,6 @@ const AnalisesModule = {
             }
 
             container.innerHTML = analises.map(a => {
-                // Verificar se tem resultado E se o array nao esta vazio
                 const hasResults = a.resultado_json && a.resultado_json.length > 0;
                 const hasExigencias = a.exigencias_json && a.exigencias_json.length > 0;
                 let status;
@@ -49,38 +48,27 @@ const AnalisesModule = {
                     status = a.resultado_json.every(r => r.status === 'atende') ? 'atende' :
                              a.resultado_json.some(r => r.status === 'atende') ? 'parcial' : 'nao-atende';
                 } else if (a.arquivo_path) {
-                    status = 'pendente'; // Tem arquivo, pode processar
+                    status = 'pendente';
                 } else if (hasExigencias) {
-                    status = 'manual-falhou'; // Tem exigencias mas sem resultados = falhou
+                    status = 'manual-falhou';
                 } else {
-                    status = 'manual-vazio'; // Analise manual sem exigencias
+                    status = 'manual-vazio';
                 }
 
                 const statusIcon = {
-                    'atende': '&#9989;',
-                    'parcial': '&#9888;',
-                    'nao-atende': '&#10060;',
-                    'pendente': '&#9203;',
-                    'manual-falhou': '&#10060;',
-                    'manual-vazio': '&#9997;'
+                    'atende': '&#9989;', 'parcial': '&#9888;', 'nao-atende': '&#10060;',
+                    'pendente': '&#9203;', 'manual-falhou': '&#10060;', 'manual-vazio': '&#9997;'
                 }[status];
 
                 const statusText = {
-                    'atende': 'Atende todos os requisitos',
-                    'parcial': 'Atende parcialmente',
-                    'nao-atende': 'Nao atende',
-                    'pendente': 'Aguardando processamento',
-                    'manual-falhou': 'Analise manual falhou',
-                    'manual-vazio': 'Analise manual vazia'
+                    'atende': 'Atende todos os requisitos', 'parcial': 'Atende parcialmente',
+                    'nao-atende': 'Nao atende', 'pendente': 'Aguardando processamento',
+                    'manual-falhou': 'Analise manual falhou', 'manual-vazio': 'Analise manual vazia'
                 }[status];
 
                 const badgeClass = {
-                    'atende': 'success',
-                    'parcial': 'warning',
-                    'nao-atende': 'error',
-                    'pendente': 'info',
-                    'manual-falhou': 'error',
-                    'manual-vazio': 'secondary'
+                    'atende': 'success', 'parcial': 'warning', 'nao-atende': 'error',
+                    'pendente': 'info', 'manual-falhou': 'error', 'manual-vazio': 'secondary'
                 }[status];
 
                 return `
@@ -90,29 +78,27 @@ const AnalisesModule = {
                                 <h3>${Sanitize.escapeHtml(a.nome_licitacao)}</h3>
                                 <p class="text-muted">${formatarData(a.created_at)}</p>
                                 <span class="badge badge-${badgeClass}">
-                                    ${statusIcon} ${statusText}
+                                    <span role="img" aria-hidden="true">${statusIcon}</span> ${statusText}
                                 </span>
                             </div>
                             <div class="d-flex gap-1">
-                                <button class="btn btn-primary btn-sm" onclick="AnalisesModule.carregarDetalheAnalise(${a.id})">Ver Detalhes</button>
-                                ${!hasResults && a.arquivo_path ? `<button class="btn btn-outline btn-sm" onclick="AnalisesModule.processarAnalise(${a.id})">Processar</button>` : ''}
-                                <button class="btn btn-danger btn-sm" onclick="AnalisesModule.excluirAnalise(${a.id})">Excluir</button>
+                                <button class="btn btn-primary btn-sm" data-action="ver-detalhes" data-id="${a.id}">Ver Detalhes</button>
+                                ${!hasResults && a.arquivo_path ? `<button class="btn btn-outline btn-sm" data-action="processar" data-id="${a.id}">Processar</button>` : ''}
+                                <button class="btn btn-danger btn-sm" data-action="excluir" data-id="${a.id}">Excluir</button>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
-
-        } catch (error) {
-            ui.showAlert('Erro ao carregar analises', 'error');
-        }
+        }, 'Erro ao carregar analises', { container: 'listaAnalises' });
     },
 
     async carregarDetalheAnalise(id) {
-        try {
+        document.getElementById('listaAnalises').classList.add('hidden');
+        document.getElementById('detalheAnalise').classList.remove('hidden');
+
+        await ErrorHandler.withErrorHandling(async () => {
             const analise = await api.get(`/analises/${id}`);
-            document.getElementById('listaAnalises').classList.add('hidden');
-            document.getElementById('detalheAnalise').classList.remove('hidden');
             document.getElementById('analiseNome').textContent = analise.nome_licitacao;
 
             const container = document.getElementById('resultadoAnalise');
@@ -121,15 +107,13 @@ const AnalisesModule = {
                 const hasExigencias = analise.exigencias_json && analise.exigencias_json.length > 0;
 
                 if (analise.arquivo_path) {
-                    // Tem arquivo, pode processar
                     container.innerHTML = `
                         <div class="empty-state">
                             <p>Esta analise ainda nao foi processada.</p>
-                            <button class="btn btn-primary mt-2" onclick="AnalisesModule.processarAnalise(${id})">Processar Agora</button>
+                            <button class="btn btn-primary mt-2" data-action="processar" data-id="${id}">Processar Agora</button>
                         </div>
                     `;
                 } else if (hasExigencias) {
-                    // Analise manual com exigencias mas sem resultados = FALHOU
                     container.innerHTML = `
                         <div class="empty-state">
                             <div class="badge badge-error mb-2">&#10060; Analise falhou</div>
@@ -144,7 +128,6 @@ const AnalisesModule = {
                         </div>
                     `;
                 } else {
-                    // Analise manual sem exigencias (nao deveria acontecer)
                     container.innerHTML = `
                         <div class="empty-state">
                             <p>Esta analise manual esta vazia.</p>
@@ -208,16 +191,14 @@ const AnalisesModule = {
                     </div>
                 `;
             }).join('');
-
-        } catch (error) {
-            ui.showAlert('Erro ao carregar analise', 'error');
-        }
+        }, 'Erro ao carregar analise', { container: 'resultadoAnalise' });
     },
 
     voltarLista() {
-        document.getElementById('listaAnalises').classList.remove('hidden');
         document.getElementById('detalheAnalise').classList.add('hidden');
+        document.getElementById('listaAnalises').classList.remove('hidden');
         window.history.pushState({}, '', 'analises.html');
+        this.carregarAnalises();
     },
 
     // === UPLOAD E FORMULARIOS ===
@@ -337,7 +318,7 @@ const AnalisesModule = {
             <div class="exigencia-item" id="exigencia-${counter}">
                 <div class="exigencia-item-header">
                     <span class="exigencia-item-numero">Exigencia ${counter}</span>
-                    <button type="button" class="exigencia-item-remove" onclick="AnalisesModule.removerExigencia(${counter})" title="Remover">
+                    <button type="button" class="exigencia-item-remove" data-action="remover-exigencia" data-id="${counter}" title="Remover">
                         &times;
                     </button>
                 </div>
@@ -475,7 +456,7 @@ const AnalisesModule = {
     },
 
     async excluirAnalise(id) {
-        if (!confirm('Tem certeza que deseja excluir esta analise?')) return;
+        if (!await confirmAction('Tem certeza que deseja excluir esta analise?', { type: 'danger', confirmText: 'Excluir' })) return;
 
         try {
             await api.delete(`/analises/${id}`);
@@ -487,20 +468,32 @@ const AnalisesModule = {
     }
 };
 
-// Funcoes globais para compatibilidade com onclick no HTML
-function carregarDetalheAnalise(id) { AnalisesModule.carregarDetalheAnalise(id); }
-function voltarLista() { AnalisesModule.voltarLista(); }
-function processarAnalise(id) { AnalisesModule.processarAnalise(id); }
-function excluirAnalise(id) { AnalisesModule.excluirAnalise(id); }
-function abrirModalNovaAnalise() { AnalisesModule.abrirModalNovaAnalise(); }
-function switchAnaliseTab(tabName) { AnalisesModule.switchAnaliseTab(tabName); }
-function adicionarExigencia() { AnalisesModule.adicionarExigencia(); }
-function removerExigencia(index) { AnalisesModule.removerExigencia(index); }
-
 // Inicializar quando DOM estiver pronto (aguarda config carregar)
 document.addEventListener('DOMContentLoaded', async () => {
     await loadAuthConfig();
     AnalisesModule.init();
+
+    // Event delegation para acoes dinamicas (cards, exigencias, etc.)
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+        switch (action) {
+            case 'ver-detalhes':
+                AnalisesModule.carregarDetalheAnalise(id);
+                break;
+            case 'processar':
+                AnalisesModule.processarAnalise(id);
+                break;
+            case 'excluir':
+                AnalisesModule.excluirAnalise(id);
+                break;
+            case 'remover-exigencia':
+                AnalisesModule.removerExigencia(id);
+                break;
+        }
+    });
 
     // Event listeners para botoes de pagina (substituem onclick inline)
     const btnNova = document.getElementById('btnNovaAnalise');

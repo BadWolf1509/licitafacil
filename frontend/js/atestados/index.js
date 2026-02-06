@@ -65,32 +65,87 @@ const AtestadosModule = {
     },
 
     setupEventDelegation() {
-        const container = document.getElementById('listaAtestados');
-        if (container) {
-            container.addEventListener('click', (e) => {
-                const btn = e.target.closest('[data-action]');
-                if (!btn) return;
-                const action = btn.dataset.action;
-                const id = parseInt(btn.dataset.id || btn.dataset.atestadoId, 10);
-                const index = btn.dataset.index !== undefined ? parseInt(btn.dataset.index, 10) : null;
-                switch (action) {
-                    case 'ver-resultado': this.verResultadoConsolidado(id); break;
-                    case 'adicionar-servico': this.adicionarServicoItem(id); break;
-                    case 'editar-atestado': this.editarAtestado(id); break;
-                    case 'excluir-atestado': this.excluirAtestado(id); break;
-                    case 'editar-servico': this.editarServicoItem(id, index); break;
-                    case 'excluir-servico': this.excluirServicoItem(id, index); break;
-                    case 'toggle-servicos': this.toggleServicos(btn, id); break;
+        // Document-level click delegation for all atestados actions
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            const id = btn.dataset.id || btn.dataset.atestadoId;
+            const numId = id ? parseInt(id, 10) : null;
+            const index = btn.dataset.index !== undefined ? parseInt(btn.dataset.index, 10) : null;
+            switch (action) {
+                // Atestado CRUD
+                case 'ver-resultado': this.verResultadoConsolidado(numId); break;
+                case 'adicionar-servico': this.adicionarServicoItem(numId); break;
+                case 'editar-atestado': this.editarAtestado(numId); break;
+                case 'excluir-atestado': this.excluirAtestado(numId); break;
+                case 'editar-servico': this.editarServicoItem(numId, index); break;
+                case 'excluir-servico': this.excluirServicoItem(numId, index); break;
+                case 'toggle-servicos': this.toggleServicos(btn, numId); break;
+                // Job actions
+                case 'reprocessar-job': this.reprocessarJob(id); break;
+                case 'excluir-job': this.excluirJob(id); break;
+                case 'cancelar-job': this.cancelarJob(id); break;
+                // Report actions
+                case 'ver-atestado': this.verAtestado(numId); break;
+                case 'mostrar-detalhes-servico': this.mostrarDetalhesServico(index); break;
+            }
+        });
+        // Document-level input delegation (debounced)
+        const debouncedFilters = {};
+        document.addEventListener('input', (e) => {
+            const input = e.target.closest('[data-action]');
+            if (!input) return;
+            const action = input.dataset.action;
+            switch (action) {
+                case 'filtrar-servicos': {
+                    const atestadoId = parseInt(input.dataset.atestadoId || input.dataset.id, 10);
+                    const key = `filtrar-servicos-${atestadoId}`;
+                    if (!debouncedFilters[key]) {
+                        debouncedFilters[key] = ui.debounce((id, val) => this.filtrarServicosAtestado(id, val));
+                    }
+                    debouncedFilters[key](atestadoId, input.value);
+                    break;
                 }
+                case 'filtrar-resultado':
+                    if (!debouncedFilters['filtrar-resultado']) {
+                        debouncedFilters['filtrar-resultado'] = ui.debounce((val) => this.filtrarServicosResultado(val));
+                    }
+                    debouncedFilters['filtrar-resultado'](input.value);
+                    break;
+                case 'filtrar-consolidados':
+                    if (!debouncedFilters['filtrar-consolidados']) {
+                        debouncedFilters['filtrar-consolidados'] = ui.debounce((val) => this.filtrarServicosConsolidados(val));
+                    }
+                    debouncedFilters['filtrar-consolidados'](input.value);
+                    break;
+            }
+        });
+
+        // Page-level button listeners
+        const btnRelatorio = document.getElementById('btnRelatorioGeral');
+        if (btnRelatorio) btnRelatorio.addEventListener('click', () => this.abrirRelatorioGeral());
+
+        const btnNovo = document.getElementById('btnNovoAtestado');
+        if (btnNovo) btnNovo.addEventListener('click', () => this.abrirModalAtestado());
+
+        const filtro = document.getElementById('filtroAtestadosInput');
+        if (filtro) filtro.addEventListener('input', ui.debounce((e) => this.filtrarAtestados(e.target.value)));
+
+        const formEditar = document.getElementById('formEditarServico');
+        if (formEditar) formEditar.addEventListener('submit', (e) => this.salvarServicoItem(e));
+
+        // Tabs do modal de atestado
+        document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.tab === tabName);
+                });
+                document.getElementById('tabUpload').classList.toggle('active', tabName === 'upload');
+                document.getElementById('tabManual').classList.toggle('active', tabName === 'manual');
             });
-            container.addEventListener('input', (e) => {
-                const input = e.target.closest('[data-action="filtrar-servicos"]');
-                if (input) {
-                    const atestadoId = parseInt(input.dataset.atestadoId, 10);
-                    this.filtrarServicosAtestado(atestadoId, input.value);
-                }
-            });
-        }
+        });
     },
 
     // Re-exportar funcoes de formatacao
@@ -328,7 +383,7 @@ const AtestadosModule = {
     },
 
     async cancelarJob(jobId) {
-        if (!confirm('Cancelar o processamento deste atestado?')) return;
+        if (!await confirmAction('Cancelar o processamento deste atestado?', { confirmText: 'Cancelar processamento' })) return;
         try {
             const data = await api.post(`/ai/queue/jobs/${jobId}/cancel`, {});
             if (data.job) {
@@ -355,7 +410,7 @@ const AtestadosModule = {
     },
 
     async excluirJob(jobId) {
-        if (!confirm('Remover este job da lista?')) return;
+        if (!await confirmAction('Remover este job da lista?', { type: 'danger', confirmText: 'Remover' })) return;
         try {
             const data = await api.delete(`/ai/queue/jobs/${jobId}`);
             if (data.deleted) {
@@ -622,7 +677,7 @@ const AtestadosModule = {
     },
 
     async excluirAtestado(id) {
-        if (!confirm('Tem certeza que deseja excluir este atestado?')) return;
+        if (!await confirmAction('Tem certeza que deseja excluir este atestado?', { type: 'danger', confirmText: 'Excluir' })) return;
 
         try {
             await api.delete(`/atestados/${id}`);
@@ -637,7 +692,7 @@ const AtestadosModule = {
     // === SERVICOS (ITENS) ===
 
     async excluirServicoItem(atestadoId, itemIndex) {
-        if (!confirm('Excluir este item de servico?')) return;
+        if (!await confirmAction('Excluir este item de servico?', { type: 'danger', confirmText: 'Excluir' })) return;
 
         try {
             const atestado = await api.get(`/atestados/${atestadoId}`);
