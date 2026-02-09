@@ -1,12 +1,13 @@
 import json
 from pathlib import Path
+
 import pytest
 
+from services.extraction import extract_keywords, normalize_pt_morphology
 from services.matching_service import (
-    matching_service,
     _check_exclusive_qualifiers,
+    matching_service,
 )
-from services.extraction import normalize_pt_morphology, extract_keywords
 
 
 def test_matching_sums_across_atestados():
@@ -551,3 +552,280 @@ def test_matching_no_exigencias_returns_empty():
     atestados = [{"id": 1, "descricao_servico": "Atestado", "servicos_json": []}]
     results = matching_service.match_exigencias([], atestados)
     assert results == []
+
+
+# ============================================================
+# Ajuste: Stopwords (OU, numeros curtos)
+# ============================================================
+
+class TestStopwordsOuAndNumbers:
+    def test_ou_nao_gera_match_espurio(self):
+        """Palavra OU nao deve contribuir para similaridade."""
+        kw = extract_keywords("PISO EM GRANILITE, MARMORITE OU GRANITINA")
+        assert "OU" not in kw
+
+    def test_numeros_curtos_removidos(self):
+        """Numeros de 1-2 digitos nao devem ser keywords."""
+        kw = extract_keywords("ARGAMASSA TRACO 1:2:8 PREPARO MANUAL")
+        assert "1" not in kw
+        assert "2" not in kw
+        assert "8" not in kw
+        assert "ARGAMASSA" in kw
+        assert "MANUAL" in kw
+
+    def test_numeros_longos_preservados(self):
+        """Numeros de 3+ digitos devem ser preservados como keywords."""
+        kw = extract_keywords("BETONEIRA 400L")
+        assert "400L" in kw
+
+    def test_granilite_nao_casa_com_lastro_via_ou(self):
+        """Lastro de concreto nao deve casar com piso em granilite."""
+        exigencias = [{
+            "descricao": "Piso em granilite, marmorite ou granitina",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Lastro de concreto magro, aplicado em pisos ou radiers",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+
+# ============================================================
+# Ajuste: Siglas preservadas (EPS, ABS)
+# ============================================================
+
+class TestSiglaExceptions:
+    def test_eps_preservado(self):
+        """EPS nao deve ser normalizado para EP."""
+        assert normalize_pt_morphology("EPS") == "EPS"
+
+    def test_abs_preservado(self):
+        """ABS nao deve ser normalizado para AB."""
+        assert normalize_pt_morphology("ABS") == "ABS"
+
+    def test_eps_keyword_preservada(self):
+        """EPS deve aparecer como keyword, nao EP."""
+        kw = extract_keywords("MOLDURA EM EPS PARA FACHADA")
+        assert "EPS" in kw
+        assert "EP" not in kw
+
+
+# ============================================================
+# Ajuste: MECANICO no grupo de qualifiers
+# ============================================================
+
+class TestMecanicoQualifier:
+    def test_manual_vs_mecanico_blocks(self):
+        """Preparo manual nao deve casar com preparo mecanico."""
+        assert _check_exclusive_qualifiers({"MANUAL"}, {"MECANICO"}) is False
+
+    def test_mecanico_vs_manual_blocks(self):
+        """Preparo mecanico nao deve casar com preparo manual."""
+        assert _check_exclusive_qualifiers({"MECANICO"}, {"MANUAL"}) is False
+
+    def test_mecanico_vs_mecanico_passes(self):
+        """Mecanico vs mecanico deve passar."""
+        assert _check_exclusive_qualifiers({"MECANICO"}, {"MECANICO"}) is True
+
+    def test_emboco_manual_vs_reboco_mecanico(self):
+        """Emboco manual nao deve casar com reboco mecanico."""
+        exigencias = [{
+            "descricao": "Emboco em argamassa preparo manual aplicado manualmente em paredes",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Reboco vertical em argamassa preparo mecanico com betoneira",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+
+# ============================================================
+# Ajuste: Grupo exclusivo PISO/PAREDE/TETO/FORRO/MURO
+# ============================================================
+
+class TestElementoQualifier:
+    def test_piso_vs_parede_blocks(self):
+        """Piso nao deve casar com parede."""
+        assert _check_exclusive_qualifiers({"PISO"}, {"PAREDE"}) is False
+
+    def test_piso_vs_teto_blocks(self):
+        """Piso nao deve casar com teto."""
+        assert _check_exclusive_qualifiers({"PISO"}, {"TETO"}) is False
+
+    def test_piso_vs_piso_passes(self):
+        """Piso vs piso deve passar."""
+        assert _check_exclusive_qualifiers({"PISO"}, {"PISO"}) is True
+
+    def test_servico_com_multiplos_elementos_passa(self):
+        """Item que menciona piso e parede deve casar com exigencia de piso."""
+        assert _check_exclusive_qualifiers({"PISO"}, {"PISO", "PAREDE"}) is True
+
+    def test_parede_concreto_nao_casa_com_piso_concreto(self):
+        """Parede de concreto nao deve casar com piso em concreto."""
+        exigencias = [{
+            "descricao": "Piso em concreto 20 MPA preparo mecanico",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Parede de placa pre-moldada de concreto preparo mecanico com betoneira",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+
+# ============================================================
+# Ajuste: Novos mandatory patterns
+# ============================================================
+
+class TestNewMandatoryPatterns:
+    def test_texturizada_bloqueia_selador(self):
+        """Selador acrilico nao deve casar com pintura texturizada."""
+        exigencias = [{
+            "descricao": "Aplicacao manual de pintura com tinta texturizada acrilica",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Fundo selador acrilico, aplicacao manual em parede",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+    def test_texturizada_casa_com_texturizada(self):
+        """Pintura texturizada deve casar com pintura texturizada."""
+        exigencias = [{
+            "descricao": "Aplicacao manual de pintura com tinta texturizada acrilica",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Aplicacao manual de pintura com tinta texturizada acrilica em fachada",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "atende"
+
+    def test_emboco_mandatory_bloqueia_alvenaria(self):
+        """Alvenaria com argamassa nao deve casar com emboco."""
+        exigencias = [{
+            "descricao": "Emboco em argamassa preparo manual em paredes",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Alvenaria de vedacao com blocos ceramicos e argamassa preparo manual",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+    def test_revisao_cobertura_bloqueia_telhamento(self):
+        """Telhamento novo nao deve casar com revisao de cobertura."""
+        exigencias = [{
+            "descricao": "Revisao de cobertura em telha ceramica",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Telhamento com telha ceramica capa-canal tipo colonial",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"
+
+    def test_revisao_cobertura_casa_com_revisao(self):
+        """Revisao de cobertura deve casar com revisao de cobertura."""
+        exigencias = [{
+            "descricao": "Revisao de cobertura em telha ceramica",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Revisao em cobertura com telha ceramica tipo canal, com reposicao de 10 porcento",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "atende"
+
+
+# ============================================================
+# Ajuste: Atividade COMPACTACAO
+# ============================================================
+
+class TestCompactacaoActivity:
+    def test_compactacao_nao_casa_com_execucao_piso(self):
+        """Compactacao de solo nao deve casar com execucao de piso."""
+        exigencias = [{
+            "descricao": "Execucao de piso em concreto armado",
+            "quantidade_minima": 100,
+            "unidade": "M2",
+        }]
+        atestados = [{
+            "id": 1,
+            "descricao_servico": "Atestado 1",
+            "servicos_json": [{
+                "item": "1.1",
+                "descricao": "Compactacao mecanica de solo para piso de concreto",
+                "quantidade": 200,
+                "unidade": "M2",
+            }],
+        }]
+        results = matching_service.match_exigencias(exigencias, atestados)
+        assert results[0]["status"] == "nao_atende"

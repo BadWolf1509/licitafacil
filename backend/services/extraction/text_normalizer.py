@@ -7,11 +7,10 @@ extrair palavras-chave e calcular similaridade entre textos.
 Usa lru_cache para melhorar performance em chamadas repetidas.
 """
 
-import unicodedata
 import re
+import unicodedata
 from functools import lru_cache
-from typing import Set, FrozenSet
-
+from typing import FrozenSet, Set
 
 # Unidades comuns de medida
 UNIT_TOKENS: Set[str] = {
@@ -23,7 +22,8 @@ UNIT_TOKENS: Set[str] = {
 STOPWORDS: Set[str] = {
     'DE', 'DO', 'DA', 'EM', 'PARA', 'COM', 'E', 'A', 'O', 'AS', 'OS',
     'UN', 'M2', 'M3', 'ML', 'M', 'VB', 'KG', 'INCLUSIVE', 'INCLUSIV',
-    'TIPO', 'MODELO', 'TRACO'
+    'TIPO', 'MODELO', 'TRACO',
+    'OU', 'NA', 'NO', 'AO', 'DAS', 'DOS', 'NAS', 'NOS',
 }
 
 
@@ -235,6 +235,12 @@ def normalize_desc_for_match(desc: str) -> str:
     return normalize_description(cleaned)
 
 
+# Siglas técnicas que NÃO devem sofrer normalização de plural (S$ → '')
+# EPS (poliestireno expandido), ABS, GPS, etc.
+_SIGLA_EXCEPTIONS: FrozenSet[str] = frozenset({
+    'EPS', 'ABS', 'GPS', 'LED', 'PIS', 'NIS',
+})
+
 # Regras de normalização morfológica para português (construção civil)
 # Plural: mais específico primeiro para evitar aplicação incorreta
 _PLURAL_RULES = [
@@ -283,6 +289,10 @@ def normalize_pt_morphology(term: str) -> str:
     if len(term) <= 2:
         return term
 
+    # Siglas técnicas não devem ser normalizadas
+    if term in _SIGLA_EXCEPTIONS:
+        return term
+
     normalized = term
 
     # Plural: aplicar primeira regra que casa
@@ -303,12 +313,17 @@ def normalize_pt_morphology(term: str) -> str:
     return normalized
 
 
+def _is_short_number(w: str) -> bool:
+    """Verifica se a palavra é um número curto (1-2 dígitos) que gera ruído."""
+    return len(w) <= 2 and w.isdigit()
+
+
 @lru_cache(maxsize=2048)
 def _extract_keywords_cached(desc: str) -> FrozenSet[str]:
     """Versão cacheada de extract_keywords usando stopwords padrão."""
     normalized = normalize_description(desc)
     words = frozenset(normalize_pt_morphology(w) for w in normalized.split())
-    return words - STOPWORDS
+    return frozenset(w for w in (words - STOPWORDS) if not _is_short_number(w))
 
 
 def extract_keywords(desc: str, stopwords: Set[str] = STOPWORDS) -> Set[str]:
@@ -331,7 +346,7 @@ def extract_keywords(desc: str, stopwords: Set[str] = STOPWORDS) -> Set[str]:
 
     normalized = normalize_description(desc)
     words = set(normalize_pt_morphology(w) for w in normalized.split())
-    return words - stopwords
+    return {w for w in (words - stopwords) if not _is_short_number(w)}
 
 
 def description_similarity(left: str, right: str) -> float:

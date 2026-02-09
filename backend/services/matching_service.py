@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Set
 
-from logging_config import get_logger
 from config import MatchingConfig as MC
-from .extraction import normalize_unit, normalize_desc_for_match, extract_keywords, parse_quantity
+from logging_config import get_logger
 
+from .extraction import extract_keywords, normalize_desc_for_match, normalize_unit, parse_quantity
 
 logger = get_logger("services.matching_service")
 
@@ -127,6 +127,7 @@ def _keyword_similarity(left: Set[str], right: Set[str]) -> float:
 
 ACTIVITY_TOKENS = [
     ("DEMOLICAO", {"DEMOLICAO", "REMOCAO", "RETIRADA"}),
+    ("COMPACTACAO", {"COMPACTACAO"}),
     ("LIMPEZA", {"LIMPEZA", "HIGIENIZACAO"}),
     ("MANUTENCAO", {"MANUTENCAO", "CONSERVACAO", "RECUPERACAO"}),
     ("SUPPLY_INSTALL", {"FORNECIMENTO", "INSTALACAO", "MONTAGEM"}),
@@ -146,6 +147,13 @@ MANDATORY_PATTERNS = [
     "CERAMIC",
     "ANTI CHAMA",
     "ANTICHAMA",
+    "TEXTURIZ",
+    "GRANILITE",
+    "GRANITINA",
+    "MARMORITE",
+    "EMBOCO",
+    "REVISAO",
+    "COBERTURA",
 ]
 
 # Grupos de qualificadores mutuamente exclusivos.
@@ -158,11 +166,12 @@ EXCLUSIVE_QUALIFIER_GROUPS: List[Set[str]] = [
     {"VEDACAO", "ESTRUTURAL"},
     {"SIMPLES", "ARMADO", "PROTENDIDO"},
     {"MACICA", "NERVURADA", "TRELICADA"},
-    {"MANUAL", "MECANIZADA", "MECANIZADO"},
+    {"MANUAL", "MECANICO", "MECANIZADA", "MECANIZADO"},
     {"SOLDAVEL", "ROSCAVEL"},
     {"ESCAVACAO", "ATERRO"},
     {"FLEXIVEL", "RIGIDO"},
     {"PVA", "ACRILICO"},
+    {"PISO", "PAREDE", "TETO", "FORRO", "MURO"},
 ]
 
 
@@ -183,7 +192,10 @@ def _check_exclusive_qualifiers(req_keywords: Set[str], serv_keywords: Set[str])
         # (ex: "flexivel e/ou rigido"), qualquer um é aceitável.
         if len(req_in_group) > 1:
             continue
-        if req_in_group and serv_in_group and req_in_group != serv_in_group:
+        # Se ambos têm qualificadores, devem ter pelo menos um em comum.
+        # Ex: req={PISO} serv={PISO, PAREDE} → interseção {PISO} → OK
+        # Ex: req={PISO} serv={PAREDE} → interseção vazia → bloqueado
+        if req_in_group and serv_in_group and not (req_in_group & serv_in_group):
             return False
     return True
 
