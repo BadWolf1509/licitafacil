@@ -495,6 +495,219 @@ class TestAnaliseCreation:
             db_session.delete(user)
             db_session.commit()
 
+    def test_create_manual_analysis_matching_error_propagates(self, client: TestClient, db_session: Session):
+        """Verifica que erro no matching propaga como HTTP error (não salva resultado falso)."""
+        from dependencies import get_services
+        from main import app
+
+        email = unique_email("manual_err")
+        supabase_id = generate_supabase_id()
+        user = Usuario(
+            email=email,
+            nome="Teste Matching Error",
+            supabase_id=supabase_id,
+            is_active=True,
+            is_approved=True,
+            is_admin=False
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        # Mock do ServiceContainer via dependency_overrides
+        mock_container = MagicMock()
+        mock_container.document_processor.analyze_qualification.side_effect = \
+            RuntimeError("Erro transiente no matching")
+        app.dependency_overrides[get_services] = lambda: mock_container
+
+        try:
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
+
+                # Mock atestado_repository para retornar atestados (ativa o branch de matching)
+                mock_atestado = MagicMock()
+                mock_atestado.id = 1
+                mock_atestado.descricao_servico = "Servico teste"
+                mock_atestado.quantidade = 5000.0
+                mock_atestado.unidade = "m2"
+                mock_atestado.servicos_json = [
+                    {"descricao": "Pavimentacao", "quantidade": 5000.0, "unidade": "m2"}
+                ]
+
+                with patch('routers.analise.atestado_repository') as mock_repo:
+                    mock_repo.get_all_with_services.return_value = [mock_atestado]
+
+                    response = client.post(
+                        "/api/v1/analises/manual",
+                        headers=headers,
+                        json={
+                            "nome_licitacao": "Analise com erro",
+                            "exigencias": [
+                                {
+                                    "descricao": "Pavimentacao",
+                                    "quantidade_minima": 1000.0,
+                                    "unidade": "m2"
+                                }
+                            ]
+                        }
+                    )
+                    # Deve retornar erro HTTP, não 200 com resultado falso
+                    assert response.status_code in [401, 429, 500]
+
+                    if response.status_code == 500:
+                        # Verificar que nenhuma análise foi salva no banco
+                        db_session.expire_all()
+                        count = db_session.query(Analise).filter(
+                            Analise.user_id == user.id,
+                            Analise.nome_licitacao == "Analise com erro"
+                        ).count()
+                        assert count == 0
+        finally:
+            app.dependency_overrides.pop(get_services, None)
+            db_session.expire_all()
+            for a in db_session.query(Analise).filter(Analise.user_id == user.id).all():
+                db_session.delete(a)
+            db_session.delete(user)
+            db_session.commit()
+
+    def test_reprocess_manual_analysis_success(self, client: TestClient, db_session: Session):
+        """Verifica que é possível reprocessar uma análise manual."""
+        from dependencies import get_services
+        from main import app
+
+        email = unique_email("reprocess_manual")
+        supabase_id = generate_supabase_id()
+        user = Usuario(
+            email=email,
+            nome="Teste Reprocess Manual",
+            supabase_id=supabase_id,
+            is_active=True,
+            is_approved=True,
+            is_admin=False
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+
+        # Criar análise manual com resultado vazio (simula fallback antigo)
+        analise = Analise(
+            user_id=user.id,
+            nome_licitacao="Manual para reprocessar",
+            arquivo_path=None,
+            exigencias_json=[
+                {"descricao": "Pavimentacao", "quantidade_minima": 1000.0, "unidade": "m2"}
+            ],
+            resultado_json=[]
+        )
+        db_session.add(analise)
+        db_session.commit()
+        db_session.refresh(analise)
+
+        matching_result = [
+            {
+                "exigencia": {"descricao": "Pavimentacao", "quantidade_minima": 1000.0, "unidade": "M2"},
+                "status": "atende",
+                "atestados_recomendados": [],
+                "soma_quantidades": 1500.0,
+                "percentual_total": 150.0,
+            }
+        ]
+
+        mock_container = MagicMock()
+        mock_container.document_processor.analyze_qualification.return_value = matching_result
+        app.dependency_overrides[get_services] = lambda: mock_container
+
+        try:
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
+
+                mock_atestado = MagicMock()
+                mock_atestado.id = 1
+                mock_atestado.descricao_servico = "Servico teste"
+                mock_atestado.quantidade = 5000.0
+                mock_atestado.unidade = "m2"
+                mock_atestado.servicos_json = []
+
+                with patch('routers.analise.atestado_repository') as mock_repo:
+                    mock_repo.get_all_with_services.return_value = [mock_atestado]
+
+                    response = client.post(
+                        f"/api/v1/analises/{analise.id}/processar",
+                        headers=headers
+                    )
+                    assert response.status_code in [200, 401, 429]
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        assert data["resultado_json"] is not None
+                        assert len(data["resultado_json"]) == 1
+                        assert data["resultado_json"][0]["status"] == "atende"
+        finally:
+            app.dependency_overrides.pop(get_services, None)
+            db_session.expire_all()
+            remaining = db_session.query(Analise).get(analise.id)
+            if remaining:
+                db_session.delete(remaining)
+            db_session.delete(user)
+            db_session.commit()
+
+    def test_reprocess_manual_analysis_no_exigencias_returns_400(self, client: TestClient, db_session: Session):
+        """Verifica que reprocessar análise manual sem exigências retorna 400."""
+        email = unique_email("reprocess_empty")
+        supabase_id = generate_supabase_id()
+        user = Usuario(
+            email=email,
+            nome="Teste Reprocess Empty",
+            supabase_id=supabase_id,
+            is_active=True,
+            is_approved=True,
+            is_admin=False
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+
+        analise = Analise(
+            user_id=user.id,
+            nome_licitacao="Manual vazia",
+            arquivo_path=None,
+            exigencias_json=[],
+            resultado_json=[]
+        )
+        db_session.add(analise)
+        db_session.commit()
+        db_session.refresh(analise)
+
+        try:
+            with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
+                mock_verify.return_value = {"id": supabase_id, "email": email}
+                headers = {"Authorization": "Bearer mock_token"}
+
+                # Mock atestado_repository para não falhar por falta de atestados
+                mock_atestado = MagicMock()
+                mock_atestado.id = 1
+                mock_atestado.descricao_servico = "Servico teste"
+                mock_atestado.quantidade = 100.0
+                mock_atestado.unidade = "m2"
+                mock_atestado.servicos_json = []
+
+                with patch('routers.analise.atestado_repository') as mock_repo:
+                    mock_repo.get_all_with_services.return_value = [mock_atestado]
+
+                    response = client.post(
+                        f"/api/v1/analises/{analise.id}/processar",
+                        headers=headers
+                    )
+                    assert response.status_code in [400, 401, 429]
+        finally:
+            db_session.expire_all()
+            remaining = db_session.query(Analise).get(analise.id)
+            if remaining:
+                db_session.delete(remaining)
+            db_session.delete(user)
+            db_session.commit()
+
     def test_delete_analise_not_found(self, client: TestClient, db_session: Session):
         """Verifica que excluir análise inexistente retorna 404."""
         email = unique_email("delete_404")

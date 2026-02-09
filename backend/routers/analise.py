@@ -265,29 +265,19 @@ async def create_manual_analysis(
     atestados_dict = atestados_to_dict(atestados)
     logger.info(f"[ANALISE_MANUAL] Atestados com servicos: {len(atestados_dict) if atestados_dict else 0}")
 
-    # Fazer matching
+    # Fazer matching se houver exigências e atestados
     resultado_matching = []
     try:
-        logger.info("[ANALISE_MANUAL] Iniciando matching...")
-        resultado_matching = services.document_processor.analyze_qualification(
-            exigencias, atestados_dict
-        )
-        logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching)} resultados")
+        if exigencias and atestados_dict:
+            logger.info("[ANALISE_MANUAL] Iniciando matching...")
+            resultado_matching = services.document_processor.analyze_qualification(
+                exigencias, atestados_dict
+            )
+            logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching)} resultados")
         # Serializar resultado (Decimal -> float)
         resultado_matching = _serialize_for_json(resultado_matching)
     except Exception as e:
-        logger.error(f"[ANALISE_MANUAL] Erro no matching: {e}", exc_info=True)
-        # Gerar resultados nao_atende como fallback em caso de erro
-        resultado_matching = [
-            {
-                "exigencia": _serialize_for_json(exig),
-                "status": "nao_atende",
-                "atestados_recomendados": [],
-                "soma_quantidades": 0.0,
-                "percentual_total": 0.0,
-            }
-            for exig in exigencias
-        ]
+        raise handle_exception(e, logger, "ao processar análise manual")
 
     # Criar análise
     nova_analise = Analise(
@@ -336,7 +326,8 @@ async def reprocess_analysis(
     """
     Reprocessa uma análise existente.
 
-    Extrai novamente as exigências do edital e refaz o matching
+    Para análises com PDF: extrai novamente as exigências e refaz o matching.
+    Para análises manuais: usa as exigências armazenadas e refaz o matching
     com os atestados atuais do usuário.
 
     **Casos de uso:**
@@ -348,21 +339,7 @@ async def reprocess_analysis(
         db, Analise, analise_id, current_user.id, Messages.ANALISE_NOT_FOUND
     )
 
-    # Verificar se há arquivo associado
-    if not analise.arquivo_path:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=Messages.EDITAL_FILE_NOT_FOUND
-        )
-
-    # Verificar se arquivo existe no storage
-    if not file_exists_in_storage(analise.arquivo_path):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=Messages.EDITAL_FILE_NOT_FOUND
-        )
-
-    # Buscar atestados do usuário usando repository
+    # Buscar atestados do usuário
     atestados = atestado_repository.get_all_with_services(db, current_user.id)
 
     if not atestados:
@@ -371,31 +348,49 @@ async def reprocess_analysis(
             detail=Messages.NO_ATESTADOS
         )
 
-    # Baixar arquivo do storage para arquivo temporário
-    file_ext = os.path.splitext(analise.arquivo_path)[1] or ".pdf"
+    atestados_dict = atestados_to_dict(atestados)
+
     try:
-        with temp_file_from_storage(analise.arquivo_path, save_temp_file_from_storage, suffix=file_ext) as temp_path:
-            # Reprocessar edital
-            resultado_edital = services.document_processor.process_edital(temp_path)
-            exigencias = resultado_edital.get("exigencias", [])
+        if analise.arquivo_path:
+            # Análise com PDF: re-extrair exigências do arquivo + re-fazer matching
+            if not file_exists_in_storage(analise.arquivo_path):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=Messages.EDITAL_FILE_NOT_FOUND
+                )
 
-            # Converter atestados para formato de análise
-            atestados_dict = atestados_to_dict(atestados)
+            file_ext = os.path.splitext(analise.arquivo_path)[1] or ".pdf"
+            with temp_file_from_storage(analise.arquivo_path, save_temp_file_from_storage, suffix=file_ext) as temp_path:
+                resultado_edital = services.document_processor.process_edital(temp_path)
+                exigencias = resultado_edital.get("exigencias", [])
 
-            # Fazer matching
+                resultado_matching = []
+                if exigencias and atestados_dict:
+                    resultado_matching = services.document_processor.analyze_qualification(
+                        exigencias, atestados_dict
+                    )
+
+                analise.exigencias_json = exigencias
+                analise.resultado_json = resultado_matching
+        else:
+            # Análise manual: usar exigências armazenadas, apenas re-fazer matching
+            exigencias = analise.exigencias_json or []
+            if not exigencias:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Análise manual sem exigências para reprocessar"
+                )
+
             resultado_matching = []
-            if exigencias and atestados_dict:
+            if atestados_dict:
                 resultado_matching = services.document_processor.analyze_qualification(
                     exigencias, atestados_dict
                 )
+            analise.resultado_json = _serialize_for_json(resultado_matching)
 
-            # Atualizar análise
-            analise.exigencias_json = exigencias
-            analise.resultado_json = resultado_matching
-            db.commit()
-            db.refresh(analise)
-
-            return analise
+        db.commit()
+        db.refresh(analise)
+        return analise
 
     except HTTPException:
         raise

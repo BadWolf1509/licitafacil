@@ -84,6 +84,7 @@ const AnalisesModule = {
                             <div class="d-flex gap-1">
                                 <button class="btn btn-primary btn-sm" data-action="ver-detalhes" data-id="${a.id}">Ver Detalhes</button>
                                 ${!hasResults && a.arquivo_path ? `<button class="btn btn-outline btn-sm" data-action="processar" data-id="${a.id}">Processar</button>` : ''}
+                                ${!a.arquivo_path && hasExigencias ? `<button class="btn btn-outline btn-sm" data-action="processar" data-id="${a.id}">Reprocessar</button>` : ''}
                                 <button class="btn btn-danger btn-sm" data-action="excluir" data-id="${a.id}">Excluir</button>
                             </div>
                         </div>
@@ -124,7 +125,7 @@ const AnalisesModule = {
                                 <li>Seus atestados nao possuem servicos compativeis</li>
                                 <li>Erro interno no processamento</li>
                             </ul>
-                            <p class="text-muted mt-2">Cadastre atestados com servicos e crie uma nova analise.</p>
+                            <button class="btn btn-primary mt-2" data-action="processar" data-id="${id}">Reprocessar</button>
                         </div>
                     `;
                 } else {
