@@ -9,9 +9,9 @@ Também torna senha_hash nullable para permitir migração gradual.
 """
 from typing import Sequence, Union
 
-from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 
+from alembic import op  # type: ignore[attr-defined]
 
 # revision identifiers, used by Alembic.
 revision: str = 'e5g9h80328gg'

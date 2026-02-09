@@ -1,26 +1,25 @@
 # Backend utilities package
 
-from .text_utils import sanitize_description
-from .retry import retry
-
 # Exceções importadas do módulo centralizado
 from exceptions import (
-    LicitaFacilError,
-    ProcessingError,
-    ValidationError,
     DatabaseError,
     ExternalServiceError,
-    ResourceNotFoundError,
+    LicitaFacilError,
     PermissionDeniedError,
+    ProcessingError,
+    ResourceNotFoundError,
+    ValidationError,
 )
 
 # Funções utilitárias de tratamento de erros
 from .error_handlers import (
     handle_exception,
-    log_exception,
     log_and_raise_http_error,
+    log_exception,
     safe_operation,
 )
+from .retry import retry
+from .text_utils import sanitize_description
 
 __all__ = [
     # text_utils

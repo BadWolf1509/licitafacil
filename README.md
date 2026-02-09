@@ -122,7 +122,7 @@ licitafacil/
 │   │   ├── extraction/    # Módulos de extração
 │   │   ├── processors/    # Processadores de texto
 │   │   └── table_extraction/  # Extração de tabelas
-│   ├── tests/             # Testes unitários (341 testes)
+│   ├── tests/             # Testes automatizados
 │   └── utils/             # Utilitários
 ├── frontend/
 │   ├── css/               # Estilos
@@ -252,7 +252,7 @@ cd backend
 pytest -v
 ```
 
-**Cobertura:** 341+ testes passando
+**Cobertura:** 1000+ testes automatizados
 
 ## Credenciais Padrão
 

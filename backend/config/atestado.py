@@ -7,7 +7,7 @@ Dividido em sub-classes para melhor organização.
 from dataclasses import dataclass
 from typing import ClassVar
 
-from .base import env_int, env_float, env_bool, PAID_SERVICES_ENABLED
+from .base import PAID_SERVICES_ENABLED, env_bool, env_float, env_int
 
 
 @dataclass(frozen=True)

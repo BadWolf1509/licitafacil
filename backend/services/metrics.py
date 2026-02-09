@@ -3,8 +3,8 @@ Metricas Prometheus para observabilidade do LicitaFacil.
 
 Expoe metricas de processamento, fila e requisicoes HTTP.
 """
-from prometheus_client import Counter, Histogram, Gauge, Info, REGISTRY
-from prometheus_client.exposition import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, Info
+from prometheus_client.exposition import CONTENT_TYPE_LATEST, generate_latest
 
 from logging_config import get_logger
 

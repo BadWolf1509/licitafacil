@@ -11,9 +11,9 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.extraction import (
+    is_valid_item_context,
     parse_item_tuple,
     parse_quantity,
-    is_valid_item_context,
 )
 from utils.text_utils import sanitize_description
 

@@ -5,20 +5,18 @@ Testa LocalStorageBackend, SupabaseStorageBackend e funcoes factory
 definidas em services/storage_service.py.
 """
 import io
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+import services.storage_service as storage_module
 from services.storage_service import (
     LocalStorageBackend,
     SupabaseStorageBackend,
-    StorageBackend,
     get_storage,
     reset_storage,
-    _storage_instance,
 )
-import services.storage_service as storage_module
-
 
 # =============================================================================
 # LocalStorageBackend
@@ -50,7 +48,7 @@ class TestLocalStorageBackend:
         content = b"nested file content"
         file_obj = io.BytesIO(content)
 
-        result = local_storage.upload(file_obj, "users/1/atestados/doc.pdf")
+        local_storage.upload(file_obj, "users/1/atestados/doc.pdf")
 
         expected_path = tmp_path / "users" / "1" / "atestados" / "doc.pdf"
         assert expected_path.exists()
@@ -146,14 +144,20 @@ class TestSupabaseStorageBackend:
         content = b"pdf content"
         file_obj = io.BytesIO(content)
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_response = MagicMock()
-            mock_urlopen.return_value = mock_response
+        with patch.object(supabase_storage, "_upload_stream_http") as mock_upload:
+            mock_upload.return_value = None
 
             result = supabase_storage.upload(file_obj, "users/1/doc.pdf", "application/pdf")
 
         expected_url = f"{self.MOCK_URL}/storage/v1/object/authenticated/uploads/users/1/doc.pdf"
         assert result == expected_url
+        mock_upload.assert_called_once_with(
+            "POST",
+            "users/1/doc.pdf",
+            file_obj,
+            "application/pdf",
+            1024 * 1024,
+        )
 
     def test_supabase_upload_conflict_upserts(self, supabase_storage):
         """Upload com conflito 409 faz upsert via PUT."""
@@ -167,15 +171,15 @@ class TestSupabaseStorageBackend:
             url="", code=409, msg="Conflict", hdrs=None, fp=io.BytesIO(b"")
         )
 
-        with patch("urllib.request.urlopen") as mock_urlopen:
-            mock_urlopen.side_effect = [http_error_409, MagicMock()]
+        with patch.object(supabase_storage, "_upload_stream_http") as mock_upload:
+            mock_upload.side_effect = [http_error_409, None]
 
             result = supabase_storage.upload(file_obj, "users/1/doc.pdf")
 
         expected_url = f"{self.MOCK_URL}/storage/v1/object/authenticated/uploads/users/1/doc.pdf"
         assert result == expected_url
         # Deve ter feito 2 chamadas: POST (falhou 409) + PUT (sucesso)
-        assert mock_urlopen.call_count == 2
+        assert mock_upload.call_count == 2
 
     def test_supabase_download_success(self, supabase_storage):
         """Download retorna bytes do arquivo."""

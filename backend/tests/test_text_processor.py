@@ -4,11 +4,11 @@ Testes unitários para o TextProcessor.
 Testa extração de itens de serviço a partir de texto.
 """
 
-from services.processors.text_processor import TextProcessor, text_processor
 from services.processors.text_cleanup import (
     parse_unit_qty_from_line,
     strip_trailing_unit_qty,
 )
+from services.processors.text_processor import TextProcessor, text_processor
 
 
 class TestExtractItemCodesFromTextLines:

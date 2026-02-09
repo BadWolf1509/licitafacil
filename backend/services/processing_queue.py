@@ -8,22 +8,18 @@ e models compartilhados.
 
 import asyncio
 import os
-from datetime import datetime
-from typing import Dict, Any, Optional, List, Callable
-from collections import deque
 import threading
+from collections import deque
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
-from logging_config import get_logger
 from config import QUEUE_MAX_CONCURRENT, QUEUE_POLL_INTERVAL
-from .models import JobStatus, ProcessingJob
-from .job_repository import JobRepository
+from logging_config import get_logger
+
 from .job_executor import JobExecutor
-from .metrics import (
-    record_job_completed,
-    record_job_failed,
-    record_job_cancelled,
-    update_queue_metrics
-)
+from .job_repository import JobRepository
+from .metrics import record_job_cancelled, record_job_completed, record_job_failed, update_queue_metrics
+from .models import JobStatus, ProcessingJob
 
 logger = get_logger('services.processing_queue')
 
@@ -322,8 +318,6 @@ class ProcessingQueue:
                     logger.warning(f"Job órfão marcado como FAILED: {job.id} (arquivo: {job.file_path})")
                     continue
 
-                if job.status == JobStatus.PROCESSING:
-                    job.status = JobStatus.PENDING
                 self._queue.append(job)
                 self._queued_jobs[job.id] = job
                 valid_count += 1

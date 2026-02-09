@@ -4,8 +4,10 @@ Testes unitários para o AIExtractionService.
 Testa o serviço unificado de extração via IA.
 """
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
+
 from services.ai.extraction_service import AIExtractionService, extraction_service
 
 

@@ -10,6 +10,7 @@ Para APIs que usam autenticação via Bearer token (não cookies),
 CSRF é menos crítico, mas esta proteção adiciona uma camada extra.
 """
 from typing import Callable, List, Optional
+
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware

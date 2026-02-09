@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
+
 logger = get_logger('services.document_ai_service')
 
 # DOCUMENT AI PERMANENTEMENTE DESABILITADO

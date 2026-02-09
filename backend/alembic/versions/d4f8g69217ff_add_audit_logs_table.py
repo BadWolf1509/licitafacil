@@ -8,9 +8,9 @@ Cria tabela de logs de auditoria para rastrear acoes administrativas.
 """
 from typing import Sequence, Union
 
-from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 
+from alembic import op  # type: ignore[attr-defined]
 
 # revision identifiers, used by Alembic.
 revision: str = 'd4f8g69217ff'

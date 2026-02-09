@@ -6,10 +6,10 @@ Extrai e orquestra as fases do processamento de atestados de capacidade técnica
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from logging_config import get_logger
 from config import AtestadoProcessingConfig as APC
+from logging_config import get_logger
 
 if TYPE_CHECKING:
     from services.protocols import DocumentProcessorProtocol
@@ -141,10 +141,10 @@ class AtestadoPipeline:
 
     def _phase2_extract_tables(self) -> None:
         """Fase 2: Extração de serviços de tabelas."""
-        from ..table_extraction_service import table_extraction_service
-        from ..processors.text_processor import text_processor  # noqa: F401
-        from ..extraction.table_processor import parse_item_tuple
         from ..ai_provider import ai_provider
+        from ..extraction.table_processor import parse_item_tuple
+        from ..processors.text_processor import text_processor  # noqa: F401
+        from ..table_extraction_service import table_extraction_service
 
         # Extrair serviços via cascata
         if (
@@ -253,9 +253,9 @@ class AtestadoPipeline:
 
     def _phase3_ai_analysis(self) -> None:
         """Fase 3: Análise com IA/Vision."""
+        from ..aditivo_processor import prefix_aditivo_items
         from ..ai_provider import ai_provider
         from ..document_analysis_service import document_analysis_service
-        from ..aditivo_processor import prefix_aditivo_items
         from ..table_extraction_service import table_extraction_service
 
         use_ai = ai_provider.is_configured
@@ -418,10 +418,10 @@ class AtestadoPipeline:
 
     def _enrich_from_text(self) -> None:
         """Executa o enriquecimento completo via texto nativo do PDF."""
-        from ..text_extraction_service import text_extraction_service
-        from ..processors.text_processor import text_processor
-        from ..processors.item_code_refiner import item_code_refiner
         from ..extraction import parse_item_tuple
+        from ..processors.item_code_refiner import item_code_refiner
+        from ..processors.text_processor import text_processor
+        from ..text_extraction_service import text_extraction_service
 
         page_segments = text_extraction_service.split_text_by_pages(self._texto or "")
         page_planilha_map, page_planilha_audit = text_extraction_service.build_page_planilha_map(page_segments)
@@ -493,11 +493,13 @@ class AtestadoPipeline:
 
     def _apply_restart_prefix_mapping(self, text_candidates: List[Dict]) -> None:
         """Mapeia prefixos de reinício nos candidatos de texto."""
+        from ..extraction import normalize_unit, parse_quantity
         from ..processing_helpers import (
-            split_restart_prefix,
             normalize_item_code as helpers_normalize_item_code,
         )
-        from ..extraction import normalize_unit, parse_quantity
+        from ..processing_helpers import (
+            split_restart_prefix,
+        )
 
         prefix_map, unique_prefix_by_code = self._processor._build_restart_prefix_maps(self._servicos_raw)
         if not (prefix_map or unique_prefix_by_code):
@@ -560,7 +562,7 @@ class AtestadoPipeline:
 
     def _check_itemless_mode(self, text_processor: Any, parse_item_tuple: Any) -> None:
         """Verifica e aplica modo itemless se códigos estruturados são insuficientes."""
-        from ..extraction import normalize_unit, normalize_description, parse_quantity
+        from ..extraction import normalize_description, normalize_unit, parse_quantity
 
         with_code = [s for s in self._servicos_raw if s.get("item")]
         if not with_code:
@@ -625,12 +627,11 @@ class AtestadoPipeline:
     def _phase5_postprocess(self) -> None:
         """Fase 5: Pós-processamento dos serviços."""
         from ..ai_provider import ai_provider
-        from ..processors.text_processor import text_processor
-        from ..processing_helpers import count_item_codes_in_text as helpers_count_item_codes_in_text
-        from ..extraction import parse_quantity, parse_item_tuple
 
         # Limpar quantidades baseadas em código
-        from ..extraction import clear_item_code_quantities
+        from ..extraction import clear_item_code_quantities, parse_item_tuple, parse_quantity
+        from ..processing_helpers import count_item_codes_in_text as helpers_count_item_codes_in_text
+        from ..processors.text_processor import text_processor
         cleared = clear_item_code_quantities(self._servicos_raw)
         if self._texto:
             needs_qty = any(parse_quantity(s.get("quantidade")) in (None, 0) for s in self._servicos_raw)

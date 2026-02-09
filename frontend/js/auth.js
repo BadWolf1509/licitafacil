@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Carregar configuração de autenticação do backend em TODAS as páginas
     // Necessário para inicializar o cliente Supabase (usado pelo Realtime)
     await loadAuthConfig();
+    await loadPasswordPolicy();
 
     // Só executar configuração de login na página de login (index.html)
     const path = window.location.pathname.toLowerCase();
@@ -110,19 +111,29 @@ function isValidEmail(email) {
  */
 function validatePassword(password) {
     const errors = [];
-    const minLength = 8;
+    const policy = CONFIG.PASSWORD_POLICY || {
+        min_length: 8,
+        require_uppercase: true,
+        require_lowercase: true,
+        require_digit: true,
+        require_special: true,
+    };
+    const minLength = policy.min_length || 8;
 
     if (!password || password.length < minLength) {
         errors.push(`Mínimo ${minLength} caracteres`);
     }
-    if (!/[A-Z]/.test(password)) {
+    if (policy.require_uppercase && !/[A-Z]/.test(password)) {
         errors.push('Pelo menos 1 letra maiúscula');
     }
-    if (!/[a-z]/.test(password)) {
+    if (policy.require_lowercase && !/[a-z]/.test(password)) {
         errors.push('Pelo menos 1 letra minúscula');
     }
-    if (!/[0-9]/.test(password)) {
+    if (policy.require_digit && !/[0-9]/.test(password)) {
         errors.push('Pelo menos 1 número');
+    }
+    if (policy.require_special && !/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;'`~]/.test(password)) {
+        errors.push('Pelo menos 1 caractere especial');
     }
 
     return {

@@ -5,26 +5,26 @@ Extrai e centraliza toda lógica de deduplicação do DocumentProcessor,
 oferecendo múltiplas estratégias para remover duplicatas.
 """
 
-from typing import Any, Dict, List, Set
 import logging
+from typing import Any, Dict, List, Set
 
+from config import AtestadoProcessingConfig as APC
 from services.extraction import (
-    normalize_description,
-    normalize_unit,
-    normalize_desc_for_match,
-    parse_quantity,
-    extract_keywords,
-    quantities_similar,
     description_similarity,
     extract_item_code,
-)
-from config import AtestadoProcessingConfig as APC
-from services.processing_helpers import (
-    normalize_item_code,
-    split_restart_prefix,
-    is_section_header_desc,
+    extract_keywords,
+    normalize_desc_for_match,
+    normalize_description,
+    normalize_unit,
+    parse_quantity,
+    quantities_similar,
 )
 from services.extraction.patterns import Patterns
+from services.processing_helpers import (
+    is_section_header_desc,
+    normalize_item_code,
+    split_restart_prefix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -507,7 +507,7 @@ def dedupe_servicos(servicos: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # para manter compatibilidade com código existente
 from services.extraction.deduplication_utils import (  # noqa: F401, E402
     build_keyword_index,
-    remove_duplicate_services,
     deduplicate_by_description,
     merge_servicos_prefer_primary,
+    remove_duplicate_services,
 )

@@ -10,28 +10,30 @@ from collections import Counter
 from typing import Any, Dict, List, Optional, Set
 
 from config import AtestadoProcessingConfig as APC
+from logging_config import get_logger
 from services.extraction import (
+    is_corrupted_text,
+    is_valid_item_context,
+    item_tuple_to_str,
     normalize_description,
     parse_item_tuple,
-    item_tuple_to_str,
-    is_valid_item_context,
-    is_corrupted_text,
 )
 from services.processing_helpers import (
-    normalize_item_code,
     is_section_header_desc,
+    normalize_item_code,
 )
 from services.text_extraction_service import text_extraction_service
 
-from logging_config import get_logger
 from .quantity_extractor import quantity_extractor
-from .text_line_parser import text_line_parser
 from .text_cleanup import (
     find_unit_qty_in_line,
-    strip_trailing_unit_qty,
     strip_footer_prefix_from_desc,
+    strip_trailing_unit_qty,
+)
+from .text_cleanup import (
     strip_unit_qty_prefix as _strip_unit_qty_prefix,
 )
+from .text_line_parser import text_line_parser
 from .text_section_builder import build_items_from_code_lines
 
 logger = get_logger("services.processors.text_processor")

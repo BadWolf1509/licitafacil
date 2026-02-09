@@ -4,14 +4,14 @@ Validacao de complexidade de senha.
 Implementa regras configuraveis para garantir senhas seguras.
 """
 import re
-from typing import Tuple, List
+from typing import List, Tuple
 
 from config.security import (
     PASSWORD_MIN_LENGTH,
-    PASSWORD_REQUIRE_UPPERCASE,
-    PASSWORD_REQUIRE_LOWERCASE,
     PASSWORD_REQUIRE_DIGIT,
+    PASSWORD_REQUIRE_LOWERCASE,
     PASSWORD_REQUIRE_SPECIAL,
+    PASSWORD_REQUIRE_UPPERCASE,
 )
 
 
@@ -100,6 +100,16 @@ class PasswordValidator:
 
         return requirements
 
+    def get_policy(self) -> dict:
+        """Retorna politica de senha em formato estruturado para clientes."""
+        return {
+            "min_length": self.min_length,
+            "require_uppercase": self.require_uppercase,
+            "require_lowercase": self.require_lowercase,
+            "require_digit": self.require_digit,
+            "require_special": self.require_special,
+        }
+
 
 # Instancia padrao do validador com configuracoes do ambiente
 password_validator = PasswordValidator()
@@ -126,3 +136,13 @@ def get_password_requirements() -> List[str]:
         Lista de strings descrevendo os requisitos
     """
     return password_validator.get_requirements()
+
+
+def get_password_policy() -> dict:
+    """
+    Funcao de conveniencia para obter politica de senha estruturada.
+
+    Returns:
+        Dicionario com regras de validacao de senha
+    """
+    return password_validator.get_policy()

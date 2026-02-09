@@ -14,12 +14,12 @@ from config import AtestadoProcessingConfig as APC
 from logging_config import get_logger
 
 from .extraction_strategies import (
-    ExtractionResult,
-    PdfPlumberStrategy,
-    DocumentAIStrategy,
-    OCRLayoutStrategy,
-    GridOCRStrategy,
     DocumentAIFallbackStrategy,
+    DocumentAIStrategy,
+    ExtractionResult,
+    GridOCRStrategy,
+    OCRLayoutStrategy,
+    PdfPlumberStrategy,
 )
 
 logger = get_logger('services.table_extraction.cascade')

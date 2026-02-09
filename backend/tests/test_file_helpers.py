@@ -5,12 +5,11 @@ Cobre cleanup_temp_file e temp_file_from_storage context manager.
 """
 
 import os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 
 from utils.file_helpers import cleanup_temp_file, temp_file_from_storage
-
 
 # ============================================================
 # cleanup_temp_file
@@ -133,6 +132,6 @@ class TestTempFileFromStorage:
             return False
 
         with pytest.raises(IOError, match="Falha ao baixar arquivo do storage"):
-            with temp_file_from_storage("bucket/missing.pdf", failing_save) as path:
+            with temp_file_from_storage("bucket/missing.pdf", failing_save):
                 # Nunca deve chegar aqui
                 pytest.fail("Nao deveria ter entrado no bloco with")

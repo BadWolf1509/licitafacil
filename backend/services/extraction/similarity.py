@@ -7,12 +7,12 @@ para detecção de duplicatas e mesclagem de dados.
 
 from typing import Optional
 
+from .table_processor import parse_quantity
 from .text_normalizer import (
+    extract_keywords,
     normalize_description,
     normalize_unit,
-    extract_keywords,
 )
-from .table_processor import parse_quantity
 
 
 def quantities_similar(qty_a: Optional[float], qty_b: Optional[float]) -> bool:

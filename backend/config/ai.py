@@ -2,7 +2,8 @@
 Configuracoes de modelos de IA do LicitaFacil.
 """
 import os
-from .base import env_int, env_float, env_bool
+
+from .base import env_bool, env_float, env_int
 
 
 class AIModelConfig:

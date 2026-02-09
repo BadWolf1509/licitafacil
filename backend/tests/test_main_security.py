@@ -5,9 +5,9 @@ Cobre:
 - PathTraversalError exception handler
 - Docs/Redoc desabilitados em producao
 """
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
 
 from utils.router_helpers import PathTraversalError, _validate_storage_path
 
@@ -53,10 +53,11 @@ class TestPathTraversalErrorHandler:
                 mock_repo.get_by_id.return_value = mock_atestado
                 # O handler deve capturar PathTraversalError e retornar 400
                 # Testar diretamente o handler
-                from main import app
-                from fastapi import Request
-                from main import path_traversal_handler
                 import asyncio
+
+                from fastapi import Request
+
+                from main import path_traversal_handler
 
                 exc = PathTraversalError("Path contains traversal sequence: ../../../etc/passwd")
                 mock_request = MagicMock(spec=Request)
@@ -67,10 +68,12 @@ class TestPathTraversalErrorHandler:
 
     def test_path_traversal_handler_generic_message(self):
         """PathTraversalError retorna mensagem generica (nao ecoa o path)."""
-        from main import path_traversal_handler
-        from fastapi import Request
         import asyncio
         import json
+
+        from fastapi import Request
+
+        from main import path_traversal_handler
 
         exc = PathTraversalError("Path contains traversal: /etc/passwd")
         mock_request = MagicMock(spec=Request)
@@ -83,9 +86,11 @@ class TestPathTraversalErrorHandler:
 
     def test_path_traversal_handler_logs_warning(self):
         """PathTraversalError loga warning."""
-        from main import path_traversal_handler
-        from fastapi import Request
         import asyncio
+
+        from fastapi import Request
+
+        from main import path_traversal_handler
 
         exc = PathTraversalError("Test")
         mock_request = MagicMock(spec=Request)

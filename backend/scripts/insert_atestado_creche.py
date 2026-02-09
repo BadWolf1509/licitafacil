@@ -3,8 +3,8 @@ Script para inserir atestado da Creche Esperança no banco de dados.
 Executar do diretório backend: python scripts/insert_atestado_creche.py
 """
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 # Adicionar backend ao path
@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database import get_db_session
 from models import Atestado, Usuario
-
 
 # Dados extraídos do PDF
 CONTRATANTE = "Prefeitura Municipal de Esperança - PB"

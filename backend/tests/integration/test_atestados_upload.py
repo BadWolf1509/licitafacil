@@ -3,16 +3,15 @@ Testes de integracao para upload de atestados.
 
 Testa o fluxo completo de upload, validacao e processamento.
 """
-import pytest
 from io import BytesIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import Usuario, Atestado
 from config import MAX_UPLOAD_SIZE_BYTES
-
+from models import Atestado, Usuario
 
 # === Fixtures para arquivos de teste ===
 

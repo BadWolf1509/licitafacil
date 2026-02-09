@@ -2,27 +2,28 @@
 Rotas para gerenciamento e status dos provedores de IA.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Optional
 import os
 import uuid
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from auth import get_current_active_user
-from models import Usuario
-from services.ai_provider import ai_provider
-from services.processing_queue import processing_queue, JobStatus, ProcessingJob
 from config import Messages
 from logging_config import get_logger, log_action
+from models import Usuario
 from schemas import (
     AIStatusResponse,
-    QueueStatusResponse,
-    QueueInfoResponse,
-    UserJobsResponse,
-    JobStatusResponse,
     JobCancelResponse,
     JobDeleteResponse,
+    JobStatusResponse,
     ProcessingJobDetail,
+    QueueInfoResponse,
+    QueueStatusResponse,
+    UserJobsResponse,
 )
+from services.ai_provider import ai_provider
+from services.processing_queue import JobStatus, ProcessingJob, processing_queue
 
 logger = get_logger('routers.ai_status')
 

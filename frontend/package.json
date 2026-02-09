@@ -26,8 +26,7 @@
       "^@/(.*)$": "<rootDir>/js/$1"
     },
     "collectCoverageFrom": [
-      "js/**/*.js",
-      "!js/atestados/**/*.js"
+      "js/**/*.js"
     ],
     "coverageThreshold": {
       "global": {

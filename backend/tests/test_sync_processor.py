@@ -4,12 +4,11 @@ Testes para services.sync_processor.
 Verifica processamento sincrono de atestados: criacao, atualizacao,
 tratamento de erros e singleton.
 """
+from unittest.mock import patch
+
 import pytest
-from datetime import date
-from unittest.mock import patch, MagicMock, PropertyMock
 
 from models import Atestado
-
 
 # ---------------------------------------------------------------------------
 # Helpers

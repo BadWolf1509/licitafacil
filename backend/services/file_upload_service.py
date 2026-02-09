@@ -5,18 +5,18 @@ Fornece uma interface unificada para validacao e upload,
 combinando as funcionalidades de validation.py e router_helpers.py.
 """
 import uuid
-from typing import Tuple, Optional, List
+from typing import List, Optional, Tuple
 
 from fastapi import UploadFile
 
-from utils.validation import validate_upload_complete_or_raise
-from utils.router_helpers import (
-    save_upload_file_to_storage,
-    safe_delete_file,
-    file_exists_in_storage,
-    get_file_from_storage
-)
 from logging_config import get_logger
+from utils.router_helpers import (
+    file_exists_in_storage,
+    get_file_from_storage,
+    safe_delete_file,
+    save_upload_file_to_storage,
+)
+from utils.validation import validate_upload_complete_or_raise
 
 logger = get_logger('services.file_upload')
 

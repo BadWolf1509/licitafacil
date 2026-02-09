@@ -9,9 +9,9 @@ import re
 from typing import Optional
 
 from services.extraction import (
+    UNIT_TOKENS,
     normalize_unit,
     parse_quantity,
-    UNIT_TOKENS,
 )
 
 

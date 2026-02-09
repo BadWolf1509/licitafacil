@@ -8,15 +8,15 @@ identificando colunas, processando linhas e gerando serviços.
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.extraction import (
-    detect_header_row,
-    guess_columns_by_header,
     compute_column_stats,
-    guess_columns_by_content,
-    validate_column_mapping,
-    filter_servicos_by_item_prefix,
-    filter_servicos_by_item_length,
-    repair_missing_prefix,
+    detect_header_row,
     dominant_item_length,
+    filter_servicos_by_item_length,
+    filter_servicos_by_item_prefix,
+    guess_columns_by_content,
+    guess_columns_by_header,
+    repair_missing_prefix,
+    validate_column_mapping,
 )
 from services.extraction.quality_assessor import compute_servicos_stats
 

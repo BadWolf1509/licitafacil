@@ -5,10 +5,10 @@ Centraliza enums e dataclasses usados por múltiplos módulos
 para evitar dependências circulares e facilitar manutenção.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 
 def _now_iso() -> str:

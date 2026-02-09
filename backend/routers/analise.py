@@ -1,31 +1,32 @@
 import os
 import uuid
 from decimal import Decimal
-from typing import Dict, Any
-from fastapi import Depends, HTTPException, status, UploadFile, File, Form
+from typing import Any, Dict
+
+from fastapi import Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Usuario, Analise
-from repositories.atestado_repository import atestado_repository
-from schemas import AnaliseResponse, Mensagem, PaginatedAnaliseResponse, AnaliseManualCreate
 from auth import get_current_approved_user
+from config import ALLOWED_PDF_EXTENSIONS, Messages
+from database import get_db
 from dependencies import ServiceContainer, get_services
-from services.atestado import atestados_to_dict
-from config import Messages, ALLOWED_PDF_EXTENSIONS
-from utils.pagination import PaginationParams, paginate_query
-from utils.validation import validate_upload_complete_or_raise
-from utils.router_helpers import (
-    safe_delete_file,
-    save_upload_file_to_storage,
-    file_exists_in_storage,
-    save_temp_file_from_storage
-)
-from utils.http_helpers import get_user_resource_or_404
-from utils.file_helpers import cleanup_temp_file, temp_file_from_storage
-from routers.base import AuthenticatedRouter
 from logging_config import get_logger, log_action
+from models import Analise, Usuario
+from repositories.atestado_repository import atestado_repository
+from routers.base import AuthenticatedRouter
+from schemas import AnaliseManualCreate, AnaliseResponse, Mensagem, PaginatedAnaliseResponse
+from services.atestado import atestados_to_dict
 from utils import handle_exception
+from utils.file_helpers import temp_file_from_storage
+from utils.http_helpers import get_user_resource_or_404
+from utils.pagination import PaginationParams, paginate_query
+from utils.router_helpers import (
+    file_exists_in_storage,
+    safe_delete_file,
+    save_temp_file_from_storage,
+    save_upload_file_to_storage,
+)
+from utils.validation import validate_upload_complete_or_raise
 
 logger = get_logger('routers.analise')
 

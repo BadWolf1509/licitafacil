@@ -37,7 +37,7 @@ backend/
 │   ├── extraction/           # Módulos de extração
 │   ├── processors/           # Processadores de texto
 │   └── table_extraction/     # Extração de tabelas
-├── tests/                     # Testes automatizados (341 testes)
+├── tests/                     # Testes automatizados
 ├── utils/                     # Utilitários
 │   ├── error_handlers.py     # Tratamento de erros
 │   ├── pagination.py         # Paginação
@@ -275,7 +275,7 @@ def listar(
 | `test_service_filter.py` | ServiceFilter (23 testes) |
 | ... | ... |
 
-**Total:** 341 testes passando
+**Total:** 1000+ testes automatizados
 
 ## Configuração
 
@@ -353,4 +353,4 @@ Módulos devem ter no máximo ~500-800 linhas. Funcionalidades complexas devem s
 | `services/aditivo/` | ~1200 | 17 |
 | `services/table_extraction/` | ~2500 | 49 |
 | `services/processors/` | ~1800 | 94 |
-| **Total** | ~6600 | 341 |
+| **Total** | ~6600 | 1000+ |

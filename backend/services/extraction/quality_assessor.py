@@ -1,16 +1,21 @@
 """
 Avaliação de qualidade dos serviços extraídos.
 """
-from typing import Dict, List, Tuple
 from collections import Counter
+from typing import Dict, List, Tuple
 
 from config import (
-    OCRNoiseConfig as ONC,
-    QualityScoreConfig as QSC,
     AtestadoProcessingConfig as APC,
 )
-from .text_normalizer import normalize_description
+from config import (
+    OCRNoiseConfig as ONC,
+)
+from config import (
+    QualityScoreConfig as QSC,
+)
+
 from .table_processor import parse_quantity
+from .text_normalizer import normalize_description
 
 
 def compute_servicos_stats(servicos: List[dict]) -> Dict:

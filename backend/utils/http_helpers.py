@@ -6,7 +6,7 @@ e validação de recursos.
 """
 import ipaddress
 import os
-from typing import List, Optional, Any, Union
+from typing import Any, List, Optional, Union
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session

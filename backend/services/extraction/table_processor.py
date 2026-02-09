@@ -9,10 +9,11 @@ Usa lru_cache para melhorar performance em chamadas repetidas.
 
 import re
 from functools import lru_cache
-from typing import Optional, Any
+from typing import Any, Optional
 
 from config import TableExtractionConfig as TEC
-from .text_normalizer import normalize_header, normalize_unit, normalize_description, UNIT_TOKENS
+
+from .text_normalizer import UNIT_TOKENS, normalize_description, normalize_header, normalize_unit
 
 
 @lru_cache(maxsize=2048)

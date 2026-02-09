@@ -2,7 +2,13 @@
 Testes para o validador de senha.
 """
 import pytest
-from utils.password_validator import PasswordValidator, validate_password, get_password_requirements
+
+from utils.password_validator import (
+    PasswordValidator,
+    get_password_policy,
+    get_password_requirements,
+    validate_password,
+)
 
 
 class TestPasswordValidator:
@@ -125,6 +131,16 @@ class TestValidatePasswordFunction:
         requirements = get_password_requirements()
         assert isinstance(requirements, list)
         assert len(requirements) > 0
+
+    def test_get_policy_function_works(self):
+        """Funcao get_password_policy deve retornar estrutura valida."""
+        policy = get_password_policy()
+        assert isinstance(policy, dict)
+        assert isinstance(policy["min_length"], int)
+        assert isinstance(policy["require_uppercase"], bool)
+        assert isinstance(policy["require_lowercase"], bool)
+        assert isinstance(policy["require_digit"], bool)
+        assert isinstance(policy["require_special"], bool)
 
 
 class TestSpecialCharacters:

@@ -4,6 +4,7 @@ Helpers de ambiente, diretorios e extensoes de arquivo.
 """
 import os
 from typing import List, Optional
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -57,7 +58,7 @@ else:
 
 # === Extensoes de Arquivo Permitidas ===
 ALLOWED_PDF_EXTENSIONS = [".pdf"]
-ALLOWED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"]
+ALLOWED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".gif", ".webp"]
 ALLOWED_DOCUMENT_EXTENSIONS = ALLOWED_PDF_EXTENSIONS + ALLOWED_IMAGE_EXTENSIONS
 
 # === Limite de Upload ===
@@ -71,6 +72,8 @@ ALLOWED_MIME_TYPES = {
     'image/jpeg': ['.jpg', '.jpeg'],
     'image/tiff': ['.tiff', '.tif'],
     'image/bmp': ['.bmp'],
+    'image/gif': ['.gif'],
+    'image/webp': ['.webp'],
 }
 
 
@@ -121,6 +124,16 @@ RATE_LIMIT_UPLOAD_WINDOW = env_int("RATE_LIMIT_UPLOAD_WINDOW", 300)  # por 5 min
 
 # === Ambiente ===
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+# === Inicializacao da aplicacao ===
+# Desabilitado por padrao para evitar drift de schema quando Alembic e usado.
+AUTO_CREATE_TABLES = env_bool("AUTO_CREATE_TABLES", False)
+
+# Exposicao publica de metricas Prometheus (apenas para ambientes controlados)
+METRICS_PUBLIC = env_bool("METRICS_PUBLIC", False)
+
+# Protecao CSRF opcional para requests mutaveis
+CSRF_PROTECTION_ENABLED = env_bool("CSRF_PROTECTION_ENABLED", False)
 
 
 # === Processamento ===

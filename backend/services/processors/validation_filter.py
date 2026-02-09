@@ -9,11 +9,11 @@ que contém filtros de baixo nível para extração. Este módulo contém
 filtros de alto nível para pós-processamento de documentos.
 """
 
-from typing import Any, Dict, List, Optional, Set
-import re
 import logging
+import re
+from typing import Any, Dict, List, Optional, Set
 
-from services.extraction import parse_quantity, item_code_in_text
+from services.extraction import item_code_in_text, parse_quantity
 from services.processing_helpers import normalize_item_code
 
 logger = logging.getLogger(__name__)

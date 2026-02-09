@@ -5,16 +5,15 @@ Valida validacao de entrada e comportamento basico.
 NOTA: Testes de criacao de admin dependem de bcrypt que pode ter
 problemas de compatibilidade em algumas versoes do Python.
 """
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from sqlalchemy.orm import Session
-
-from models import Usuario
-from config.defaults import DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, MIN_PASSWORD_LENGTH
-
 
 # Importar o modulo seed para poder mockar corretamente
 import seed as seed_module
+from config.defaults import DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, MIN_PASSWORD_LENGTH
+from models import Usuario
 
 
 class TestSeedValidation:

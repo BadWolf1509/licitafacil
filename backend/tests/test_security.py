@@ -3,9 +3,10 @@ Testes de segurança para o LicitaFácil.
 
 Verifica CORS, autenticação, rate limiting e validação de uploads.
 """
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 
 class TestCORSSecurity:
@@ -78,9 +79,9 @@ class TestUploadSecurity:
     def test_upload_config_exists(self):
         """Verifica que configurações de upload existem."""
         from config import (
-            MAX_UPLOAD_SIZE_BYTES,
             ALLOWED_DOCUMENT_EXTENSIONS,
             ALLOWED_MIME_TYPES,
+            MAX_UPLOAD_SIZE_BYTES,
         )
 
         assert MAX_UPLOAD_SIZE_BYTES > 0
@@ -146,11 +147,11 @@ class TestRateLimitingSecurity:
     def test_rate_limit_config_exists(self):
         """Verifica que configuração de rate limit existe."""
         from config import (
+            RATE_LIMIT_AUTH_LOGIN,
+            RATE_LIMIT_AUTH_REGISTER,
             RATE_LIMIT_ENABLED,
             RATE_LIMIT_REQUESTS,
             RATE_LIMIT_WINDOW,
-            RATE_LIMIT_AUTH_LOGIN,
-            RATE_LIMIT_AUTH_REGISTER,
         )
 
         assert RATE_LIMIT_ENABLED is not None
@@ -162,9 +163,9 @@ class TestRateLimitingSecurity:
     def test_auth_rate_limits_are_restrictive(self):
         """Verifica que limites de auth são mais restritivos."""
         from config import (
-            RATE_LIMIT_REQUESTS,
             RATE_LIMIT_AUTH_LOGIN,
             RATE_LIMIT_AUTH_REGISTER,
+            RATE_LIMIT_REQUESTS,
         )
 
         # Limites de auth devem ser menores que o global
@@ -256,12 +257,7 @@ class TestSecurityHeadersMiddleware:
 
     def test_security_headers_config_exists(self):
         """Verifica que configuracoes de security headers existem."""
-        from config.security import (
-            SECURITY_HEADERS_ENABLED,
-            HSTS_MAX_AGE,
-            FRAME_OPTIONS,
-            REFERRER_POLICY
-        )
+        from config.security import FRAME_OPTIONS, HSTS_MAX_AGE, REFERRER_POLICY, SECURITY_HEADERS_ENABLED
 
         assert SECURITY_HEADERS_ENABLED is not None
         assert HSTS_MAX_AGE > 0
@@ -290,10 +286,10 @@ class TestPasswordPolicyConfig:
         """Verifica que configuracoes de politica de senha existem."""
         from config.security import (
             PASSWORD_MIN_LENGTH,
-            PASSWORD_REQUIRE_UPPERCASE,
-            PASSWORD_REQUIRE_LOWERCASE,
             PASSWORD_REQUIRE_DIGIT,
-            PASSWORD_REQUIRE_SPECIAL
+            PASSWORD_REQUIRE_LOWERCASE,
+            PASSWORD_REQUIRE_SPECIAL,
+            PASSWORD_REQUIRE_UPPERCASE,
         )
 
         assert PASSWORD_MIN_LENGTH >= 8
@@ -324,17 +320,17 @@ class TestPathTraversalProtection:
         assert result == "users/1/atestados/file.pdf"
 
     def test_validate_storage_path_rejects_dotdot(self):
-        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        from utils.router_helpers import PathTraversalError, _validate_storage_path
         with pytest.raises(PathTraversalError):
             _validate_storage_path("users/1/../../etc/passwd")
 
     def test_validate_storage_path_rejects_dotdot_middle(self):
-        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        from utils.router_helpers import PathTraversalError, _validate_storage_path
         with pytest.raises(PathTraversalError):
             _validate_storage_path("users/1/atestados/../../../secrets")
 
     def test_validate_storage_path_rejects_outside_users(self):
-        from utils.router_helpers import _validate_storage_path, PathTraversalError
+        from utils.router_helpers import PathTraversalError, _validate_storage_path
         with pytest.raises(PathTraversalError):
             _validate_storage_path("tmp/malicious/file.pdf")
 

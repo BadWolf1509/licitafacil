@@ -7,7 +7,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
-
 PROMPTS_DIR = Path(__file__).parent
 
 

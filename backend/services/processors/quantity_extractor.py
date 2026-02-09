@@ -7,14 +7,13 @@ Extrai quantidades e unidades de texto associadas a códigos de item.
 import re
 from typing import Any, Dict, List, Optional, Set
 
+from logging_config import get_logger
 from services.extraction import (
+    UNIT_TOKENS,
     normalize_unit,
     parse_quantity,
-    UNIT_TOKENS,
 )
 from services.processing_helpers import normalize_item_code
-
-from logging_config import get_logger
 
 logger = get_logger("services.processors.quantity_extractor")
 

@@ -7,10 +7,10 @@ Detecta linhas de grade em imagens e extrai servicos usando OCR.
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from services.extraction.quality_assessor import compute_servicos_stats, compute_quality_score
 from config import AtestadoProcessingConfig as APC
 from exceptions import OCRError
 from logging_config import get_logger
+from services.extraction.quality_assessor import compute_quality_score, compute_servicos_stats
 
 logger = get_logger('services.table_extraction.extractors.grid_ocr')
 
@@ -37,8 +37,8 @@ def extract_servicos_from_grid_ocr(
         Tupla (servicos, confidence, debug)
     """
     # Importar aqui para evitar import circular
-    from services.pdf_extraction_service import pdf_extraction_service
     from services.ocr_service import ocr_service
+    from services.pdf_extraction_service import pdf_extraction_service
 
     min_conf = APC.OCR_LAYOUT_CONFIDENCE
     dpi = APC.OCR_LAYOUT_DPI

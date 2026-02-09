@@ -1,27 +1,27 @@
 """
 Testes para os módulos de extração (text_normalizer, table_processor, item_filters).
 """
-from services.extraction.text_normalizer import (
-    normalize_description,
-    normalize_unit,
-    extract_keywords,
-    description_similarity,
-)
-from services.extraction.table_processor import (
-    parse_item_tuple,
-    item_tuple_to_str,
-    parse_quantity,
-    detect_header_row,
-)
 from services.extraction.item_filters import (
     filter_classification_paths,
     is_summary_row,
 )
 from services.extraction.similarity import (
-    quantities_similar,
     descriptions_similar,
     items_similar,
+    quantities_similar,
     servico_key,
+)
+from services.extraction.table_processor import (
+    detect_header_row,
+    item_tuple_to_str,
+    parse_item_tuple,
+    parse_quantity,
+)
+from services.extraction.text_normalizer import (
+    description_similarity,
+    extract_keywords,
+    normalize_description,
+    normalize_unit,
 )
 
 

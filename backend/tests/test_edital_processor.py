@@ -8,19 +8,20 @@ cancelamento e delegacao ao matching_service.
 Todos os servicos externos (pdf_extractor, pdf_extraction_service,
 matching_service) sao mockados para evitar dependencias reais.
 """
+from typing import Any, Optional
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, call
 
+from exceptions import OCRError, TextExtractionError, UnsupportedFileError
 from services.edital_processor import EditalProcessor, edital_processor
-from exceptions import UnsupportedFileError, TextExtractionError, OCRError
-
 
 # === Helpers ===
 
 def _make_extract_result(
     tem_texto: bool = True,
     texto: str = "Texto do edital de licitacao",
-    tabelas: list = None,
+    tabelas: Optional[list[Any]] = None,
     paginas: int = 3,
 ) -> dict:
     """Cria resultado simulado de pdf_extractor.extract_all."""

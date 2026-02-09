@@ -15,9 +15,9 @@ Opções:
     --dry-run           Mostra o que seria feito sem executar
     --remove-passwords  Remove senha_hash dos usuários migrados
 """
+import argparse
 import os
 import sys
-import argparse
 from pathlib import Path
 
 # Adicionar o diretório backend ao path
@@ -25,12 +25,13 @@ backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from dotenv import load_dotenv  # noqa: E402
+
 load_dotenv()
 
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY  # noqa: E402
+from config import SUPABASE_SERVICE_KEY, SUPABASE_URL  # noqa: E402
 from models import Usuario  # noqa: E402
 
 

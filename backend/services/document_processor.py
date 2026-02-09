@@ -5,50 +5,55 @@ Fachada que delega para sub-processadores especializados.
 Pós-processamento de serviços extraído para postprocessor.py.
 """
 
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
-from .pdf_extractor import pdf_extractor  # noqa: F401
-from .ocr_service import ocr_service  # noqa: F401
-from .ai_provider import ai_provider  # noqa: F401
-from .document_ai_service import document_ai_service  # noqa: F401
-from .pdf_extraction_service import pdf_extraction_service, ProcessingCancelled  # noqa: F401 (re-export)
-from .table_extraction_service import table_extraction_service  # noqa: F401
-from .document_analysis_service import document_analysis_service  # noqa: F401
-from .pdf_converter import pdf_converter  # noqa: F401
-from .extraction import (  # noqa: F401 (re-exports)
-    normalize_unit,
-    normalize_desc_for_match,
-    description_similarity,
-    parse_item_tuple,
-    item_tuple_to_str,
-    parse_quantity,
-    filter_classification_paths,
-    remove_duplicate_services,
-    filter_summary_rows,
-    UNIT_TOKENS,
-    extract_item_code,
-    split_item_description,
-)
-from .edital_processor import edital_processor
-from .processing_helpers import (  # noqa: F401 (re-exports)
-    normalize_item_code as helpers_normalize_item_code,
-    is_section_header_desc,
-    is_narrative_desc,
-    is_contaminated_desc,
-    split_restart_prefix,
-    item_key as helpers_item_key,
-)
-from .processors.text_processor import text_processor  # noqa: F401
-from .processors.text_cleanup import strip_trailing_unit_qty  # noqa: F401
-from .processors.deduplication import ServiceDeduplicator  # noqa: F401
-from .processors.service_merger import ServiceMerger  # noqa: F401
-from .processors.validation_filter import ServiceFilter  # noqa: F401
-from config import AtestadoProcessingConfig as APC, PAID_SERVICES_ENABLED
+from config import PAID_SERVICES_ENABLED
+from config import AtestadoProcessingConfig as APC
+from logging_config import get_logger
 
 # Pós-processamento extraído para módulo dedicado
 from . import postprocessor
+from .ai_provider import ai_provider  # noqa: F401
+from .document_ai_service import document_ai_service  # noqa: F401
+from .document_analysis_service import document_analysis_service  # noqa: F401
+from .edital_processor import edital_processor
+from .extraction import (  # noqa: F401 (re-exports)
+    UNIT_TOKENS,
+    description_similarity,
+    extract_item_code,
+    filter_classification_paths,
+    filter_summary_rows,
+    item_tuple_to_str,
+    normalize_desc_for_match,
+    normalize_unit,
+    parse_item_tuple,
+    parse_quantity,
+    remove_duplicate_services,
+    split_item_description,
+)
+from .ocr_service import ocr_service  # noqa: F401
+from .pdf_converter import pdf_converter  # noqa: F401
+from .pdf_extraction_service import ProcessingCancelled, pdf_extraction_service  # noqa: F401 (re-export)
+from .pdf_extractor import pdf_extractor  # noqa: F401
+from .processing_helpers import (
+    is_contaminated_desc,
+    is_narrative_desc,
+    is_section_header_desc,
+    split_restart_prefix,
+)
+from .processing_helpers import (
+    item_key as helpers_item_key,
+)
+from .processing_helpers import (  # noqa: F401 (re-exports)
+    normalize_item_code as helpers_normalize_item_code,
+)
+from .processors.deduplication import ServiceDeduplicator  # noqa: F401
+from .processors.service_merger import ServiceMerger  # noqa: F401
+from .processors.text_cleanup import strip_trailing_unit_qty  # noqa: F401
+from .processors.text_processor import text_processor  # noqa: F401
+from .processors.validation_filter import ServiceFilter  # noqa: F401
+from .table_extraction_service import table_extraction_service  # noqa: F401
 
-from logging_config import get_logger
 logger = get_logger('services.document_processor')
 
 
@@ -92,8 +97,22 @@ class DocumentProcessor:
         from .atestado.pipeline import AtestadoPipeline
         return AtestadoPipeline(self, file_path, use_vision, progress_callback, cancel_check).run()
 
-    def process_edital(self, file_path: str, progress_callback=None, cancel_check=None) -> Dict[str, Any]:
-        """Processa uma pagina de edital com quantitativos minimos."""
+    def process_edital(
+        self,
+        file_path: str,
+        progress_callback=None,
+        cancel_check=None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Processa uma pagina de edital com quantitativos minimos.
+
+        Aceita kwargs por compatibilidade com o protocolo e chamadas futuras.
+        """
+        if kwargs.get("progress_callback") is not None:
+            progress_callback = kwargs["progress_callback"]
+        if kwargs.get("cancel_check") is not None:
+            cancel_check = kwargs["cancel_check"]
         return edital_processor.process(file_path, progress_callback, cancel_check)
 
     def analyze_qualification(
@@ -136,4 +155,5 @@ document_processor = DocumentProcessor()
 # Configurar AtestadoProcessor com referencia ao DocumentProcessor
 # Importação tardia necessária para evitar dependência circular
 from .atestado.processor import atestado_processor  # noqa: E402
+
 atestado_processor.set_document_processor(document_processor)

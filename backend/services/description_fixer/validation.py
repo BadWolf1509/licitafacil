@@ -6,10 +6,8 @@ from typing import List, Optional
 
 from services.extraction import normalize_accents
 from services.extraction.patterns import Patterns
-from .constants import (
-    REVERSED_FOOTER_TOKENS,
-    TECHNICAL_NOUNS, COMPOUND_PAIRS
-)
+
+from .constants import COMPOUND_PAIRS, REVERSED_FOOTER_TOKENS, TECHNICAL_NOUNS
 
 
 def is_valid_prefix_line(prev_line: str) -> bool:

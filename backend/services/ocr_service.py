@@ -6,14 +6,15 @@ Inclui pré-processamento de imagem para melhorar qualidade.
 OTIMIZAÇÃO: EasyOCR é carregado sob demanda (lazy loading) para economizar ~500MB de RAM.
 """
 
-from exceptions import OCRError
-from typing import List, Optional, Dict, Any, TYPE_CHECKING
 import io
-from PIL import Image
-import numpy as np
-import cv2
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from config import OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK, OCR_PREFER_TESSERACT
+import cv2
+import numpy as np
+from PIL import Image
+
+from config import OCR_PREFER_TESSERACT, OCR_PREPROCESS_ENABLED, OCR_TESSERACT_FALLBACK
+from exceptions import OCRError
 from logging_config import get_logger
 
 logger = get_logger('services.ocr_service')

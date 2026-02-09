@@ -20,6 +20,14 @@ import { extrairItemDescricao, parseItemSortKey, compararItens, ordenarServicosP
 import { renderProgressBar, renderJobHtml, updateJobElement, renderProcessingJobsList } from './job-renderer.js';
 import { gerarRelatorioAtestado, gerarRelatorioGeral, gerarDetalhesServico } from './relatorios.js';
 
+function switchAtestadoTab(tabName) {
+    document.querySelectorAll('#modalAtestadoTabs .modal-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    document.getElementById('tabUpload').classList.toggle('active', tabName === 'upload');
+    document.getElementById('tabManual').classList.toggle('active', tabName === 'manual');
+}
+
 // Estado global do modulo
 const state = {
     cache: [],

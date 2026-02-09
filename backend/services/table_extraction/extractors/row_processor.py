@@ -8,21 +8,21 @@ de serviços de uma tabela normalizada.
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.extraction import (
+    build_description_from_cells,
+    item_tuple_to_str,
     normalize_description,
     normalize_unit,
     parse_item_tuple,
-    item_tuple_to_str,
     parse_quantity,
-    build_description_from_cells,
 )
 from utils.text_utils import sanitize_description
 
-from ..parsers import parse_unit_qty_from_text, find_unit_qty_pairs
 from ..filters import (
+    is_page_metadata,
     is_row_noise,
     is_section_header_row,
-    is_page_metadata,
 )
+from ..parsers import find_unit_qty_pairs, parse_unit_qty_from_text
 from .helpers import extract_hidden_item_from_text, extract_trailing_unit
 
 

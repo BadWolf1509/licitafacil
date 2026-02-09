@@ -3,10 +3,12 @@ Serviço de extração de texto e tabelas de PDFs.
 Utiliza pdfplumber para PDFs digitais e PyMuPDF para renderização.
 """
 
-from exceptions import PDFError
-import pdfplumber
+from typing import Any, Dict, List
+
 import fitz  # PyMuPDF
-from typing import List, Dict, Any
+import pdfplumber
+
+from exceptions import PDFError
 from logging_config import get_logger
 
 logger = get_logger('services.pdf_extractor')

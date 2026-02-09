@@ -5,22 +5,22 @@ Centraliza padrões de logging e tratamento de exceções
 para garantir consistência em todo o projeto.
 """
 from functools import wraps
-from typing import Callable, TypeVar, Any, Optional
 from logging import Logger
+from typing import Any, Callable, Optional, TypeVar
 
 from fastapi import HTTPException, status
 
-from .router_helpers import safe_delete_file
-
 # Importar exceções do módulo centralizado
 from exceptions import (
-    ProcessingError,
-    ValidationError,
     DatabaseError,
     ExternalServiceError,
-    ResourceNotFoundError,
     PermissionDeniedError,
+    ProcessingError,
+    ResourceNotFoundError,
+    ValidationError,
 )
+
+from .router_helpers import safe_delete_file
 
 T = TypeVar("T")
 

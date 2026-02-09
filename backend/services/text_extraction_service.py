@@ -4,24 +4,29 @@ Extrai itens, quantidades e descricoes de texto bruto.
 
 Inclui cache de resultados para evitar reprocessamento de arquivos identicos.
 """
-from typing import Dict, Any, Optional, Set, Callable
-import re
 import os
+import re
+from typing import Any, Callable, Dict, Optional, Set
 
+from exceptions import OCRError, PDFError, TextExtractionError, UnsupportedFileError
+from logging_config import get_logger
+
+from .cache import get_cache
 from .extraction import (
+    UNIT_TOKENS,
     normalize_description,
     normalize_unit,
     parse_quantity,
-    UNIT_TOKENS,
-    normalize_item_code as _normalize_item_code,
+)
+from .extraction import (
     item_code_in_text as _item_code_in_text,
 )
-from .pdf_extractor import pdf_extractor
+from .extraction import (
+    normalize_item_code as _normalize_item_code,
+)
 from .ocr_service import ocr_service
 from .pdf_extraction_service import pdf_extraction_service
-from .cache import get_cache
-from exceptions import PDFError, OCRError, UnsupportedFileError, TextExtractionError
-from logging_config import get_logger
+from .pdf_extractor import pdf_extractor
 
 logger = get_logger('services.text_extraction')
 

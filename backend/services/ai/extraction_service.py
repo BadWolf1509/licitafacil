@@ -9,13 +9,13 @@ import json
 from typing import Any, Dict, List, Optional
 
 from prompts import (
-    get_atestado_vision_prompts,
     get_atestado_text_prompt,
+    get_atestado_vision_prompts,
     get_edital_prompt,
 )
-from utils.json_helpers import clean_json_response
-from services.extraction import filter_classification_paths
 from services.base_ai_provider import BaseAIProvider
+from services.extraction import filter_classification_paths
+from utils.json_helpers import clean_json_response
 
 
 class AIExtractionService:

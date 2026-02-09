@@ -9,9 +9,9 @@ Now all authentication is handled by Supabase Auth.
 """
 from typing import Sequence, Union
 
-from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 
+from alembic import op  # type: ignore[attr-defined]
 
 # revision identifiers, used by Alembic.
 revision: str = 'f6a0i91439hh'

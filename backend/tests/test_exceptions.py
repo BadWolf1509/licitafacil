@@ -206,12 +206,12 @@ class TestExceptionHierarchy:
     def test_all_inherit_from_base(self):
         """Verifica que todas as excecoes herdam de LicitaFacilError."""
         from exceptions import (
-            LicitaFacilError,
             ConfigurationError,
+            DatabaseError,
+            ExternalAPIError,
+            LicitaFacilError,
             ProcessingError,
             ValidationError,
-            ExternalAPIError,
-            DatabaseError
         )
 
         assert issubclass(ConfigurationError, LicitaFacilError)
@@ -223,11 +223,16 @@ class TestExceptionHierarchy:
     def test_specific_inherit_from_category(self):
         """Verifica que excecoes especificas herdam da categoria."""
         from exceptions import (
-            AINotConfiguredError, ConfigurationError,
-            OCRError, ProcessingError,
-            UnsupportedFileError, ValidationError,
-            OpenAIError, ExternalAPIError,
-            RecordNotFoundError, DatabaseError
+            AINotConfiguredError,
+            ConfigurationError,
+            DatabaseError,
+            ExternalAPIError,
+            OCRError,
+            OpenAIError,
+            ProcessingError,
+            RecordNotFoundError,
+            UnsupportedFileError,
+            ValidationError,
         )
 
         assert issubclass(AINotConfiguredError, ConfigurationError)

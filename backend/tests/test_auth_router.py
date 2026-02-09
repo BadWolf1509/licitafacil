@@ -5,7 +5,8 @@ Testa endpoints de configuração, status, perfil e requisitos de senha.
 Usa mocking para autenticação Supabase.
 """
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -92,6 +93,18 @@ class TestPasswordRequirements:
         for req in data["requisitos"]:
             assert isinstance(req, str)
             assert len(req) > 0
+
+    def test_get_password_requirements_has_policy(self, client: TestClient):
+        """Verifica que endpoint retorna política estruturada de senha."""
+        response = client.get("/api/v1/auth/password-requirements")
+        assert response.status_code == 200
+        data = response.json()
+        assert "policy" in data
+        assert isinstance(data["policy"]["min_length"], int)
+        assert isinstance(data["policy"]["require_uppercase"], bool)
+        assert isinstance(data["policy"]["require_lowercase"], bool)
+        assert isinstance(data["policy"]["require_digit"], bool)
+        assert isinstance(data["policy"]["require_special"], bool)
 
 
 class TestAuthStatus:

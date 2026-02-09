@@ -5,11 +5,12 @@ NOTA: APIs pagas (OpenAI, Gemini) foram DESABILITADAS permanentemente.
 O sistema usa apenas processamento local (OCR, pdfplumber, PyMuPDF).
 """
 
-from typing import List, Dict, Any, Optional
 from enum import Enum
-from exceptions import AINotConfiguredError
+from typing import Any, Dict, List, Optional
 
+from exceptions import AINotConfiguredError
 from logging_config import get_logger
+
 logger = get_logger('services.ai_provider')
 
 # APIs PAGAS PERMANENTEMENTE DESABILITADAS

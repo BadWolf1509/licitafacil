@@ -1,17 +1,18 @@
 from datetime import datetime, timezone
-from fastapi import Depends, HTTPException, status, Request
+
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Usuario
-from schemas import Mensagem, PaginatedUsuarioResponse, AdminStatsResponse, JobCleanupResponse, JobBulkDeleteResponse
 from auth import get_current_admin_user
 from config import Messages
+from database import get_db
+from models import Usuario
 from repositories import usuario_repository
 from routers.base import AdminRouter
-from services.audit_service import audit_service, AuditAction
-from services.processing_queue import processing_queue
+from schemas import AdminStatsResponse, JobBulkDeleteResponse, JobCleanupResponse, Mensagem, PaginatedUsuarioResponse
+from services.audit_service import AuditAction, audit_service
 from services.cache import cached, invalidate_prefix
+from services.processing_queue import processing_queue
 from utils.http_helpers import get_client_ip_safe
 from utils.pagination import PaginationParams, paginate_query
 
@@ -447,9 +448,11 @@ def diagnose_db_connection(
 
     Cria um job de teste, verifica, exclui e verifica novamente.
     """
-    from database import engine
-    from sqlalchemy import text
     import uuid
+
+    from sqlalchemy import text
+
+    from database import engine
 
     test_id = f"diag-{uuid.uuid4().hex[:8]}"
     steps: list[dict] = []

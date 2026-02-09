@@ -4,16 +4,16 @@ Funções auxiliares reutilizáveis para routers.
 Centraliza operações comuns de arquivos e diretórios,
 usando Supabase Storage em produção e filesystem local em desenvolvimento.
 """
-import os
 import io
+import os
 from pathlib import Path
 from typing import Optional
 
 from fastapi import UploadFile
 
 from config import UPLOAD_DIR
-from services.storage_service import get_storage
 from logging_config import get_logger
+from services.storage_service import get_storage
 
 logger = get_logger('utils.router_helpers')
 

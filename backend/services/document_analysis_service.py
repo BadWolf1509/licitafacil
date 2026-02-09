@@ -8,21 +8,22 @@ Responsável por:
 - Merge de resultados de múltiplas fontes
 """
 
-from typing import Dict, Any, List, Optional, Callable
+from typing import Any, Callable, Dict, List, Optional
 
-from .ai_provider import ai_provider
-from .pdf_extraction_service import pdf_extraction_service
+from config import AtestadoProcessingConfig as APC
+from exceptions import GeminiError, OpenAIError
+from logging_config import get_logger
+
 from .aditivo_processor import prefix_aditivo_items
+from .ai_provider import ai_provider
 from .extraction import (
-    filter_summary_rows,
-    compute_servicos_stats,
     compute_quality_score,
+    compute_servicos_stats,
+    filter_summary_rows,
     merge_servicos_prefer_primary,
 )
-from exceptions import OpenAIError, GeminiError
-from config import AtestadoProcessingConfig as APC
+from .pdf_extraction_service import pdf_extraction_service
 
-from logging_config import get_logger
 logger = get_logger('services.document_analysis_service')
 
 

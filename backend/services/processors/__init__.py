@@ -5,23 +5,23 @@ Contém processadores extraídos do DocumentProcessor para
 melhor modularização e testabilidade.
 """
 
-from .text_processor import TextProcessor, text_processor
-from .quantity_extractor import QuantityExtractor, quantity_extractor
 from .deduplication import ServiceDeduplicator, dedupe_servicos
+from .item_code_refiner import ItemCodeRefiner, item_code_refiner
+from .quantity_extractor import QuantityExtractor, quantity_extractor
 from .service_merger import (
     ServiceMerger,
     merge_planilhas,
     normalize_planilha_prefixes,
 )
+from .text_line_parser import TextLineParser, text_line_parser
+from .text_processor import TextProcessor, text_processor
 from .validation_filter import (
     ServiceFilter,
-    filter_servicos,
     filter_headers,
-    filter_no_quantity,
     filter_no_code,
+    filter_no_quantity,
+    filter_servicos,
 )
-from .item_code_refiner import ItemCodeRefiner, item_code_refiner
-from .text_line_parser import TextLineParser, text_line_parser
 
 __all__ = [
     "TextProcessor",

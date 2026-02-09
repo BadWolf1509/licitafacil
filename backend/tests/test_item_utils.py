@@ -5,11 +5,11 @@ Testa funções de manipulação de códigos de item.
 """
 
 from services.extraction.item_utils import (
-    normalize_item_code,
-    strip_restart_prefix,
-    split_restart_prefix,
     item_code_in_text,
     max_restart_prefix_index,
+    normalize_item_code,
+    split_restart_prefix,
+    strip_restart_prefix,
 )
 
 

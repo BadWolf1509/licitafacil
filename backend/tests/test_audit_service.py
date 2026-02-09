@@ -7,15 +7,14 @@ Usa o db_session fixture do conftest.py com SQLite de teste para
 verificar que os registros de auditoria sao criados e consultados
 corretamente no banco de dados.
 """
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Optional
-from unittest.mock import MagicMock, patch
+
+import pytest
 from sqlalchemy.orm import Session
 
-from services.audit_service import AuditService, AuditAction, audit_service
 from models import AuditLog, Usuario
-
+from services.audit_service import AuditAction, AuditService, audit_service
 
 # === Helpers ===
 

@@ -8,8 +8,7 @@ usadas na extração de serviços de tabelas.
 import re
 from typing import List, Optional, Tuple
 
-from services.extraction import normalize_unit, parse_quantity, UNIT_TOKENS
-
+from services.extraction import UNIT_TOKENS, normalize_unit, parse_quantity
 
 # Unidades de parada (preposições que podem parecer unidades)
 STOP_UNITS = {"DE", "DA", "DO", "EM", "COM", "PARA", "POR", "QUE"}

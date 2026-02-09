@@ -5,16 +5,16 @@ Contém funções para construir índices invertidos e remover
 duplicatas de listas de serviços.
 """
 
-from typing import Dict, List, Set
 from collections import defaultdict
+from typing import Dict, List, Set
 
-from .text_normalizer import (
-    normalize_description,
-    extract_keywords,
-)
 from .similarity import (
     items_similar,
     servico_key,
+)
+from .text_normalizer import (
+    extract_keywords,
+    normalize_description,
 )
 
 

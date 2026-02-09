@@ -5,7 +5,7 @@ Inclui parsing de datas, ordenação de serviços e conversão de dados.
 """
 import re
 from datetime import date, datetime
-from typing import Optional, List
+from typing import List, Optional
 
 
 def parse_date(date_str: Optional[str]) -> Optional[date]:

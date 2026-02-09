@@ -9,22 +9,23 @@ Responsável por:
 - Manipulação de imagens (crop, resize)
 """
 
-from typing import List, Optional, Callable
 import io
 import re
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, List, Optional
 
-import pdfplumber
 import fitz  # PyMuPDF
+import pdfplumber
 from PIL import Image
 
-from .ocr_service import ocr_service
-from .extraction import normalize_description, is_garbage_text
-from exceptions import PDFError, OCRError
-from config import OCR_PARALLEL_ENABLED, OCR_MAX_WORKERS
-
+from config import OCR_MAX_WORKERS, OCR_PARALLEL_ENABLED
+from exceptions import OCRError, PDFError
 from logging_config import get_logger
+
+from .extraction import is_garbage_text, normalize_description
+from .ocr_service import ocr_service
+
 logger = get_logger('services.pdf_extraction_service')
 
 

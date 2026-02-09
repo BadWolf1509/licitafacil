@@ -3,22 +3,23 @@ Testes para validação de upload de arquivos.
 
 Testa as funções de validação em config/validation.py e utils/validation.py.
 """
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
 from fastapi import HTTPException
 
+from config import ALLOWED_DOCUMENT_EXTENSIONS, MAX_UPLOAD_SIZE_BYTES
 from config.validation import (
     detect_mime_type,
-    validate_upload_file,
     validate_file_size,
     validate_mime_type,
     validate_upload_complete,
+    validate_upload_file,
 )
-from config import MAX_UPLOAD_SIZE_BYTES, ALLOWED_DOCUMENT_EXTENSIONS
 from utils.validation import (
-    validate_upload_or_raise,
-    validate_upload_complete_or_raise,
     validate_file_size_or_raise,
+    validate_upload_complete_or_raise,
+    validate_upload_or_raise,
 )
 
 
@@ -54,6 +55,16 @@ class TestDetectMimeType:
         """Detecta BMP corretamente."""
         content = b'BM rest of file'
         assert detect_mime_type(content) == 'image/bmp'
+
+    def test_detect_gif(self):
+        """Detecta GIF corretamente."""
+        content = b'GIF89a rest of file'
+        assert detect_mime_type(content) == 'image/gif'
+
+    def test_detect_webp(self):
+        """Detecta WEBP corretamente."""
+        content = b'RIFF\x00\x00\x00\x00WEBPVP8 '
+        assert detect_mime_type(content) == 'image/webp'
 
     def test_unknown_type_returns_none(self):
         """Tipo desconhecido retorna None."""
@@ -321,6 +332,8 @@ class TestAllowedExtensions:
         assert '.png' in ALLOWED_DOCUMENT_EXTENSIONS
         assert '.jpg' in ALLOWED_DOCUMENT_EXTENSIONS
         assert '.jpeg' in ALLOWED_DOCUMENT_EXTENSIONS
+        assert '.gif' in ALLOWED_DOCUMENT_EXTENSIONS
+        assert '.webp' in ALLOWED_DOCUMENT_EXTENSIONS
 
     def test_dangerous_extensions_not_allowed(self):
         """Extensões perigosas não estão permitidas."""

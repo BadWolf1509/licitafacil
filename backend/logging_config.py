@@ -23,18 +23,17 @@ Para medir tempo de operações:
 """
 import json
 import logging
+import os
 import re
+import sys
 import time
 import uuid
-from contextvars import ContextVar
 from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from functools import wraps
-from typing import Optional, List, Any, Dict, Callable, TypeVar
-
-import os
-import sys
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 # Context var para correlation ID (thread-safe)
 _correlation_id: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)

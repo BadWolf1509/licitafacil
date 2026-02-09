@@ -4,6 +4,7 @@ SECRET_KEY, JWT e validacoes de seguranca.
 """
 import os
 import secrets
+
 from .base import ENVIRONMENT
 
 # === Seguranca ===

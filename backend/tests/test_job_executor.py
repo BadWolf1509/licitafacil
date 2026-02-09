@@ -7,13 +7,12 @@ IMPORTANTE: Todos os testes mockam o document_processor, ai_provider e
 job_repository para evitar processamento real de documentos e acesso
 ao banco de dados.
 """
-import asyncio
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch, PropertyMock
 
 from services.job_executor import JobExecutor, _now_iso
 from services.models import JobStatus, ProcessingJob
-
 
 # === Helpers ===
 

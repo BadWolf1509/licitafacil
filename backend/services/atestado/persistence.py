@@ -3,12 +3,12 @@ Persistência de atestados no banco de dados.
 
 Fornece funções para salvar e atualizar atestados processados.
 """
-from database import get_db_session
-from models import Atestado
 from config import Messages
+from database import get_db_session
 from logging_config import get_logger
+from models import Atestado
 
-from .service import parse_date, ordenar_servicos
+from .service import ordenar_servicos, parse_date
 
 logger = get_logger('services.atestado.persistence')
 

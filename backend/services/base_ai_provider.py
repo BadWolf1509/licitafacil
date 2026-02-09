@@ -5,11 +5,11 @@ Define o contrato que todos os provedores devem implementar,
 permitindo fácil extensão e substituição.
 """
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
-import time
 
 
 class AIProviderType(str, Enum):

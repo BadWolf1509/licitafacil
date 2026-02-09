@@ -4,8 +4,8 @@ Extrai serviços, quantidades e dados de documentos de atestado.
 """
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from logging_config import get_logger
 
@@ -58,14 +58,15 @@ class AtestadoProcessor:
         Returns:
             Dicionário com dados extraídos do atestado
         """
+        from config import AtestadoProcessingConfig as APC
+
+        from ..aditivo_processor import prefix_aditivo_items
+        from ..ai_provider import ai_provider
+        from ..description_fixer import fix_descriptions
+        from ..document_analysis_service import document_analysis_service
         from ..pdf_extraction_service import pdf_extraction_service
         from ..table_extraction_service import table_extraction_service
-        from ..document_analysis_service import document_analysis_service
         from ..text_extraction_service import text_extraction_service
-        from ..ai_provider import ai_provider
-        from ..aditivo_processor import prefix_aditivo_items
-        from ..description_fixer import fix_descriptions
-        from config import AtestadoProcessingConfig as APC
 
         # Preferir pipeline completo quando disponível (inclui adição de itens do texto)
         if self._doc_processor:
@@ -306,8 +307,9 @@ class AtestadoProcessor:
         dados: dict
     ) -> list:
         """Enriquece serviços com dados extraídos do texto."""
-        from ..text_extraction_service import text_extraction_service
         from config import AtestadoProcessingConfig as APC
+
+        from ..text_extraction_service import text_extraction_service
 
         if not self._doc_processor:
             return servicos_raw

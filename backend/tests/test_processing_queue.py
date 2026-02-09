@@ -6,11 +6,12 @@ Testa as funcoes em services/processing_queue.py.
 IMPORTANTE: Todos os testes mockam o repositorio para evitar
 persistir jobs de teste no banco de dados Supabase.
 """
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.processing_queue import ProcessingQueue
+import pytest
+
 from services.models import JobStatus
+from services.processing_queue import ProcessingQueue
 
 
 @pytest.fixture

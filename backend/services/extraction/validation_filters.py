@@ -9,13 +9,13 @@ Contém funções para filtrar serviços por:
 """
 
 import re
-from typing import Optional, Tuple
 from collections import Counter
+from typing import Optional, Tuple
 
-from .text_normalizer import normalize_description, normalize_unit
-from .table_processor import parse_item_tuple, item_tuple_to_str, parse_quantity
 from config import DeduplicationConfig
 
+from .table_processor import item_tuple_to_str, parse_item_tuple, parse_quantity
+from .text_normalizer import normalize_description, normalize_unit
 
 # Unidades de medida válidas para construção civil/engenharia
 VALID_UNITS = {

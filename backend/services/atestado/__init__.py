@@ -11,15 +11,15 @@ Componentes:
 - pipeline: Pipeline completo de processamento
 """
 
+from .persistence import salvar_atestado_processado
+from .pipeline import AtestadoPipeline
+from .processor import AtestadoProcessor, atestado_processor
 from .service import (
+    atestados_to_dict,
+    ordenar_servicos,
     parse_date,
     sort_key_item,
-    ordenar_servicos,
-    atestados_to_dict,
 )
-from .persistence import salvar_atestado_processado
-from .processor import AtestadoProcessor, atestado_processor
-from .pipeline import AtestadoPipeline
 
 __all__ = [
     # service

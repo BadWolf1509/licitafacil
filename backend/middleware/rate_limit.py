@@ -9,19 +9,20 @@ import os
 import time
 from collections import defaultdict
 from typing import Callable, Dict, List, Optional, Tuple, Union
+
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import (
-    RATE_LIMIT_ENABLED,
-    RATE_LIMIT_REQUESTS,
-    RATE_LIMIT_WINDOW,
     RATE_LIMIT_AUTH_LOGIN,
     RATE_LIMIT_AUTH_REGISTER,
     RATE_LIMIT_AUTH_WINDOW,
+    RATE_LIMIT_ENABLED,
+    RATE_LIMIT_REQUESTS,
     RATE_LIMIT_UPLOAD,
     RATE_LIMIT_UPLOAD_WINDOW,
+    RATE_LIMIT_WINDOW,
     Messages,
 )
 from logging_config import get_logger
@@ -71,6 +72,19 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests: Dict[str, list] = defaultdict(list)
         self.path_requests: Dict[str, Dict[str, list]] = defaultdict(lambda: defaultdict(list))
         self._last_cleanup = time.time()
+
+        # Backend distribuido opcional (Redis). Sem REDIS_URL usa memoria local.
+        self._redis = None
+        redis_url = os.environ.get("REDIS_URL", "").strip()
+        if redis_url:
+            try:
+                import redis  # type: ignore[import-not-found]
+                self._redis = redis.from_url(redis_url, decode_responses=True)
+                self._redis.ping()
+                logger.info("RateLimit usando backend Redis")
+            except Exception as e:
+                logger.warning(f"Redis indisponivel para RateLimit; fallback memoria: {e}")
+                self._redis = None
 
     def _is_trusted_proxy(self, ip: str) -> bool:
         """Verifica se o IP é de um proxy confiável."""
@@ -122,6 +136,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _cleanup_old_requests(self, current_time: float):
         """Remove requisições antigas para liberar memória."""
+        if self._redis:
+            return
+
         # Limpar requisições globais
         cutoff = current_time - self.window_seconds
         keys_to_delete = []
@@ -179,6 +196,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         Returns:
             Tupla (is_limited, remaining_requests)
         """
+        if self._redis:
+            return self._is_rate_limited_redis(
+                key=f"rl:global:{client_ip}",
+                limit=self.requests_limit,
+                window=self.window_seconds,
+            )
+
         current_time = time.time()
         cutoff = current_time - self.window_seconds
 
@@ -207,6 +231,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         Returns:
             Tupla (is_limited, remaining_requests)
         """
+        if self._redis:
+            return self._is_rate_limited_redis(
+                key=f"rl:path:{path_key}:{client_ip}",
+                limit=limit,
+                window=window,
+            )
+
         current_time = time.time()
         cutoff = current_time - window
 
@@ -224,6 +255,38 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         # Registrar nova requisição
         self.path_requests[path_key][client_ip].append(current_time)
+        return False, remaining - 1
+
+    def _is_rate_limited_redis(self, key: str, limit: int, window: int) -> Tuple[bool, int]:
+        """
+        Rate limiting com Redis usando sorted set por janela deslizante.
+
+        O score é timestamp Unix e o member é único por request.
+        """
+        if not self._redis:
+            return False, limit
+
+        now = time.time()
+        cutoff = now - window
+
+        # Limpar expirados e obter contagem atual
+        pipe = self._redis.pipeline()
+        pipe.zremrangebyscore(key, 0, cutoff)
+        pipe.zcard(key)
+        pipe.expire(key, window + 5)
+        _, count_raw, _ = pipe.execute()
+        count = int(count_raw or 0)
+
+        remaining = max(0, limit - count)
+        if count >= limit:
+            return True, remaining
+
+        member = f"{now}-{time.monotonic_ns()}"
+        pipe = self._redis.pipeline()
+        pipe.zadd(key, {member: now})
+        pipe.expire(key, window + 5)
+        pipe.execute()
+
         return False, remaining - 1
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

@@ -10,16 +10,15 @@ conexao direta em vez de Session do SQLAlchemy.
 Os metodos que usam get_db_session (save, get_by_id, update_status, etc.)
 sao testados com mocks do context manager get_db_session.
 """
-import os
-import pytest
-from datetime import datetime
-from unittest.mock import patch, MagicMock, PropertyMock
 from contextlib import contextmanager
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from models import ProcessingJobModel
 from repositories.job_repository import JobRepository, _now_iso
 from services.models import JobStatus, ProcessingJob
-from models import ProcessingJobModel
-
 
 # === Helpers ===
 
@@ -612,7 +611,23 @@ class TestJobRepositoryQuery:
 
     @patch('repositories.job_repository.get_db_session')
     def test_get_pending(self, mock_get_db, repo):
-        """get_pending retorna jobs pendentes e em processamento."""
+        """get_pending retorna jobs pendentes por padrão."""
+        mock_db = MagicMock()
+        mock_get_db.return_value = _mock_db_session(mock_db)
+
+        models = [
+            _make_model(job_id="pending-1", status="pending"),
+        ]
+        mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = models
+
+        results = repo.get_pending()
+
+        assert len(results) == 1
+        assert results[0].status == JobStatus.PENDING
+
+    @patch('repositories.job_repository.get_db_session')
+    def test_get_pending_can_include_processing(self, mock_get_db, repo):
+        """get_pending pode incluir jobs em processamento quando solicitado."""
         mock_db = MagicMock()
         mock_get_db.return_value = _mock_db_session(mock_db)
 
@@ -622,7 +637,7 @@ class TestJobRepositoryQuery:
         ]
         mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = models
 
-        results = repo.get_pending()
+        results = repo.get_pending(include_processing=True)
 
         assert len(results) == 2
         assert results[0].status == JobStatus.PENDING

@@ -5,11 +5,12 @@ Testa endpoints de CRUD, criação manual e paginação de análises.
 Usa mocking para autenticação Supabase.
 """
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import Usuario, Analise
+from models import Analise, Usuario
 
 
 def unique_email(prefix: str = "test") -> str:

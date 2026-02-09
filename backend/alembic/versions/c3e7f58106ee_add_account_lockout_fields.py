@@ -10,9 +10,9 @@ Adiciona campos para bloqueio de conta apos tentativas de login falhas:
 """
 from typing import Sequence, Union
 
-from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 
+from alembic import op  # type: ignore[attr-defined]
 
 # revision identifiers, used by Alembic.
 revision: str = 'c3e7f58106ee'

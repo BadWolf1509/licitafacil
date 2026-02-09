@@ -14,14 +14,15 @@ from typing import Any, Dict, List, Tuple
 
 from config import AtestadoProcessingConfig as APC
 
-# Re-exportar funcoes dos modulos individuais para compatibilidade
-from .ocr_table_builder import median, build_table_from_ocr_words
 from .ocr_column_detector import infer_item_column_from_words
 from .ocr_quality import (
-    item_sequence_suspicious,
     assign_itemless_items,
     is_retry_result_better,
+    item_sequence_suspicious,
 )
+
+# Re-exportar funcoes dos modulos individuais para compatibilidade
+from .ocr_table_builder import build_table_from_ocr_words, median
 
 
 def extract_from_ocr_words(

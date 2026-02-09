@@ -4,10 +4,10 @@ Testes para o módulo de logging.
 import logging
 
 from logging_config import (
-    sanitize_dict,
-    SanitizingFilter,
     SENSITIVE_KEYS,
     SENSITIVE_PATTERNS,
+    SanitizingFilter,
+    sanitize_dict,
 )
 
 

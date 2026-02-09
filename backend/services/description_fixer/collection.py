@@ -5,7 +5,8 @@ import re
 from typing import List
 
 from services.extraction.patterns import Patterns
-from .constants import STOP_PREFIXES, FOOTER_DATE_PATTERN, TECHNICAL_NOUNS
+
+from .constants import FOOTER_DATE_PATTERN, STOP_PREFIXES, TECHNICAL_NOUNS
 from .validation import looks_like_reversed_footer_line
 
 

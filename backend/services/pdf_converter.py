@@ -2,7 +2,7 @@
 Utilitários para conversão de PDF para imagens.
 """
 import io
-from typing import List, Optional, Callable
+from typing import Callable, List, Optional
 
 import fitz  # PyMuPDF
 from PIL import Image

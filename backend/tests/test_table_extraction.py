@@ -5,26 +5,26 @@ Testa parsers, filtros, extratores e utilitários.
 """
 
 from services.table_extraction import (
-    # Parsers
-    parse_unit_qty_from_text,
+    # Extractors
+    TableExtractor,
+    calc_complete_ratio,
+    # Utils
+    calc_qty_ratio,
+    calc_quality_metrics,
+    collect_item_codes,
+    extract_hidden_item_from_text,
+    extract_trailing_unit,
     find_unit_qty_pairs,
+    first_last_item_tuple,
+    infer_missing_units,
+    is_header_row,
+    is_page_metadata,
     # Filters
     is_row_noise,
     is_section_header_row,
-    is_page_metadata,
-    is_header_row,
+    # Parsers
+    parse_unit_qty_from_text,
     strip_section_header_prefix,
-    # Extractors
-    TableExtractor,
-    extract_hidden_item_from_text,
-    extract_trailing_unit,
-    infer_missing_units,
-    # Utils
-    calc_qty_ratio,
-    calc_complete_ratio,
-    calc_quality_metrics,
-    collect_item_codes,
-    first_last_item_tuple,
 )
 
 

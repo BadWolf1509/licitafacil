@@ -11,6 +11,7 @@ Headers implementados:
 - Permissions-Policy: Controla APIs do navegador
 """
 from typing import Callable, Optional
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -67,8 +68,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         Retorna Content Security Policy padrao.
 
         Configurada para permitir:
-        - Scripts inline (necessario para o frontend atual)
-        - Scripts do Supabase via CDN (jsdelivr)
+        - Scripts locais e do Supabase via CDN (jsdelivr)
         - Estilos inline e Google Fonts
         - Fontes do Google Fonts
         - Imagens de data: e blob:
@@ -76,7 +76,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         """
         return (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob:; "
             "font-src 'self' https://fonts.gstatic.com; "

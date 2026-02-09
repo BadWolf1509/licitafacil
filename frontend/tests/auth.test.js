@@ -350,19 +350,29 @@ describe('validatePassword', () => {
     // Replica a funcao validatePassword do auth.js
     function validatePassword(password) {
         const errors = [];
-        const minLength = 8;
+        const policy = {
+            min_length: 8,
+            require_uppercase: true,
+            require_lowercase: true,
+            require_digit: true,
+            require_special: true,
+        };
+        const minLength = policy.min_length;
 
         if (!password || password.length < minLength) {
             errors.push(`Minimo ${minLength} caracteres`);
         }
-        if (!/[A-Z]/.test(password)) {
+        if (policy.require_uppercase && !/[A-Z]/.test(password)) {
             errors.push('Pelo menos 1 letra maiuscula');
         }
-        if (!/[a-z]/.test(password)) {
+        if (policy.require_lowercase && !/[a-z]/.test(password)) {
             errors.push('Pelo menos 1 letra minuscula');
         }
-        if (!/[0-9]/.test(password)) {
+        if (policy.require_digit && !/[0-9]/.test(password)) {
             errors.push('Pelo menos 1 numero');
+        }
+        if (policy.require_special && !/[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\;'`~]/.test(password)) {
+            errors.push('Pelo menos 1 caractere especial');
         }
 
         return {
@@ -372,7 +382,7 @@ describe('validatePassword', () => {
     }
 
     test('deve aceitar senha valida com todos os requisitos', () => {
-        const result = validatePassword('Senha123');
+        const result = validatePassword('Senha123!');
         expect(result.valid).toBe(true);
         expect(result.errors.length).toBe(0);
     });
@@ -406,6 +416,12 @@ describe('validatePassword', () => {
         expect(result.errors).toContain('Pelo menos 1 numero');
     });
 
+    test('deve rejeitar senha sem caractere especial', () => {
+        const result = validatePassword('Senha1234');
+        expect(result.valid).toBe(false);
+        expect(result.errors).toContain('Pelo menos 1 caractere especial');
+    });
+
     test('deve retornar multiplos erros quando aplicavel', () => {
         const result = validatePassword('abc');
         expect(result.valid).toBe(false);
@@ -413,7 +429,7 @@ describe('validatePassword', () => {
     });
 
     test('deve aceitar senha com exatamente 8 caracteres', () => {
-        const result = validatePassword('Abcd1234');
+        const result = validatePassword('Ab1!cd23');
         expect(result.valid).toBe(true);
     });
 

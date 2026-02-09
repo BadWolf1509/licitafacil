@@ -3,7 +3,7 @@ Protocolos (Interfaces) para servicos do LicitaFacil.
 Define contratos que os servicos devem implementar.
 Permite injecao de dependencia e facilita testes.
 """
-from typing import Protocol, Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
 
 
 class PDFExtractorProtocol(Protocol):

@@ -1,7 +1,8 @@
 """
 Repositório base com operações CRUD genéricas.
 """
-from typing import TypeVar, Generic, Type, Optional, List, Any
+from typing import Any, Generic, List, Optional, Type, TypeVar
+
 from sqlalchemy.orm import Session
 
 ModelType = TypeVar("ModelType")

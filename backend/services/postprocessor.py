@@ -6,38 +6,42 @@ Contém: normalização de campos, enriquecimento com dados de tabela,
 filtros e deduplicação.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict
+
+from config import AtestadoProcessingConfig as APC
+from logging_config import get_logger
 
 from .extraction import (
-    normalize_unit,
-    normalize_desc_for_match,
-    description_similarity,
-    parse_item_tuple,
-    item_tuple_to_str,
-    parse_quantity,
-    filter_classification_paths,
-    remove_duplicate_services,
-    filter_summary_rows,
     UNIT_TOKENS,
+    description_similarity,
     extract_item_code,
+    filter_classification_paths,
+    filter_summary_rows,
+    item_tuple_to_str,
+    normalize_unit,
+    parse_item_tuple,
+    parse_quantity,
+    remove_duplicate_services,
     split_item_description,
 )
 from .processing_helpers import (
-    normalize_item_code as helpers_normalize_item_code,
-    is_section_header_desc,
-    is_narrative_desc,
     is_contaminated_desc,
+    is_narrative_desc,
+    is_section_header_desc,
     split_restart_prefix,
+)
+from .processing_helpers import (
     item_key as helpers_item_key,
 )
-from .processors.text_processor import text_processor
-from .processors.text_cleanup import strip_trailing_unit_qty
+from .processing_helpers import (
+    normalize_item_code as helpers_normalize_item_code,
+)
 from .processors.deduplication import ServiceDeduplicator
 from .processors.service_merger import ServiceMerger
+from .processors.text_cleanup import strip_trailing_unit_qty
+from .processors.text_processor import text_processor
 from .processors.validation_filter import ServiceFilter
-from config import AtestadoProcessingConfig as APC
 
-from logging_config import get_logger
 logger = get_logger('services.postprocessor')
 
 

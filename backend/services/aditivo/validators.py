@@ -5,6 +5,7 @@ Contém funções para detectar linhas contaminadas e validar descrições.
 """
 
 import re
+
 from ..extraction.constants import KNOWN_CATEGORIES
 from ..extraction.patterns import Patterns
 from ..extraction.text_normalizer import normalize_accents

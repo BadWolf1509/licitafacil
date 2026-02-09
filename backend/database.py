@@ -4,16 +4,16 @@ Configuração do banco de dados PostgreSQL (Supabase).
 O LicitaFácil usa exclusivamente PostgreSQL via Supabase.
 """
 
+import os
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
-import os
-import sys
-from dotenv import load_dotenv
 
 # Carregar .env do diretório raiz do projeto (um nível acima do backend)
 env_path = Path(__file__).parent.parent / '.env'

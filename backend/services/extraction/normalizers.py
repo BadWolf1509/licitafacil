@@ -11,9 +11,9 @@ import re
 from functools import lru_cache
 
 from .text_normalizer import (
-    normalize_description,
-    normalize_desc_for_match,
     extract_keywords,
+    normalize_desc_for_match,
+    normalize_description,
 )
 
 

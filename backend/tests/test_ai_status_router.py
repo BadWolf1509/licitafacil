@@ -5,7 +5,8 @@ Testa endpoints de status dos provedores de IA, fila de processamento e jobs.
 Usa mocking para autenticação Supabase e fila de processamento.
 """
 import uuid
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 

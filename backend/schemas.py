@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator
-from typing import Optional, List, Generic, TypeVar, Any, Sequence
 from datetime import datetime
 from decimal import Decimal
+from typing import Any, Generic, List, Optional, Sequence, TypeVar
+
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 T = TypeVar('T')
 
@@ -234,9 +235,19 @@ class UserStatusResponse(BaseModel):
     auth_mode: str
 
 
+class PasswordPolicy(BaseModel):
+    """Política de senha estruturada para validação no frontend."""
+    min_length: int
+    require_uppercase: bool
+    require_lowercase: bool
+    require_digit: bool
+    require_special: bool
+
+
 class PasswordRequirementsResponse(BaseModel):
     """Requisitos de senha."""
     requisitos: List[str]
+    policy: PasswordPolicy
 
 
 class QueueInfoResponse(BaseModel):

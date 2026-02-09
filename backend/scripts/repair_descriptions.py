@@ -8,17 +8,17 @@ Uso:
     python scripts/repair_descriptions.py            # Aplicar correções
 """
 
-import sys
-import re
 import argparse
+import re
+import sys
 from pathlib import Path
 
 # Adicionar diretório pai ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from database import get_db_session
-from models import Atestado
 from logging_config import get_logger
+from models import Atestado
 
 logger = get_logger('scripts.repair_descriptions')
 

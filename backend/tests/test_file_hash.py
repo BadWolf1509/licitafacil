@@ -5,17 +5,17 @@ Testa compute_file_hash, compute_content_hash e funcoes de chave de cache
 definidas em utils/file_hash.py.
 """
 import hashlib
+
 import pytest
 
 from utils.file_hash import (
-    compute_file_hash,
     compute_content_hash,
+    compute_file_hash,
     get_file_cache_key,
     get_ocr_cache_key,
     get_table_extraction_cache_key,
     get_text_extraction_cache_key,
 )
-
 
 # =============================================================================
 # compute_file_hash

@@ -4,11 +4,11 @@ Utilitários unificados para códigos de item.
 Este módulo contém funções canônicas para manipulação de códigos de item,
 substituindo implementações duplicadas em outros módulos.
 """
-from typing import Any, List, Dict, Optional, Tuple
-import re
 import logging
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
-from .table_processor import parse_item_tuple, item_tuple_to_str, parse_quantity
+from .table_processor import item_tuple_to_str, parse_item_tuple, parse_quantity
 
 logger = logging.getLogger(__name__)
 

@@ -2,14 +2,15 @@
 Processador de editais de licitacao.
 Extrai exigencias tecnicas de documentos de edital.
 """
-from typing import Dict, Any, List
 from pathlib import Path
+from typing import Any, Dict, List
 
-from .pdf_extractor import pdf_extractor
-from .pdf_extraction_service import pdf_extraction_service
-from .matching_service import matching_service
-from exceptions import UnsupportedFileError, TextExtractionError, PDFError, OCRError
+from exceptions import OCRError, PDFError, TextExtractionError, UnsupportedFileError
 from logging_config import get_logger
+
+from .matching_service import matching_service
+from .pdf_extraction_service import pdf_extraction_service
+from .pdf_extractor import pdf_extractor
 
 logger = get_logger('services.edital_processor')
 

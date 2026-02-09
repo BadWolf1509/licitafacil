@@ -5,7 +5,7 @@ Identifica seções de aditivo contratual em documentos de atestado.
 """
 
 import re
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 def detect_aditivo_sections(texto: str) -> List[Dict[str, Any]]:

@@ -6,13 +6,13 @@ Autenticação via Supabase Auth - valida tokens JWT do Supabase.
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from config import SUPABASE_SERVICE_KEY, SUPABASE_URL
 from database import get_db
-from models import Usuario
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY
 from logging_config import get_logger
+from models import Usuario
 
 logger = get_logger('auth')
 

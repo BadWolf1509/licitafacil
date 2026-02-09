@@ -8,8 +8,9 @@ import re
 from typing import Any, Dict, List
 
 from utils.text_utils import sanitize_description
-from ..filters import is_row_noise, is_header_row
-from .text_parser import parse_unit_qty_from_text, find_unit_qty_pairs
+
+from ..filters import is_header_row, is_row_noise
+from .text_parser import find_unit_qty_pairs, parse_unit_qty_from_text
 
 
 def parse_row_text_to_servicos(row_text: str) -> List[Dict[str, Any]]:

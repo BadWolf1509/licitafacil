@@ -7,10 +7,10 @@ não para services/extraction/item_filters.py.
 
 from services.processors.validation_filter import (
     ServiceFilter,
-    filter_servicos,
     filter_headers,
-    filter_no_quantity,
     filter_no_code,
+    filter_no_quantity,
+    filter_servicos,
 )
 
 

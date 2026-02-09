@@ -1,8 +1,9 @@
 """
 Testes para o middleware de Security Headers.
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

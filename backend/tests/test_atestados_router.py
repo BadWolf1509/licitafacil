@@ -6,11 +6,12 @@ Usa mocking para autenticação Supabase.
 """
 import uuid
 from datetime import date
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from models import Usuario, Atestado
+from models import Atestado, Usuario
 
 
 def unique_email(prefix: str = "test") -> str:

@@ -5,9 +5,7 @@ Verifica que DocumentProcessor delega corretamente para sub-processadores
 (pipeline, edital_processor, postprocessor) e que get_status retorna
 campos obrigatorios.
 """
-import pytest
-from unittest.mock import patch, MagicMock, PropertyMock
-
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # test_document_processor_singleton_exists
@@ -21,7 +19,7 @@ class TestDocumentProcessorSingletonExists:
         assert document_processor is not None
 
     def test_singleton_is_document_processor(self):
-        from services.document_processor import document_processor, DocumentProcessor
+        from services.document_processor import DocumentProcessor, document_processor
         assert isinstance(document_processor, DocumentProcessor)
 
 

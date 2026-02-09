@@ -10,22 +10,21 @@ from typing import Any, Dict, List, Optional, Set
 
 from config import AtestadoProcessingConfig as APC
 from services.extraction import (
+    is_corrupted_text,
     normalize_description,
     normalize_unit,
     parse_item_tuple,
     parse_quantity,
-    is_corrupted_text,
 )
 from services.processing_helpers import (
-    is_section_header_desc,
     is_narrative_desc,
+    is_section_header_desc,
 )
 
 from .text_cleanup import (
     parse_unit_qty_from_line,
     strip_trailing_unit_qty,
 )
-
 
 # Prefixos que indicam rodapé/cabeçalho (não descrição)
 STOP_PREFIXES = (

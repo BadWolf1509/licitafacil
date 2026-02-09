@@ -5,9 +5,9 @@ Testa inicializacao do cliente, validacao de tokens, verificacao de sessao,
 extracao de dados do usuario e tratamento de configuracao ausente.
 Usa mocking para evitar dependencia de conexao real com Supabase.
 """
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ============================================================================
 # 1. Supabase client initialization

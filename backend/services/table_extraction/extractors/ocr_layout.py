@@ -36,8 +36,8 @@ def extract_servicos_from_ocr_layout(
         Tupla (servicos, confidence, debug)
     """
     # Importar aqui para evitar import circular
-    from services.pdf_extraction_service import pdf_extraction_service
     from services.ocr_service import ocr_service
+    from services.pdf_extraction_service import pdf_extraction_service
 
     min_conf = APC.OCR_LAYOUT_CONFIDENCE
     dpi = APC.OCR_LAYOUT_DPI

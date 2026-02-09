@@ -9,6 +9,7 @@ const createApi = () => ({
     async request(endpoint, options = {}) {
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
         const token = localStorage.getItem(CONFIG.TOKEN_KEY);
+        const method = String(options.method || 'GET').toUpperCase();
 
         const headers = {
             'Content-Type': 'application/json',
@@ -18,10 +19,14 @@ const createApi = () => ({
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+            headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
 
         try {
             const response = await fetch(url, {
                 ...options,
+                method,
                 headers
             });
 
@@ -100,7 +105,7 @@ const createApi = () => ({
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
         const token = localStorage.getItem(CONFIG.TOKEN_KEY);
 
-        const headers = {};
+        const headers = { 'X-Requested-With': 'XMLHttpRequest' };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
@@ -262,6 +267,21 @@ describe('api.post', () => {
             })
         );
     });
+
+    test('deve enviar header X-Requested-With em metodo mutavel', async () => {
+        fetch.mockImplementationOnce(() => mockFetchResponse({}));
+
+        await api.post('/usuarios', { nome: 'Teste' });
+
+        expect(fetch).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    'X-Requested-With': 'XMLHttpRequest'
+                })
+            })
+        );
+    });
 });
 
 describe('api.put', () => {
@@ -386,6 +406,16 @@ describe('api.upload', () => {
 
         const callHeaders = fetch.mock.calls[0][1].headers;
         expect(callHeaders['Content-Type']).toBeUndefined();
+    });
+
+    test('deve adicionar X-Requested-With no upload', async () => {
+        fetch.mockImplementationOnce(() => mockFetchResponse({ success: true }));
+
+        const formData = new FormData();
+        await api.upload('/atestados', formData);
+
+        const callHeaders = fetch.mock.calls[0][1].headers;
+        expect(callHeaders['X-Requested-With']).toBe('XMLHttpRequest');
     });
 
     test('deve adicionar Authorization quando token existe', async () => {

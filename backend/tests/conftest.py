@@ -6,20 +6,20 @@ Usa mocking para autenticação já que o Supabase não está disponível em tes
 import os
 import sys
 import uuid
-import pytest
 from datetime import date
 from typing import Generator
-from unittest.mock import patch, MagicMock
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 # Adicionar o diretório backend ao path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base
-from models import Usuario, Atestado, Analise, ProcessingJobModel, AuditLog
-
+from models import Analise, Atestado, AuditLog, ProcessingJobModel, Usuario
 
 # === Configuração do Banco de Dados de Teste ===
 
@@ -198,8 +198,8 @@ def sample_analise(db_session: Session, test_user: Usuario) -> Analise:
 @pytest.fixture
 def client(test_engine) -> Generator[TestClient, None, None]:
     """Cliente de teste FastAPI."""
-    from main import app
     from database import get_db
+    from main import app
 
     # Override da dependencia de banco
     def override_get_db():

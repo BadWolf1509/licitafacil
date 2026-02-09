@@ -9,9 +9,9 @@ import re
 from typing import Any, Dict, Optional
 
 from services.extraction import (
+    item_tuple_to_str,
     normalize_unit,
     parse_item_tuple,
-    item_tuple_to_str,
     parse_quantity,
 )
 

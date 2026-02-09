@@ -2,11 +2,11 @@
 Repositórios para acesso a dados.
 Implementa o padrão Repository para separar lógica de acesso ao banco.
 """
+from .analise_repository import AnaliseRepository, analise_repository
+from .atestado_repository import AtestadoRepository, atestado_repository
 from .base import BaseRepository
-from .atestado_repository import atestado_repository, AtestadoRepository
-from .analise_repository import analise_repository, AnaliseRepository
-from .usuario_repository import usuario_repository, UsuarioRepository
 from .job_repository import JobRepository
+from .usuario_repository import UsuarioRepository, usuario_repository
 
 __all__ = [
     'BaseRepository',

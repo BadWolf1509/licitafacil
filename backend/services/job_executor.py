@@ -9,10 +9,11 @@ import asyncio
 import os
 import traceback
 from datetime import datetime
-from typing import Optional, Callable, Dict, Any
+from typing import Any, Callable, Dict, Optional
+
+from logging_config import get_logger
 
 from .models import JobStatus, ProcessingJob
-from logging_config import get_logger
 
 logger = get_logger('services.job_executor')
 

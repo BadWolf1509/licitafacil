@@ -6,9 +6,9 @@ Fornece decorators e context managers para limitar tempo de execucao.
 import asyncio
 import signal
 import threading
-from functools import wraps
-from typing import TypeVar, Callable
 from contextlib import contextmanager
+from functools import wraps
+from typing import Callable, TypeVar
 
 from logging_config import get_logger
 

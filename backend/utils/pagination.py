@@ -1,7 +1,8 @@
 """
 Utilitários de paginação para endpoints da API.
 """
-from typing import TypeVar, Type, Any
+from typing import Any, Type, TypeVar
+
 from fastapi import Query
 from sqlalchemy.orm import Query as SQLQuery
 

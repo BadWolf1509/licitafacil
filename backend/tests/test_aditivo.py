@@ -6,10 +6,10 @@ Testa validadores, detector de seções e transformador de aditivos.
 
 from services.aditivo import (
     detect_aditivo_sections,
-    prefix_aditivo_items,
+    get_aditivo_start_line,
     is_contaminated_line,
     is_good_description,
-    get_aditivo_start_line,
+    prefix_aditivo_items,
 )
 
 

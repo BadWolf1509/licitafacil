@@ -1,52 +1,69 @@
 import os
-from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, Response
-from dotenv import load_dotenv
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError as SAIntegrityError, OperationalError
+from datetime import datetime, timezone
 
-from database import engine, Base, get_db
-from sqlalchemy.orm import Session
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
-from routers import auth, admin, atestados, analise, ai_status
-from services.processing_queue import processing_queue
-from services.metrics import get_metrics, get_metrics_content_type, set_app_info
-from middleware.rate_limit import RateLimitMiddleware
-from middleware.security_headers import SecurityHeadersMiddleware
+from sqlalchemy.exc import IntegrityError as SAIntegrityError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import Session
+from starlette.middleware.gzip import GZipMiddleware
+
+from auth import get_current_admin_user
+from config import (
+    API_PREFIX,
+    API_VERSION,
+    AUTO_CREATE_TABLES,
+    CORS_ALLOW_CREDENTIALS,
+    CORS_ORIGINS,
+    CSRF_PROTECTION_ENABLED,
+    ENVIRONMENT,
+    METRICS_PUBLIC,
+    UPLOAD_DIR,
+    Messages,
+)
+from config.security import FRAME_OPTIONS, HSTS_MAX_AGE, REFERRER_POLICY, SECURITY_HEADERS_ENABLED
+from database import Base, engine, get_db
+from exceptions import (
+    DatabaseError,
+    DuplicateRecordError,
+    LicitaFacilError,
+    ProcessingError,
+    RecordNotFoundError,
+    ValidationError,
+)
+from logging_config import clear_correlation_id, get_logger, set_correlation_id
 from middleware.csrf_protection import CSRFProtectionMiddleware
 from middleware.http_metrics import HTTPMetricsMiddleware
-from starlette.middleware.gzip import GZipMiddleware
-from config import CORS_ORIGINS, CORS_ALLOW_CREDENTIALS, UPLOAD_DIR, Messages, API_PREFIX, API_VERSION, ENVIRONMENT
-from config.security import SECURITY_HEADERS_ENABLED, HSTS_MAX_AGE, FRAME_OPTIONS, REFERRER_POLICY
-from exceptions import (
-    LicitaFacilError,
-    DatabaseError,
-    RecordNotFoundError,
-    DuplicateRecordError,
-    ValidationError,
-    ProcessingError
-)
+from middleware.rate_limit import RateLimitMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
+from routers import admin, ai_status, analise, atestados, auth
+from services.metrics import get_metrics, get_metrics_content_type, set_app_info
+from services.processing_queue import processing_queue
 from utils.router_helpers import PathTraversalError
 
-from logging_config import get_logger, set_correlation_id, clear_correlation_id
 logger = get_logger('main')
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
-# Criar tabelas no banco de dados
-Base.metadata.create_all(bind=engine)
+# Criar tabelas automaticamente apenas quando explicitamente habilitado.
+# Em produção, o schema deve ser gerenciado exclusivamente por Alembic.
+if AUTO_CREATE_TABLES:
+    Base.metadata.create_all(bind=engine)
+    logger.warning("AUTO_CREATE_TABLES habilitado: tabelas criadas automaticamente.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gerenciador de ciclo de vida da aplicação."""
     # Startup: validar configuracao
-    from config.validators import validate_atestado_config, get_config_summary
     from config import ENVIRONMENT
+    from config.validators import get_config_summary, validate_atestado_config
 
     logger.info("Validando configuracao...")
     validation_result = validate_atestado_config()
@@ -110,8 +127,6 @@ if SECURITY_HEADERS_ENABLED:
     logger.info("Security Headers middleware habilitado")
 
 # 3. CSRF Protection (requer header X-Requested-With para requisições mutáveis)
-# Desabilitado por padrão para compatibilidade - habilitar via CSRF_PROTECTION_ENABLED=true
-CSRF_PROTECTION_ENABLED = os.environ.get("CSRF_PROTECTION_ENABLED", "false").lower() == "true"
 if CSRF_PROTECTION_ENABLED:
     app.add_middleware(CSRFProtectionMiddleware, enabled=True)
     logger.info("CSRF Protection middleware habilitado")
@@ -162,7 +177,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=CORS_ALLOW_CREDENTIALS,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     # Headers permitidos explicitamente (evita allow_headers=["*"])
     allow_headers=[
         "Authorization",
@@ -394,18 +409,34 @@ def api_version():
     }
 
 
-@app.get("/metrics")
-def metrics():
-    """
-    Endpoint de metricas Prometheus.
+if METRICS_PUBLIC:
+    @app.get("/metrics")
+    def metrics():
+        """
+        Endpoint de metricas Prometheus.
 
-    Expoe metricas de processamento, fila e requisicoes HTTP
-    no formato compativel com Prometheus/Grafana.
-    """
-    return Response(
-        content=get_metrics(),
-        media_type=get_metrics_content_type()
-    )
+        Expoe metricas de processamento, fila e requisicoes HTTP
+        no formato compativel com Prometheus/Grafana.
+        """
+        return Response(
+            content=get_metrics(),
+            media_type=get_metrics_content_type()
+        )
+else:
+    @app.get("/metrics")
+    def metrics(
+        current_user=Depends(get_current_admin_user)
+    ):
+        """
+        Endpoint de metricas Prometheus (restrito a administradores).
+
+        Defina METRICS_PUBLIC=true para exposicao publica em ambiente
+        com controle de rede (ex: scraping interno).
+        """
+        return Response(
+            content=get_metrics(),
+            media_type=get_metrics_content_type()
+        )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """
 Configuracoes de extracao de tabelas do LicitaFacil.
 """
-from .base import env_int, env_float
+from .base import env_float, env_int
 
 
 class TableExtractionConfig:

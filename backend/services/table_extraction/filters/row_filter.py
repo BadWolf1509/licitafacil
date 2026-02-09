@@ -12,7 +12,6 @@ import re
 from services.extraction import normalize_description
 from services.extraction.patterns import Patterns
 
-
 # Tokens que indicam ruído (não são serviços)
 NOISE_TOKENS = (
     "RUA PROJETADA",

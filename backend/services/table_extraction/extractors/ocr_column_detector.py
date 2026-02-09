@@ -6,8 +6,8 @@ Contem a logica de inferencia da coluna de item a partir de palavras OCR.
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from services.extraction import parse_item_tuple
 from config import AtestadoProcessingConfig as APC
+from services.extraction import parse_item_tuple
 
 
 def infer_item_column_from_words(

@@ -1,11 +1,11 @@
 target-version = "py313"
 line-length = 120
+exclude = ["temp_query.py"]
 
 [lint]
 select = ["E", "F", "W", "I"]
 ignore = [
     "E501",  # line too long - handled by formatter
-    "F401",  # unused import - used for re-exports
 ]
 
 [lint.per-file-ignores]

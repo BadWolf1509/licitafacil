@@ -1,10 +1,9 @@
-from logging.config import fileConfig
 import os
 import sys
+from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy import pool
+from sqlalchemy import create_engine, pool
 
 from alembic import context  # type: ignore[attr-defined]
 
@@ -13,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Carregar variáveis de ambiente
 from dotenv import load_dotenv
+
 env_path = Path(__file__).parent.parent.parent / '.env'
 load_dotenv(env_path)
 
@@ -41,8 +41,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Importar models para autogenerate
-from database import Base  # noqa: E402
 import models  # noqa: E402, F401 - importa para registrar os modelos
+from database import Base  # noqa: E402
 
 # add your model's MetaData object here
 # for 'autogenerate' support

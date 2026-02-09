@@ -1,11 +1,13 @@
 """
 Repositório para operações de Usuario.
 """
-from typing import Optional, List
+from typing import List, Optional
+
+from sqlalchemy import and_, case, func
 from sqlalchemy.orm import Session, load_only
-from sqlalchemy import func, case, and_
 
 from models import Usuario
+
 from .base import BaseRepository
 
 # Colunas necessárias para listagem de usuários (evita lazy loading)

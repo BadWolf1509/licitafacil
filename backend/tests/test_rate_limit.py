@@ -2,7 +2,7 @@
 Testes para o middleware de Rate Limiting.
 """
 
-from middleware.rate_limit import RateLimitMiddleware, PATH_SPECIFIC_LIMITS
+from middleware.rate_limit import PATH_SPECIFIC_LIMITS, RateLimitMiddleware
 
 
 class TestPathSpecificLimits:
@@ -19,7 +19,7 @@ class TestPathSpecificLimits:
 
     def test_login_limit_is_restrictive(self):
         """Verifica que limite de login é mais restritivo que o global."""
-        from config import RATE_LIMIT_REQUESTS, RATE_LIMIT_AUTH_LOGIN
+        from config import RATE_LIMIT_AUTH_LOGIN, RATE_LIMIT_REQUESTS
 
         assert RATE_LIMIT_AUTH_LOGIN < RATE_LIMIT_REQUESTS
         assert RATE_LIMIT_AUTH_LOGIN <= 10  # No máximo 10 tentativas

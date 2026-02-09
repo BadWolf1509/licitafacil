@@ -1,10 +1,12 @@
 """
 Repositório para operações de Analise.
 """
-from typing import Optional, List
+from typing import List, Optional
+
 from sqlalchemy.orm import Session, joinedload
 
 from models import Analise
+
 from .base import BaseRepository
 
 

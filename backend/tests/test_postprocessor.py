@@ -6,21 +6,17 @@ build_text_item_map, apply_text_descriptions, build_restart_prefix_maps,
 normalize_servicos_fields, PostprocessConfig e filtros internos.
 """
 
-from unittest.mock import patch, MagicMock
 
-import pytest
 
 from config.atestado import PostprocessConfig
 from services.postprocessor import (
-    postprocess_servicos,
-    filter_items_without_code,
-    should_replace_desc,
-    build_text_item_map,
     apply_text_descriptions,
     build_restart_prefix_maps,
-    normalize_servicos_fields,
+    build_text_item_map,
+    filter_items_without_code,
+    postprocess_servicos,
+    should_replace_desc,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

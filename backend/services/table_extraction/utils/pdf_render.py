@@ -5,11 +5,12 @@ Funções para renderizar páginas de PDF como imagens e recortar regiões.
 """
 
 from typing import Optional
+
 import fitz
 import pdfplumber
 
-from services.pdf_extraction_service import pdf_extraction_service
 from logging_config import get_logger
+from services.pdf_extraction_service import pdf_extraction_service
 
 logger = get_logger('services.table_extraction.utils.pdf_render')
 

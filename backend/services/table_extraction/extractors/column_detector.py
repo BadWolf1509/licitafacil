@@ -7,8 +7,8 @@ em tabelas extraídas de documentos.
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from services.extraction import score_item_column
 from config import AtestadoProcessingConfig as APC
+from services.extraction import score_item_column
 
 
 class ColumnDetector:

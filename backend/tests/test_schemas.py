@@ -1,17 +1,17 @@
 """Tests for Pydantic schemas defined in schemas.py."""
 
-import pytest
 from decimal import Decimal
+
+import pytest
 from pydantic import ValidationError
 
 from schemas import (
-    ServicoAtestado,
-    ExigenciaEdital,
     AnaliseManualCreate,
-    PaginatedResponse,
     AtestadoServicosUpdate,
+    ExigenciaEdital,
+    PaginatedResponse,
+    ServicoAtestado,
 )
-
 
 # ---------- ServicoAtestado ----------
 

@@ -5,9 +5,10 @@ from typing import Dict, List
 
 from services.extraction import is_corrupted_text
 from services.extraction.patterns import Patterns
+
 from .collection import collect_continuation_lines, collect_previous_lines
-from .validation import should_prefix_with_previous, is_description_fragment
 from .matching import extract_unit_qty
+from .validation import is_description_fragment, should_prefix_with_previous
 
 
 def build_line_to_page_map(texto: str) -> Dict[int, int]:

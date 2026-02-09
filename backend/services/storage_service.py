@@ -4,11 +4,12 @@ Serviço de Storage para arquivos.
 Suporta armazenamento local (desenvolvimento) e Supabase Storage (produção).
 A escolha é feita automaticamente com base nas variáveis de ambiente.
 """
+import io
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-from config import UPLOAD_DIR, SUPABASE_URL, SUPABASE_SERVICE_KEY
+from config import SUPABASE_SERVICE_KEY, SUPABASE_URL, UPLOAD_DIR
 from logging_config import get_logger
 
 logger = get_logger('services.storage')
@@ -181,8 +182,8 @@ class SupabaseStorageBackend(StorageBackend):
 
     def _ensure_bucket(self) -> None:
         """Cria bucket se não existir."""
-        import urllib.request
         import json
+        import urllib.request
 
         url = f"{self.storage_url}/bucket"
         headers = self._get_headers()
@@ -206,31 +207,14 @@ class SupabaseStorageBackend(StorageBackend):
                 logger.warning(f"[STORAGE] Erro ao criar bucket: {e}")
 
     def upload(self, file: BinaryIO, path: str, content_type: str = "application/octet-stream") -> str:
-        import urllib.request
-
-        url = f"{self.storage_url}/object/{self.BUCKET_NAME}/{path}"
-        headers = self._get_headers()
-        headers["Content-Type"] = content_type
-
-        file_content = file.read()
-
-        try:
-            req = urllib.request.Request(url, data=file_content, headers=headers, method='POST')
-            urllib.request.urlopen(req)
-            logger.debug(f"[STORAGE] Upload concluído: {path}")
-            return self.get_url(path)
-        except urllib.error.HTTPError as e:
-            # Se arquivo já existe, tenta atualizar
-            if e.code == 409:
-                req = urllib.request.Request(url, data=file_content, headers=headers, method='PUT')
-                urllib.request.urlopen(req)
-                logger.debug(f"[STORAGE] Arquivo atualizado: {path}")
-                return self.get_url(path)
-            raise
+        # Mantem compatibilidade com callers existentes; usa streaming internamente.
+        if hasattr(file, "seek"):
+            file.seek(0)
+        return self.upload_stream(file, path, content_type)
 
     def download(self, path: str) -> Optional[bytes]:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         url = f"{self.storage_url}/object/{self.BUCKET_NAME}/{path}"
         headers = self._get_headers()
@@ -245,8 +229,8 @@ class SupabaseStorageBackend(StorageBackend):
             raise
 
     def delete(self, path: str) -> bool:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         url = f"{self.storage_url}/object/{self.BUCKET_NAME}/{path}"
         headers = self._get_headers()
@@ -261,8 +245,8 @@ class SupabaseStorageBackend(StorageBackend):
             return False
 
     def exists(self, path: str) -> bool:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         url = f"{self.storage_url}/object/{self.BUCKET_NAME}/{path}"
         headers = self._get_headers()
@@ -281,6 +265,91 @@ class SupabaseStorageBackend(StorageBackend):
     def get_public_url(self, path: str) -> str:
         """Retorna URL pública (se bucket for público)."""
         return f"{self.storage_url}/object/public/{self.BUCKET_NAME}/{path}"
+
+    def _upload_stream_http(
+        self,
+        method: str,
+        path: str,
+        file: BinaryIO,
+        content_type: str,
+        chunk_size: int,
+    ) -> None:
+        """Envia arquivo para o Supabase usando transfer-encoding chunked."""
+        import http.client
+        import urllib.error
+        from urllib.parse import quote, urlparse
+
+        encoded_path = quote(path, safe="/-_.~")
+        url = f"{self.storage_url}/object/{self.BUCKET_NAME}/{encoded_path}"
+        parsed = urlparse(url)
+        request_path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+
+        conn_class = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+        conn = conn_class(parsed.netloc, timeout=120)
+
+        try:
+            conn.putrequest(method, request_path)
+            headers = self._get_headers()
+            headers["Content-Type"] = content_type
+            headers["Transfer-Encoding"] = "chunked"
+            for key, value in headers.items():
+                conn.putheader(key, value)
+            conn.endheaders()
+
+            while True:
+                chunk = file.read(chunk_size)
+                if not chunk:
+                    break
+                conn.send(f"{len(chunk):X}\r\n".encode("ascii"))
+                conn.send(chunk)
+                conn.send(b"\r\n")
+
+            conn.send(b"0\r\n\r\n")
+            response = conn.getresponse()
+            body = response.read()
+
+            if 200 <= response.status < 300:
+                return
+
+            raise urllib.error.HTTPError(
+                url=url,
+                code=response.status,
+                msg=response.reason,
+                hdrs=response.headers,
+                fp=io.BytesIO(body),
+            )
+        finally:
+            conn.close()
+
+    def upload_stream(
+        self,
+        file: BinaryIO,
+        path: str,
+        content_type: str = "application/octet-stream",
+        chunk_size: int = 1024 * 1024,
+    ) -> str:
+        """
+        Upload usando streaming para evitar carregar arquivo inteiro em memória.
+
+        Faz POST e, em caso de conflito (409), repete como PUT para upsert.
+        """
+        import urllib.error
+
+        if hasattr(file, "seek"):
+            file.seek(0)
+
+        try:
+            self._upload_stream_http("POST", path, file, content_type, chunk_size)
+            logger.debug(f"[STORAGE] Upload concluído (stream): {path}")
+            return self.get_url(path)
+        except urllib.error.HTTPError as e:
+            if e.code != 409:
+                raise
+            if hasattr(file, "seek"):
+                file.seek(0)
+            self._upload_stream_http("PUT", path, file, content_type, chunk_size)
+            logger.debug(f"[STORAGE] Arquivo atualizado (stream): {path}")
+            return self.get_url(path)
 
 
 # =============================================================================

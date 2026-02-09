@@ -11,16 +11,16 @@ import re
 from typing import Optional
 
 from .extraction import (
-    normalize_description,
-    normalize_unit,
-    parse_item_tuple,
-    item_tuple_to_str,
-    parse_quantity,
-    SECTION_HEADERS,
     KNOWN_CATEGORIES,
     NARRATIVE_TOKENS,
+    SECTION_HEADERS,
+    item_tuple_to_str,
+    normalize_description,
     # Item utilities - importados de item_utils.py
     normalize_item_code,
+    normalize_unit,
+    parse_item_tuple,
+    parse_quantity,
     split_restart_prefix,
 )
 

@@ -4,8 +4,8 @@ Validadores de configuração do LicitaFácil.
 Fornece funções para validar valores de configuração
 e garantir que estão dentro de limites aceitáveis.
 """
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
 

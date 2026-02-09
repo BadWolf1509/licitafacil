@@ -94,8 +94,8 @@ class SyncProcessor:
         resultado: Dict[str, Any]
     ) -> Atestado:
         """Salva atestado processado no banco diretamente (modo síncrono)."""
-        from services.atestado.service import parse_date, ordenar_servicos
         from config import Messages
+        from services.atestado.service import ordenar_servicos, parse_date
 
         data_emissao = parse_date(resultado.get("data_emissao"))
         servicos = ordenar_servicos(resultado.get("servicos") or [])

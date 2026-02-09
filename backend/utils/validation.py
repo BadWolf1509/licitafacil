@@ -3,13 +3,13 @@ Utilitários de validação para uploads e outros dados.
 """
 from typing import List, Optional
 
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, UploadFile, status
 
 from config import (
-    validate_upload_file,
-    validate_upload_complete,
-    validate_file_size,
     ALLOWED_DOCUMENT_EXTENSIONS,
+    validate_file_size,
+    validate_upload_complete,
+    validate_upload_file,
 )
 
 

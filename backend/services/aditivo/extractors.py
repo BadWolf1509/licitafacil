@@ -6,10 +6,11 @@ a partir do texto do documento.
 """
 
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from logging_config import get_logger
 from utils.text_utils import sanitize_description
+
 from .validators import is_contaminated_line, is_good_description
 
 logger = get_logger('services.aditivo.extractors')

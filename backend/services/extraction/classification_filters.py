@@ -9,7 +9,6 @@ import re
 
 from .table_processor import parse_item_tuple
 
-
 _COMPARISON_PATTERN = re.compile(r"(>=|<=|>|<)\s*\d")
 
 

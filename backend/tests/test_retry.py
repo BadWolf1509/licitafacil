@@ -4,14 +4,11 @@ Testes para utils.retry - decorators de retry com backoff exponencial.
 Cobre retry sincrono, async_retry assincrono e casos de borda.
 """
 
-import asyncio
-import time
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from utils.retry import retry, async_retry
-
+from utils.retry import async_retry, retry
 
 # ============================================================
 # Sync retry decorator
@@ -236,7 +233,7 @@ class TestAsyncRetrySuccess:
                 raise ConnectionError("transient")
             return "recovered"
 
-        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch("asyncio.sleep", new_callable=AsyncMock):
             result = await flaky()
 
         assert result == "recovered"

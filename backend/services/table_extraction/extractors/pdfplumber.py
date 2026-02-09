@@ -6,9 +6,9 @@ Extrai servicos de tabelas em PDFs usando a biblioteca pdfplumber.
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from services.extraction import normalize_description, normalize_unit, parse_quantity
 from exceptions import PDFError
 from logging_config import get_logger
+from services.extraction import normalize_description, normalize_unit, parse_quantity
 
 logger = get_logger('services.table_extraction.extractors.pdfplumber')
 

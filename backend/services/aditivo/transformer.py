@@ -5,17 +5,17 @@ Responsável por prefixar e processar itens de aditivo contratual.
 """
 
 import re
-from typing import List, Dict, Any, Set, Tuple, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from logging_config import get_logger
-from ..extraction import parse_item_tuple
-from ..extraction.item_utils import strip_restart_prefix, max_restart_prefix_index
-from ..extraction.patterns import Patterns
 from utils.text_utils import sanitize_description
 
+from ..extraction import parse_item_tuple
+from ..extraction.item_utils import max_restart_prefix_index, strip_restart_prefix
+from ..extraction.patterns import Patterns
 from .detector import detect_aditivo_sections, get_aditivo_start_line
-from .validators import is_contaminated_line, is_good_description
 from .extractors import AditivoItemExtractor
+from .validators import is_contaminated_line, is_good_description
 
 logger = get_logger('services.aditivo.transformer')
 

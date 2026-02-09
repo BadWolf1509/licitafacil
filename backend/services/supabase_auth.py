@@ -3,9 +3,9 @@ Serviço de autenticação usando Supabase Auth.
 
 Fornece validação de tokens JWT do Supabase e gerenciamento de usuários.
 """
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
-from config import SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY, ENVIRONMENT
+from config import ENVIRONMENT, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, SUPABASE_URL
 from logging_config import get_logger
 
 logger = get_logger('services.supabase_auth')

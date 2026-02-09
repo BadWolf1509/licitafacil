@@ -8,47 +8,91 @@ Responsável por:
 - Cascata de extração com thresholds de qualidade
 """
 
-from typing import Optional, Callable
+from typing import Callable, Optional
 
+from logging_config import get_logger
+
+from .table_extraction.analyzers import analyze_document_type as _analyze_document_type
+from .table_extraction.cascade import CascadeStrategy
+from .table_extraction.extractors import (
+    TableExtractor,
+    infer_missing_units,
+)
+from .table_extraction.extractors import (
+    assign_itemless_items as _assign_itemless_items,
+)
+from .table_extraction.extractors import (
+    build_table_from_ocr_words as _build_table_from_ocr_words,
+)
+from .table_extraction.extractors import (
+    extract_from_ocr_words as _extract_from_ocr_words,
+)
+from .table_extraction.extractors import (
+    extract_servicos_from_document_ai as _extract_servicos_from_document_ai,
+)
+from .table_extraction.extractors import (
+    extract_servicos_from_grid_ocr as _extract_servicos_from_grid_ocr,
+)
+from .table_extraction.extractors import (
+    extract_servicos_from_ocr_layout as _extract_servicos_from_ocr_layout,
+)
+from .table_extraction.extractors import (
+    extract_servicos_from_tables as _extract_servicos_from_tables,
+)
+from .table_extraction.extractors import (
+    infer_item_column_from_words as _infer_item_column_from_words,
+)
+from .table_extraction.extractors import (
+    is_retry_result_better as _is_retry_result_better,
+)
 
 # Importar módulos extraídos do pacote table_extraction
 from .table_extraction.parsers import (
     parse_row_text_to_servicos as _parse_row_text_to_servicos,
 )
-from .table_extraction.extractors import (
-    TableExtractor,
-    infer_missing_units,
-    extract_servicos_from_tables as _extract_servicos_from_tables,
-    extract_servicos_from_document_ai as _extract_servicos_from_document_ai,
-    extract_servicos_from_grid_ocr as _extract_servicos_from_grid_ocr,
-    extract_servicos_from_ocr_layout as _extract_servicos_from_ocr_layout,
-    build_table_from_ocr_words as _build_table_from_ocr_words,
-    infer_item_column_from_words as _infer_item_column_from_words,
-    assign_itemless_items as _assign_itemless_items,
-    is_retry_result_better as _is_retry_result_better,
-    extract_from_ocr_words as _extract_from_ocr_words,
+from .table_extraction.utils import (
+    apply_restart_prefix as _apply_restart_prefix,
+)
+from .table_extraction.utils import (
+    build_table_signature as _build_table_signature,
+)
+from .table_extraction.utils import (
+    calc_complete_ratio as _calc_complete_ratio,
 )
 from .table_extraction.utils import (
     calc_qty_ratio as _calc_qty_ratio,
-    calc_complete_ratio as _calc_complete_ratio,
+)
+from .table_extraction.utils import (
     calc_quality_metrics as _calc_quality_metrics,
-    merge_table_sources as _merge_table_sources,
-    render_pdf_page as _render_pdf_page,
-    crop_page_image as _crop_page_image,
-    detect_grid_rows as _detect_grid_rows,
-    first_last_item_tuple as _first_last_item_tuple,
-    build_table_signature as _build_table_signature,
-    should_start_new_planilha as _should_start_new_planilha,
+)
+from .table_extraction.utils import (
     collect_item_codes as _collect_item_codes,
+)
+from .table_extraction.utils import (
+    crop_page_image as _crop_page_image,
+)
+from .table_extraction.utils import (
+    detect_grid_rows as _detect_grid_rows,
+)
+from .table_extraction.utils import (
+    first_last_item_tuple as _first_last_item_tuple,
+)
+from .table_extraction.utils import (
+    merge_table_sources as _merge_table_sources,
+)
+from .table_extraction.utils import (
+    render_pdf_page as _render_pdf_page,
+)
+from .table_extraction.utils import (
     should_restart_prefix as _should_restart_prefix,
-    apply_restart_prefix as _apply_restart_prefix,
+)
+from .table_extraction.utils import (
+    should_start_new_planilha as _should_start_new_planilha,
+)
+from .table_extraction.utils import (
     summarize_table_debug as _summarize_table_debug_fn,
 )
-from .table_extraction.analyzers import analyze_document_type as _analyze_document_type
-from .table_extraction.cascade import CascadeStrategy
 
-
-from logging_config import get_logger
 logger = get_logger('services.table_extraction_service')
 
 

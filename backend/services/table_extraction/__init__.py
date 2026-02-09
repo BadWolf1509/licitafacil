@@ -12,48 +12,42 @@ Estrutura:
 - utils/: Utilitários (planilha, merge)
 """
 
-from .parsers import (
-    parse_unit_qty_from_text,
-    find_unit_qty_pairs,
-)
+# Análise de documento
+from .analyzers import analyze_document_type
 
-from .filters import (
-    is_row_noise,
-    is_section_header_row,
-    is_page_metadata,
-    is_header_row,
-    strip_section_header_prefix,
-)
-
+# Estratégia de cascata
+from .cascade import CascadeStrategy
 from .extractors import (
     TableExtractor,
     extract_hidden_item_from_text,
     extract_trailing_unit,
     infer_missing_units,
 )
-
-from .utils import (
-    build_table_signature,
-    should_start_new_planilha,
-    collect_item_codes,
-    should_restart_prefix,
-    apply_restart_prefix,
-    first_last_item_tuple,
-    merge_table_sources,
+from .filters import (
+    is_header_row,
+    is_page_metadata,
+    is_row_noise,
+    is_section_header_row,
+    strip_section_header_prefix,
+)
+from .parsers import (
+    find_unit_qty_pairs,
+    parse_unit_qty_from_text,
 )
 
 # Métricas de qualidade (fonte única em utils/)
 from .utils import (
-    calc_qty_ratio,
+    apply_restart_prefix,
+    build_table_signature,
     calc_complete_ratio,
+    calc_qty_ratio,
     calc_quality_metrics,
+    collect_item_codes,
+    first_last_item_tuple,
+    merge_table_sources,
+    should_restart_prefix,
+    should_start_new_planilha,
 )
-
-# Análise de documento
-from .analyzers import analyze_document_type
-
-# Estratégia de cascata
-from .cascade import CascadeStrategy
 
 __all__ = [
     # Parsers

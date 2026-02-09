@@ -1,32 +1,33 @@
 """Extratores de servicos de diferentes fontes."""
 
-from .base import ExtractionStrategy, ExtractionResult
-from .table import TableExtractor
+from .base import ExtractionResult, ExtractionStrategy
+from .column_detector import ColumnDetector, column_detector
+from .confidence_calculator import ConfidenceCalculator, confidence_calculator
+from .document_ai import extract_servicos_from_document_ai
+from .grid_ocr import extract_servicos_from_grid_ocr
 from .helpers import (
     extract_hidden_item_from_text,
     extract_trailing_unit,
     infer_missing_units,
 )
-from .column_detector import ColumnDetector, column_detector
-from .confidence_calculator import ConfidenceCalculator, confidence_calculator
-from .row_processor import RowProcessor, row_processor
 from .ocr_helpers import (
-    median,
-    build_table_from_ocr_words,
-    infer_item_column_from_words,
-    item_sequence_suspicious,
     assign_itemless_items,
-    is_retry_result_better,
+    build_table_from_ocr_words,
     extract_from_ocr_words,
+    infer_item_column_from_words,
+    is_retry_result_better,
+    item_sequence_suspicious,
+    median,
 )
+from .ocr_layout import extract_servicos_from_ocr_layout
+
 # Submodules podem ser importados diretamente:
 # from .ocr_table_builder import build_table_from_ocr_words
 # from .ocr_column_detector import infer_item_column_from_words
 # from .ocr_quality import item_sequence_suspicious, is_retry_result_better
 from .pdfplumber import extract_servicos_from_tables
-from .document_ai import extract_servicos_from_document_ai
-from .grid_ocr import extract_servicos_from_grid_ocr
-from .ocr_layout import extract_servicos_from_ocr_layout
+from .row_processor import RowProcessor, row_processor
+from .table import TableExtractor
 
 __all__ = [
     # Base

@@ -30,6 +30,13 @@ const CONFIG = {
     SUPABASE_URL: null,
     SUPABASE_ANON_KEY: null,
     SUPABASE_ENABLED: false,
+    PASSWORD_POLICY: {
+        min_length: 8,
+        require_uppercase: true,
+        require_lowercase: true,
+        require_digit: true,
+        require_special: true,
+    },
 
     // Constantes de tempo (ms) centralizadas
     TIMEOUTS: {
@@ -51,6 +58,7 @@ let supabaseClient = null;
 
 // Promise para garantir que loadAuthConfig execute apenas uma vez
 let authConfigPromise = null;
+let passwordPolicyPromise = null;
 
 /**
  * Carrega configuração de autenticação do backend
@@ -90,6 +98,34 @@ async function loadAuthConfig() {
     })();
 
     return authConfigPromise;
+}
+
+/**
+ * Carrega política de senha do backend para manter frontend alinhado.
+ * IDEMPOTENTE: múltiplas chamadas retornam a mesma Promise.
+ */
+async function loadPasswordPolicy() {
+    if (passwordPolicyPromise) {
+        return passwordPolicyPromise;
+    }
+
+    passwordPolicyPromise = (async () => {
+        try {
+            const data = await api.get('/auth/password-requirements');
+            if (data && data.policy) {
+                CONFIG.PASSWORD_POLICY = {
+                    ...CONFIG.PASSWORD_POLICY,
+                    ...data.policy,
+                };
+            }
+            return CONFIG.PASSWORD_POLICY;
+        } catch (error) {
+            console.warn('[AUTH] Failed to load password policy:', error);
+            return CONFIG.PASSWORD_POLICY;
+        }
+    })();
+
+    return passwordPolicyPromise;
 }
 
 /**
@@ -162,6 +198,7 @@ const api = {
             token = localStorage.getItem(CONFIG.TOKEN_KEY);
         }
 
+        const method = String(options.method || 'GET').toUpperCase();
         const headers = {
             'Content-Type': 'application/json',
             ...options.headers
@@ -170,10 +207,14 @@ const api = {
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+            headers['X-Requested-With'] = 'XMLHttpRequest';
+        }
 
         try {
             const response = await fetch(url, {
                 ...options,
+                method,
                 headers
             });
 
@@ -273,7 +314,9 @@ const api = {
             token = localStorage.getItem(CONFIG.TOKEN_KEY);
         }
 
-        const headers = {};
+        const headers = {
+            'X-Requested-With': 'XMLHttpRequest',
+        };
         if (token) {
             headers['Authorization'] = `Bearer ${token}`;
         }

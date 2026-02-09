@@ -7,14 +7,13 @@ de texto OCR para corrigir itens com prefixos truncados.
 
 from typing import Any, Dict, List, Optional, Set
 
+from logging_config import get_logger
 from services.extraction import (
+    description_similarity,
     normalize_unit,
     parse_quantity,
-    description_similarity,
 )
 from services.processing_helpers import normalize_item_code
-
-from logging_config import get_logger
 
 logger = get_logger("services.processors.item_code_refiner")
 

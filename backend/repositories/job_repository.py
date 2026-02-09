@@ -13,10 +13,10 @@ from typing import List, Optional
 
 from sqlalchemy import text
 
-from database import get_db_session, engine
+from database import engine, get_db_session
+from logging_config import get_logger
 from models import ProcessingJobModel
 from services.models import JobStatus, ProcessingJob
-from logging_config import get_logger
 
 logger = get_logger('services.job_repository')
 
@@ -112,16 +112,23 @@ class JobRepository:
                 return None
             return self._model_to_job(model)
 
-    def get_pending(self) -> List[ProcessingJob]:
+    def get_pending(self, include_processing: bool = False) -> List[ProcessingJob]:
         """
-        Busca jobs pendentes ou em processamento.
+        Busca jobs pendentes para processamento.
+
+        Em cenários multi-instância, incluir jobs em processamento pode causar
+        duplicidade; por isso o padrão é retornar apenas `pending`.
 
         Returns:
             Lista de jobs pendentes
         """
+        statuses = ['pending']
+        if include_processing:
+            statuses.append('processing')
+
         with get_db_session() as db:
             models = db.query(ProcessingJobModel).filter(
-                ProcessingJobModel.status.in_(['pending', 'processing'])
+                ProcessingJobModel.status.in_(statuses)
             ).order_by(ProcessingJobModel.created_at.asc()).all()
             return [self._model_to_job(m) for m in models]
 

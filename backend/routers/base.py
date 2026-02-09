@@ -7,7 +7,7 @@ automaticamente, reduzindo repetição de código nos endpoints.
 
 from fastapi import APIRouter, Depends
 
-from auth import get_current_approved_user, get_current_admin_user
+from auth import get_current_admin_user, get_current_approved_user
 
 
 class AuthenticatedRouter(APIRouter):

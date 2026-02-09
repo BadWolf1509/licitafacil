@@ -3,14 +3,14 @@ Container de Dependencias para LicitaFacil.
 Centraliza instanciacao e acesso aos servicos.
 Permite injecao de dependencia nos routers via FastAPI Depends.
 """
-from typing import Optional
 from functools import lru_cache
+from typing import Optional
 
 from services.protocols import (
+    AtestadoServiceProtocol,
     DocumentProcessorProtocol,
-    ProcessingQueueProtocol,
     OCRServiceProtocol,
-    AtestadoServiceProtocol
+    ProcessingQueueProtocol,
 )
 
 

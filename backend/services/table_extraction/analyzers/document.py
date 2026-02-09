@@ -6,6 +6,7 @@ para otimizar o fluxo de extracao.
 """
 
 from typing import Any, Dict
+
 import pdfplumber
 
 from config import AtestadoProcessingConfig as APC

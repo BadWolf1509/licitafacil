@@ -2,6 +2,7 @@
 Funcoes de validacao do LicitaFacil.
 """
 from typing import List, Optional
+
 from .base import (
     ALLOWED_DOCUMENT_EXTENSIONS,
     ALLOWED_MIME_TYPES,
@@ -11,7 +12,6 @@ from .base import (
 )
 from .messages import Messages
 
-
 # Assinaturas de arquivo (magic bytes) para deteccao de MIME type
 FILE_SIGNATURES = {
     b'%PDF': 'application/pdf',
@@ -20,6 +20,8 @@ FILE_SIGNATURES = {
     b'II*\x00': 'image/tiff',  # Little-endian TIFF
     b'MM\x00*': 'image/tiff',  # Big-endian TIFF
     b'BM': 'image/bmp',
+    b'GIF87a': 'image/gif',
+    b'GIF89a': 'image/gif',
 }
 
 
@@ -33,6 +35,10 @@ def detect_mime_type(content: bytes) -> Optional[str]:
     Returns:
         MIME type detectado ou None se desconhecido
     """
+    # WEBP: RIFF....WEBP (assinatura distribuida em duas partes)
+    if len(content) >= 12 and content.startswith(b'RIFF') and content[8:12] == b'WEBP':
+        return 'image/webp'
+
     for signature, mime_type in FILE_SIGNATURES.items():
         if content.startswith(signature):
             return mime_type

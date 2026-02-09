@@ -16,11 +16,7 @@ class TestConfig:
 
     def test_allowed_extensions(self):
         """Verifica que extensoes permitidas estao definidas."""
-        from config import (
-            ALLOWED_PDF_EXTENSIONS,
-            ALLOWED_IMAGE_EXTENSIONS,
-            ALLOWED_DOCUMENT_EXTENSIONS
-        )
+        from config import ALLOWED_DOCUMENT_EXTENSIONS, ALLOWED_IMAGE_EXTENSIONS, ALLOWED_PDF_EXTENSIONS
         assert ".pdf" in ALLOWED_PDF_EXTENSIONS
         assert ".png" in ALLOWED_IMAGE_EXTENSIONS
         assert ".jpg" in ALLOWED_IMAGE_EXTENSIONS
@@ -28,18 +24,19 @@ class TestConfig:
 
     def test_is_allowed_extension_pdf(self):
         """Verifica validacao de extensao PDF."""
-        from config import is_allowed_extension, ALLOWED_PDF_EXTENSIONS
+        from config import ALLOWED_PDF_EXTENSIONS, is_allowed_extension
         assert is_allowed_extension("documento.pdf", ALLOWED_PDF_EXTENSIONS) is True
         assert is_allowed_extension("documento.PDF", ALLOWED_PDF_EXTENSIONS) is True
         assert is_allowed_extension("documento.doc", ALLOWED_PDF_EXTENSIONS) is False
 
     def test_is_allowed_extension_images(self):
         """Verifica validacao de extensao de imagens."""
-        from config import is_allowed_extension, ALLOWED_IMAGE_EXTENSIONS
+        from config import ALLOWED_IMAGE_EXTENSIONS, is_allowed_extension
         assert is_allowed_extension("foto.png", ALLOWED_IMAGE_EXTENSIONS) is True
         assert is_allowed_extension("foto.jpg", ALLOWED_IMAGE_EXTENSIONS) is True
         assert is_allowed_extension("foto.jpeg", ALLOWED_IMAGE_EXTENSIONS) is True
-        assert is_allowed_extension("foto.gif", ALLOWED_IMAGE_EXTENSIONS) is False
+        assert is_allowed_extension("foto.gif", ALLOWED_IMAGE_EXTENSIONS) is True
+        assert is_allowed_extension("foto.webp", ALLOWED_IMAGE_EXTENSIONS) is True
 
     def test_is_allowed_extension_all_documents(self):
         """Verifica validacao para todos os tipos de documento."""
@@ -87,6 +84,7 @@ class TestCORSConfig:
         with patch.dict(os.environ, {"ENVIRONMENT": "development", "CORS_ORIGINS": ""}):
             # Reimportar para pegar novos valores
             import importlib
+
             import config
             importlib.reload(config)
 
@@ -97,6 +95,7 @@ class TestCORSConfig:
         """Verifica origens CORS customizadas."""
         with patch.dict(os.environ, {"CORS_ORIGINS": "https://meusite.com,https://api.meusite.com"}):
             import importlib
+
             import config
             importlib.reload(config)
 

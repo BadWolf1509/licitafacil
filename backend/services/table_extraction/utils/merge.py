@@ -8,9 +8,9 @@ preservando a melhor informação de cada fonte.
 from typing import Any, Dict, List, Optional, Tuple
 
 from services.extraction import (
+    description_similarity,
     normalize_description,
     parse_quantity,
-    description_similarity,
 )
 
 

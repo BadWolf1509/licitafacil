@@ -5,8 +5,8 @@ Extrai e centraliza lógica de mesclagem de planilhas do DocumentProcessor,
 oferecendo estratégias para unificar planilhas fragmentadas e normalizar prefixos.
 """
 
-from typing import Any, Dict, List, Set
 import logging
+from typing import Any, Dict, List, Set
 
 from config import AtestadoProcessingConfig as APC
 from services.processing_helpers import (

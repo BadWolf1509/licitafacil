@@ -4,12 +4,13 @@ Servico de auditoria para rastrear acoes administrativas.
 Registra todas as acoes importantes realizadas no sistema para
 fins de compliance e seguranca.
 """
-from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
 
-from models import AuditLog
 from logging_config import get_logger
+from models import AuditLog
 
 logger = get_logger(__name__)
 

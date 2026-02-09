@@ -10,21 +10,17 @@ de BaseRepository e recebem Session como parametro.
 """
 import uuid
 from datetime import date
+from decimal import Decimal
 
-import pytest
 from sqlalchemy.orm import Session
 
-from models import Usuario, Atestado, Analise
+from models import Analise, Atestado, Usuario
 from repositories import (
-    atestado_repository,
-    analise_repository,
-    usuario_repository,
     AtestadoRepository,
-    AnaliseRepository,
-    UsuarioRepository,
+    analise_repository,
+    atestado_repository,
+    usuario_repository,
 )
-from repositories.base import BaseRepository
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -127,7 +123,7 @@ class TestBaseRepositoryCRUD:
         atestado = _make_atestado(db_session, user.id, descricao="Original")
 
         atestado.descricao_servico = "Atualizado"
-        atestado.quantidade = 9999.0
+        atestado.quantidade = Decimal("9999.0")
         repo.update(db_session, atestado)
 
         db_session.expire_all()

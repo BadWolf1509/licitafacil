@@ -8,31 +8,32 @@ Este router fornece endpoints auxiliares e sincronização.
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from database import get_db
-from models import Usuario
-from schemas import (
-    UsuarioCreate,
-    UsuarioResponse,
-    UsuarioLogin,
-    Token,
-    Mensagem,
-    UsuarioUpdate,
-    AuthConfigResponse,
-    UserStatusResponse,
-    PasswordRequirementsResponse,
-)
 from auth import (
-    get_current_approved_user,
+    SUPABASE_AUTH_ENABLED,
+    get_auth_mode,
     get_current_active_user,
+    get_current_approved_user,
     get_user_by_email,
     is_supabase_auth_enabled,
-    get_auth_mode,
-    SUPABASE_AUTH_ENABLED
 )
-from repositories import usuario_repository
-from utils.password_validator import validate_password, get_password_requirements
-from services.cache import cached
+from database import get_db
 from logging_config import get_logger, log_action
+from models import Usuario
+from repositories import usuario_repository
+from schemas import (
+    AuthConfigResponse,
+    Mensagem,
+    PasswordPolicy,
+    PasswordRequirementsResponse,
+    Token,
+    UserStatusResponse,
+    UsuarioCreate,
+    UsuarioLogin,
+    UsuarioResponse,
+    UsuarioUpdate,
+)
+from services.cache import cached
+from utils.password_validator import get_password_policy, get_password_requirements, validate_password
 
 logger = get_logger('routers.auth')
 
@@ -108,7 +109,10 @@ def get_password_requirements_info() -> PasswordRequirementsResponse:
     }
     ```
     """
-    return PasswordRequirementsResponse(requisitos=get_password_requirements())
+    return PasswordRequirementsResponse(
+        requisitos=get_password_requirements(),
+        policy=PasswordPolicy(**get_password_policy())
+    )
 
 
 # === Endpoints de Registro ===

@@ -6,20 +6,16 @@ Uso:
     python seed.py
 """
 import os
+
 from dotenv import load_dotenv
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from passlib.context import CryptContext
-
-from database import engine, SessionLocal, Base
-from models import Usuario
-from config.defaults import (
-    DEFAULT_ADMIN_EMAIL,
-    DEFAULT_ADMIN_NAME,
-    MIN_PASSWORD_LENGTH
-)
-from utils.password_validator import validate_password
+from config.defaults import DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_NAME, MIN_PASSWORD_LENGTH
+from database import Base, SessionLocal, engine
 from logging_config import get_logger
+from models import Usuario
+from utils.password_validator import validate_password
 
 logger = get_logger('seed')
 

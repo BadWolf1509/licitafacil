@@ -8,14 +8,15 @@ prefixos de reinício (S1-, S2-), e assinaturas de tabela.
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from config import AtestadoProcessingConfig as APC
+from config import TableExtractionConfig as TEC
 from services.extraction import (
+    item_tuple_to_str,
     normalize_description,
     normalize_header,
     parse_item_tuple,
-    item_tuple_to_str,
 )
 from services.extraction.table_processor import guess_columns_by_header
-from config import AtestadoProcessingConfig as APC, TableExtractionConfig as TEC
 
 
 def first_last_item_tuple(

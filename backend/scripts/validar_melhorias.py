@@ -4,9 +4,10 @@ contra os dados da ultima analise (ID 15 - CR/2/2026 Itabaiana).
 
 Compara os resultados ANTIGOS (gravados no banco) com os NOVOS (recalculados).
 """
-import sys
+# ruff: noqa: E402
+
 import os
-import json
+import sys
 from pathlib import Path
 
 # Force UTF-8 output on Windows
@@ -17,10 +18,11 @@ if sys.platform == "win32":
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
+from sqlalchemy import desc
+
 from database import get_db_session
 from models import Analise, Atestado
 from services.matching_service import matching_service
-from sqlalchemy import desc
 
 
 def main():
@@ -83,7 +85,7 @@ def main():
             novo = resultado_novo[i] if i < len(resultado_novo) else None
 
             if antigo:
-                print(f"\n  >>> RESULTADO ANTIGO (gravado no banco):")
+                print("\n  >>> RESULTADO ANTIGO (gravado no banco):")
                 print(f"      Status: {antigo.get('status')}")
                 print(f"      Soma: {antigo.get('soma_quantidades', 0)}")
                 print(f"      Percentual: {antigo.get('percentual_total', 0):.1f}%")
@@ -103,7 +105,7 @@ def main():
                         print(f"         ... +{len(itens)-3} itens")
 
             if novo:
-                print(f"\n  >>> RESULTADO NOVO (recalculado com melhorias):")
+                print("\n  >>> RESULTADO NOVO (recalculado com melhorias):")
                 print(f"      Status: {novo.get('status')}")
                 print(f"      Soma: {novo.get('soma_quantidades', 0)}")
                 print(f"      Percentual: {novo.get('percentual_total', 0):.1f}%")
