@@ -8,4 +8,4 @@ NOTA: Provedores pagos foram permanentemente desabilitados.
 Veja PAID_SERVICES_ENABLED em config/base.py.
 """
 
-__all__ = []
+__all__: list[str] = []

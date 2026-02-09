@@ -98,7 +98,7 @@ class QuantityExtractor:
                     code = item_match[2]
 
                     parsed = self._parse_unit_qty_from_line(segment)
-                    if parsed:
+                    if parsed and code:
                         self._add_qty_to_map(qty_map, code, parsed)
                         continue
 

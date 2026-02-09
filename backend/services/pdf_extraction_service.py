@@ -206,7 +206,7 @@ class PDFExtractionService:
                     )
                     try:
                         page = doc[page_idx]
-                        pix = page.get_pixmap(matrix=matrix)
+                        pix = page.get_pixmap(matrix=matrix)  # type: ignore[attr-defined]
                         img_bytes = pix.tobytes("png")
                         # Liberar memoria do pixmap imediatamente
                         del pix

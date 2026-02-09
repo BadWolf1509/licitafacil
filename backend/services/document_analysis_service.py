@@ -200,7 +200,7 @@ class DocumentAnalysisService:
             def pick(field: str) -> Any:
                 value = meta.get(field)
                 if value is None or value == "":
-                    return dados_ocr.get(field) if dados_ocr else None
+                    return dados_ocr.get(field) if dados_ocr else None  # type: ignore[union-attr]
                 return value
 
             return {
