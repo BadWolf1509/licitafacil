@@ -16,6 +16,7 @@ from repositories.atestado_repository import atestado_repository
 from routers.base import AuthenticatedRouter
 from schemas import AnaliseManualCreate, AnaliseResponse, Mensagem, PaginatedAnaliseResponse
 from services.atestado import atestados_to_dict
+from services.matching_service import matching_service
 from utils import handle_exception
 from utils.file_helpers import temp_file_from_storage
 from utils.http_helpers import get_user_resource_or_404
@@ -236,7 +237,6 @@ async def create_manual_analysis(
     dados: AnaliseManualCreate,
     current_user: Usuario = Depends(get_current_approved_user),
     db: Session = Depends(get_db),
-    services: ServiceContainer = Depends(get_services)
 ) -> AnaliseResponse:
     """
     Cria uma análise de licitação com exigências informadas manualmente.
@@ -270,7 +270,7 @@ async def create_manual_analysis(
     try:
         if exigencias and atestados_dict:
             logger.info("[ANALISE_MANUAL] Iniciando matching...")
-            resultado_matching = services.document_processor.analyze_qualification(
+            resultado_matching = matching_service.match_exigencias(
                 exigencias, atestados_dict
             )
             logger.info(f"[ANALISE_MANUAL] Matching concluido: {len(resultado_matching)} resultados")
@@ -374,6 +374,7 @@ async def reprocess_analysis(
                 analise.resultado_json = resultado_matching
         else:
             # Análise manual: usar exigências armazenadas, apenas re-fazer matching
+            # Usa matching_service diretamente (não precisa importar document_processor pesado)
             exigencias = analise.exigencias_json or []
             if not exigencias:
                 raise HTTPException(
@@ -383,7 +384,7 @@ async def reprocess_analysis(
 
             resultado_matching = []
             if atestados_dict:
-                resultado_matching = services.document_processor.analyze_qualification(
+                resultado_matching = matching_service.match_exigencias(
                     exigencias, atestados_dict
                 )
             analise.resultado_json = _serialize_for_json(resultado_matching)

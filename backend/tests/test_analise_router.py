@@ -497,9 +497,6 @@ class TestAnaliseCreation:
 
     def test_create_manual_analysis_matching_error_propagates(self, client: TestClient, db_session: Session):
         """Verifica que erro no matching propaga como HTTP error (não salva resultado falso)."""
-        from dependencies import get_services
-        from main import app
-
         email = unique_email("manual_err")
         supabase_id = generate_supabase_id()
         user = Usuario(
@@ -512,12 +509,6 @@ class TestAnaliseCreation:
         )
         db_session.add(user)
         db_session.commit()
-
-        # Mock do ServiceContainer via dependency_overrides
-        mock_container = MagicMock()
-        mock_container.document_processor.analyze_qualification.side_effect = \
-            RuntimeError("Erro transiente no matching")
-        app.dependency_overrides[get_services] = lambda: mock_container
 
         try:
             with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
@@ -534,8 +525,12 @@ class TestAnaliseCreation:
                     {"descricao": "Pavimentacao", "quantidade": 5000.0, "unidade": "m2"}
                 ]
 
-                with patch('routers.analise.atestado_repository') as mock_repo:
+                # Mock matching_service diretamente (não usa mais document_processor)
+                with patch('routers.analise.atestado_repository') as mock_repo, \
+                     patch('routers.analise.matching_service') as mock_matching:
                     mock_repo.get_all_with_services.return_value = [mock_atestado]
+                    mock_matching.match_exigencias.side_effect = \
+                        RuntimeError("Erro transiente no matching")
 
                     response = client.post(
                         "/api/v1/analises/manual",
@@ -563,7 +558,6 @@ class TestAnaliseCreation:
                         ).count()
                         assert count == 0
         finally:
-            app.dependency_overrides.pop(get_services, None)
             db_session.expire_all()
             for a in db_session.query(Analise).filter(Analise.user_id == user.id).all():
                 db_session.delete(a)
@@ -572,9 +566,6 @@ class TestAnaliseCreation:
 
     def test_reprocess_manual_analysis_success(self, client: TestClient, db_session: Session):
         """Verifica que é possível reprocessar uma análise manual."""
-        from dependencies import get_services
-        from main import app
-
         email = unique_email("reprocess_manual")
         supabase_id = generate_supabase_id()
         user = Usuario(
@@ -613,10 +604,6 @@ class TestAnaliseCreation:
             }
         ]
 
-        mock_container = MagicMock()
-        mock_container.document_processor.analyze_qualification.return_value = matching_result
-        app.dependency_overrides[get_services] = lambda: mock_container
-
         try:
             with patch('services.supabase_auth.verify_supabase_token') as mock_verify:
                 mock_verify.return_value = {"id": supabase_id, "email": email}
@@ -629,8 +616,11 @@ class TestAnaliseCreation:
                 mock_atestado.unidade = "m2"
                 mock_atestado.servicos_json = []
 
-                with patch('routers.analise.atestado_repository') as mock_repo:
+                # Mock matching_service e atestado_repository diretamente
+                with patch('routers.analise.atestado_repository') as mock_repo, \
+                     patch('routers.analise.matching_service') as mock_matching:
                     mock_repo.get_all_with_services.return_value = [mock_atestado]
+                    mock_matching.match_exigencias.return_value = matching_result
 
                     response = client.post(
                         f"/api/v1/analises/{analise.id}/processar",
@@ -644,7 +634,6 @@ class TestAnaliseCreation:
                         assert len(data["resultado_json"]) == 1
                         assert data["resultado_json"][0]["status"] == "atende"
         finally:
-            app.dependency_overrides.pop(get_services, None)
             db_session.expire_all()
             remaining = db_session.query(Analise).get(analise.id)
             if remaining:
