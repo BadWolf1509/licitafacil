@@ -242,8 +242,13 @@ def client(test_engine) -> Generator[TestClient, None, None]:
 
 @pytest.fixture
 def mock_supabase_verify():
-    """Mock para verificação de token Supabase."""
-    with patch('services.supabase_auth.verify_supabase_token') as mock:
+    """Mock para verificação de token Supabase.
+
+    Também forca SUPABASE_AUTH_ENABLED=True para que o fluxo de validação
+    chegue até verify_supabase_token mesmo em ambientes sem credenciais (CI).
+    """
+    with patch('services.supabase_auth.verify_supabase_token') as mock, \
+         patch('auth.SUPABASE_AUTH_ENABLED', True):
         yield mock
 
 
