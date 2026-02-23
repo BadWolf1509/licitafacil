@@ -1,0 +1,179 @@
+/* Calendario - Estilos */
+
+.calendario-container {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .calendario-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Navegacao do mes */
+.calendario-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.calendario-nav h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.calendario-nav button {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.calendario-nav button:hover {
+    background: var(--bg-secondary);
+}
+
+/* Grid do calendario */
+.calendario-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.calendario-header {
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+    padding: 0.5rem;
+    background: var(--secondary);
+    color: var(--text-light);
+    text-transform: uppercase;
+}
+
+.calendario-dia {
+    min-height: 80px;
+    padding: 0.5rem;
+    background: var(--bg-card);
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s;
+}
+
+.calendario-dia:hover {
+    background: var(--bg-secondary);
+}
+
+.calendario-dia.hoje {
+    border: 2px solid var(--primary);
+}
+
+.calendario-dia.selecionado {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.calendario-dia.outro-mes {
+    opacity: 0.4;
+}
+
+.dia-numero {
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.dia-indicadores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+.dia-indicador {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: inline-block;
+}
+
+.dia-indicador.enviado {
+    background: var(--success);
+}
+
+.dia-indicador.cancelado {
+    background: var(--text-secondary);
+}
+
+/* Painel lateral - lembretes do dia */
+.lembretes-painel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+}
+
+.lembretes-painel h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+}
+
+.lembrete-card {
+    padding: 0.75rem;
+    border-left: 3px solid var(--primary);
+    background: var(--bg-secondary);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    margin-bottom: 0.5rem;
+}
+
+.lembrete-card.enviado {
+    border-left-color: var(--success);
+}
+
+.lembrete-card.cancelado {
+    border-left-color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.lembrete-titulo {
+    font-weight: 500;
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+}
+
+.lembrete-hora {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.lembrete-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+
+.lembrete-acoes {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.lembrete-acoes button {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.lembretes-vazio {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem 0;
+    font-size: 0.875rem;
+}

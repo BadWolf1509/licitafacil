@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Calendário</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/calendario.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="monitoramento.html">Monitoramento PNCP</a>
+                    <a href="calendario.html" class="active">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Header -->
+        <div class="d-flex justify-between align-center mb-3">
+            <h1>Calendário de Lembretes</h1>
+            <button class="btn btn-primary" data-action="novo-lembrete">+ Novo Lembrete</button>
+        </div>
+
+        <div class="calendario-container">
+            <!-- Calendario -->
+            <div>
+                <div class="calendario-nav">
+                    <button data-action="mes-anterior">&lt; Anterior</button>
+                    <h2 id="calendarioTitulo">Fevereiro 2026</h2>
+                    <button data-action="mes-proximo">Próximo &gt;</button>
+                </div>
+
+                <div class="calendario-grid" id="calendarioGrid">
+                    <div class="calendario-header">Dom</div>
+                    <div class="calendario-header">Seg</div>
+                    <div class="calendario-header">Ter</div>
+                    <div class="calendario-header">Qua</div>
+                    <div class="calendario-header">Qui</div>
+                    <div class="calendario-header">Sex</div>
+                    <div class="calendario-header">Sab</div>
+                </div>
+            </div>
+
+            <!-- Painel lateral -->
+            <div class="lembretes-painel">
+                <h3 id="diaSelecionadoTitulo">Selecione um dia</h3>
+                <div id="lembretesDia">
+                    <div class="lembretes-vazio">Clique em um dia para ver lembretes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Novo Lembrete -->
+    <div class="modal" id="modalLembrete">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Novo Lembrete</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formLembrete">
+                <div class="form-group">
+                    <label class="form-label">Título *</label>
+                    <input type="text" class="form-input" id="lembreteTitulo" required
+                        placeholder="Ex: Prazo de entrega de documentos" maxlength="255">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Descrição</label>
+                    <textarea class="form-input" id="lembreteDescricao" rows="3"
+                        placeholder="Detalhes do lembrete (opcional)"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Data e Hora *</label>
+                    <input type="datetime-local" class="form-input" id="lembreteData" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-input" id="lembreteTipo">
+                        <option value="manual">Manual</option>
+                        <option value="abertura_licitacao">Abertura de Licitação</option>
+                        <option value="encerramento_proposta">Encerramento de Proposta</option>
+                        <option value="vencimento_documento">Vencimento de Documento</option>
+                        <option value="entrega_contrato">Entrega de Contrato</option>
+                        <option value="prazo_recurso">Prazo de Recurso</option>
+                    </select>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Criar Lembrete</button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/lib/supabase.min.js"></script>
+    <script src="js/sanitize.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/notificacoes.js"></script>
+    <script src="js/calendario.js"></script>
+</body>
+</html>
