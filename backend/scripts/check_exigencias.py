@@ -1,6 +1,7 @@
 """Verifica se os atestados no banco cobrem exigencias especificas."""
 import sys
 import unicodedata
+from typing import Any
 
 sys.path.insert(0, ".")
 from database import get_db_session
@@ -15,7 +16,7 @@ def normalize(text):
     return text.lower().strip()
 
 
-EXIGENCIAS = [
+EXIGENCIAS: list[dict[str, Any]] = [
     {
         "nome": "Forma para sapata em chapa de madeira compensada resinada, 17 mm, 4 utilizacoes",
         "keywords": ["forma", "sapata", "compensada", "resinada"],

@@ -51,7 +51,7 @@ class LicitacaoStatus:
     ]
 
     # Mapa de transições válidas: status_atual -> [status_destino_permitidos]
-    TRANSITIONS = {
+    TRANSITIONS: dict[str, list[str]] = {
         IDENTIFICADA: [EM_ANALISE, DESISTIDA, CANCELADA],
         EM_ANALISE: [GO_NOGO, DESISTIDA, CANCELADA],
         GO_NOGO: [ELABORANDO_PROPOSTA, DESISTIDA, CANCELADA],
