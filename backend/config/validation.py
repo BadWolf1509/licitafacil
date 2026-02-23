@@ -1,5 +1,5 @@
 """
-Funcoes de validacao do LicitaFacil.
+Funções de validação do LicitaFacil.
 """
 from typing import List, Optional
 
@@ -12,7 +12,7 @@ from .base import (
 )
 from .messages import Messages
 
-# Assinaturas de arquivo (magic bytes) para deteccao de MIME type
+# Assinaturas de arquivo (magic bytes) para detecção de MIME type
 FILE_SIGNATURES = {
     b'%PDF': 'application/pdf',
     b'\x89PNG\r\n\x1a\n': 'image/png',
@@ -30,12 +30,12 @@ def detect_mime_type(content: bytes) -> Optional[str]:
     Detecta o MIME type real do arquivo baseado nos magic bytes.
 
     Args:
-        content: Primeiros bytes do arquivo (minimo 8 bytes)
+        content: Primeiros bytes do arquivo (mínimo 8 bytes)
 
     Returns:
         MIME type detectado ou None se desconhecido
     """
-    # WEBP: RIFF....WEBP (assinatura distribuida em duas partes)
+    # WEBP: RIFF....WEBP (assinatura distribuída em duas partes)
     if len(content) >= 12 and content.startswith(b'RIFF') and content[8:12] == b'WEBP':
         return 'image/webp'
 
@@ -50,17 +50,17 @@ def validate_upload_file(
     allowed_extensions: Optional[List[str]] = None
 ) -> str:
     """
-    Valida arquivo de upload e retorna a extensao.
+    Valida arquivo de upload e retorna a extensão.
 
     Args:
         filename: Nome do arquivo
-        allowed_extensions: Lista de extensoes permitidas (usa ALLOWED_DOCUMENT_EXTENSIONS se None)
+        allowed_extensions: Lista de extensões permitidas (usa ALLOWED_DOCUMENT_EXTENSIONS se None)
 
     Returns:
-        Extensao do arquivo em minusculas
+        Extensão do arquivo em minúsculas
 
     Raises:
-        ValueError: Se o arquivo for invalido
+        ValueError: Se o arquivo for inválido
     """
     if not filename:
         raise ValueError(Messages.FILE_REQUIRED)
@@ -89,31 +89,31 @@ def validate_file_size(file_size: int) -> None:
     """
     if file_size > MAX_UPLOAD_SIZE_BYTES:
         raise ValueError(
-            f"Arquivo muito grande. Tamanho maximo permitido: {MAX_UPLOAD_SIZE_MB}MB"
+            f"Arquivo muito grande. Tamanho máximo permitido: {MAX_UPLOAD_SIZE_MB}MB"
         )
 
 
 def validate_mime_type(content: bytes, expected_extension: str) -> None:
     """
-    Valida o MIME type real do arquivo comparando com a extensao esperada.
+    Valida o MIME type real do arquivo comparando com a extensão esperada.
 
     Args:
-        content: Primeiros bytes do arquivo (minimo 8 bytes)
-        expected_extension: Extensao declarada do arquivo
+        content: Primeiros bytes do arquivo (mínimo 8 bytes)
+        expected_extension: Extensão declarada do arquivo
 
     Raises:
-        ValueError: Se o MIME type nao corresponder a extensao
+        ValueError: Se o MIME type não corresponder à extensão
     """
     detected_mime = detect_mime_type(content)
 
     if detected_mime is None:
-        raise ValueError("Tipo de arquivo nao reconhecido ou invalido")
+        raise ValueError("Tipo de arquivo não reconhecido ou inválido")
 
-    # Verificar se o MIME detectado corresponde a extensao declarada
+    # Verificar se o MIME detectado corresponde à extensão declarada
     allowed_extensions_for_mime = ALLOWED_MIME_TYPES.get(detected_mime, [])
     if expected_extension not in allowed_extensions_for_mime:
         raise ValueError(
-            f"O conteudo do arquivo nao corresponde a extensao {expected_extension}. "
+            f"O conteúdo do arquivo não corresponde à extensão {expected_extension}. "
             f"Tipo detectado: {detected_mime}"
         )
 
@@ -124,23 +124,23 @@ async def validate_upload_complete(
     validate_content: bool = True
 ) -> str:
     """
-    Validacao completa de arquivo de upload (extensao, tamanho e MIME type).
+    Validação completa de arquivo de upload (extensão, tamanho e MIME type).
 
     Args:
         file: Objeto UploadFile do FastAPI
-        allowed_extensions: Lista de extensoes permitidas
+        allowed_extensions: Lista de extensões permitidas
         validate_content: Se True, valida MIME type real do arquivo
 
     Returns:
-        Extensao do arquivo em minusculas
+        Extensão do arquivo em minúsculas
 
     Raises:
-        ValueError: Se alguma validacao falhar
+        ValueError: Se alguma validação falhar
     """
-    # 1. Validar extensao
+    # 1. Validar extensão
     ext = validate_upload_file(file.filename, allowed_extensions)
 
-    # 2. Validar tamanho (se disponivel)
+    # 2. Validar tamanho (se disponível)
     if hasattr(file, 'size') and file.size is not None:
         validate_file_size(file.size)
 
@@ -148,7 +148,7 @@ async def validate_upload_complete(
     if validate_content:
         # Ler primeiros bytes para detectar tipo
         content = await file.read(1024)
-        await file.seek(0)  # Voltar ao inicio
+        await file.seek(0)  # Voltar ao início
 
         if len(content) < 4:
             raise ValueError("Arquivo muito pequeno ou vazio")

@@ -1,5 +1,5 @@
 """
-Utilitarios para calcular hash de arquivos.
+Utilitários para calcular hash de arquivos.
 
 Usado para identificar arquivos unicamente no cache de resultados OCR.
 """
@@ -27,16 +27,16 @@ def compute_file_hash(file_path: Union[str, Path], algorithm: str = "sha256") ->
         Hash hexadecimal do arquivo
 
     Raises:
-        FileNotFoundError: Se o arquivo nao existir
-        ValueError: Se o algoritmo nao for suportado
+        FileNotFoundError: Se o arquivo não existir
+        ValueError: Se o algoritmo não for suportado
     """
     file_path = Path(file_path)
 
     if not file_path.exists():
-        raise FileNotFoundError(f"Arquivo nao encontrado: {file_path}")
+        raise FileNotFoundError(f"Arquivo não encontrado: {file_path}")
 
     if algorithm not in hashlib.algorithms_available:
-        raise ValueError(f"Algoritmo nao suportado: {algorithm}")
+        raise ValueError(f"Algoritmo não suportado: {algorithm}")
 
     hasher = hashlib.new(algorithm)
 
@@ -49,17 +49,17 @@ def compute_file_hash(file_path: Union[str, Path], algorithm: str = "sha256") ->
 
 def compute_content_hash(content: bytes, algorithm: str = "sha256") -> str:
     """
-    Calcula o hash de um conteudo em bytes.
+    Calcula o hash de um conteúdo em bytes.
 
     Args:
-        content: Conteudo em bytes
+        content: Conteúdo em bytes
         algorithm: Algoritmo de hash
 
     Returns:
-        Hash hexadecimal do conteudo
+        Hash hexadecimal do conteúdo
     """
     if algorithm not in hashlib.algorithms_available:
-        raise ValueError(f"Algoritmo nao suportado: {algorithm}")
+        raise ValueError(f"Algoritmo não suportado: {algorithm}")
 
     hasher = hashlib.new(algorithm)
     hasher.update(content)
@@ -68,7 +68,7 @@ def compute_content_hash(content: bytes, algorithm: str = "sha256") -> str:
 
 def get_file_cache_key(file_path: Union[str, Path], prefix: str = "file") -> str:
     """
-    Gera uma chave de cache unica para um arquivo.
+    Gera uma chave de cache única para um arquivo.
 
     Combina o hash do arquivo com o prefixo para criar uma chave.
 
@@ -86,7 +86,7 @@ def get_file_cache_key(file_path: Union[str, Path], prefix: str = "file") -> str
 
 def get_ocr_cache_key(file_path: Union[str, Path], dpi: int = 300) -> str:
     """
-    Gera uma chave de cache especifica para resultados OCR.
+    Gera uma chave de cache específica para resultados OCR.
 
     Inclui o DPI na chave pois diferentes DPIs produzem resultados diferentes.
 
@@ -103,7 +103,7 @@ def get_ocr_cache_key(file_path: Union[str, Path], dpi: int = 300) -> str:
 
 def get_table_extraction_cache_key(file_path: Union[str, Path]) -> str:
     """
-    Gera uma chave de cache para resultados de extracao de tabela.
+    Gera uma chave de cache para resultados de extração de tabela.
 
     Args:
         file_path: Caminho do arquivo
@@ -117,7 +117,7 @@ def get_table_extraction_cache_key(file_path: Union[str, Path]) -> str:
 
 def get_text_extraction_cache_key(file_path: Union[str, Path]) -> str:
     """
-    Gera uma chave de cache para resultados de extracao de texto.
+    Gera uma chave de cache para resultados de extração de texto.
 
     Args:
         file_path: Caminho do arquivo

@@ -41,8 +41,10 @@ from middleware.csrf_protection import CSRFProtectionMiddleware
 from middleware.http_metrics import HTTPMetricsMiddleware
 from middleware.rate_limit import RateLimitMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
-from routers import admin, ai_status, analise, atestados, auth
+from routers import admin, ai_status, analise, atestados, auth, documentos, lembretes, licitacoes, notificacoes, pncp
 from services.metrics import get_metrics, get_metrics_content_type, set_app_info
+from services.notification.reminder_scheduler import reminder_scheduler
+from services.pncp.sync_service import pncp_sync_service
 from services.processing_queue import processing_queue
 from utils.router_helpers import PathTraversalError
 
@@ -61,36 +63,52 @@ if AUTO_CREATE_TABLES:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gerenciador de ciclo de vida da aplicação."""
-    # Startup: validar configuracao
+    # Startup: validar configuração
     from config import ENVIRONMENT
     from config.validators import get_config_summary, validate_atestado_config
 
-    logger.info("Validando configuracao...")
+    logger.info("Validando configuração...")
     validation_result = validate_atestado_config()
 
     if not validation_result.is_valid:
         for error in validation_result.errors:
-            logger.error(f"Erro de configuracao: {error.config_name}={error.value}: {error.message}")
-        # Em producao, falhar se configuracao invalida
+            logger.error(f"Erro de configuração: {error.config_name}={error.value}: {error.message}")
+        # Em produção, falhar se configuração inválida
         if ENVIRONMENT == "production":
-            raise RuntimeError("Configuracao invalida. Corrija os erros acima antes de iniciar.")
-        logger.warning("Continuando com configuracao invalida (ambiente de desenvolvimento)")
+            raise RuntimeError("Configuração inválida. Corrija os erros acima antes de iniciar.")
+        logger.warning("Continuando com configuração inválida (ambiente de desenvolvimento)")
 
     for warning in validation_result.warnings:
-        logger.warning(f"Aviso de configuracao: {warning.config_name}={warning.value}: {warning.message}")
+        logger.warning(f"Aviso de configuração: {warning.config_name}={warning.value}: {warning.message}")
 
-    logger.info(f"Configuracao validada: {get_config_summary()}")
+    logger.info(f"Configuração validada: {get_config_summary()}")
 
-    # Startup: inicializar metricas
+    # Startup: inicializar métricas
     set_app_info(version=API_VERSION, environment=ENVIRONMENT)
-    logger.info("Metricas Prometheus inicializadas")
+    logger.info("Métricas Prometheus inicializadas")
 
     # Startup: iniciar fila de processamento
     await processing_queue.start()
     logger.info("Fila de processamento iniciada")
     logger.info("OCR será carregado sob demanda (lazy loading)")
 
+    # Startup: iniciar scheduler de lembretes
+    await reminder_scheduler.start()
+    logger.info("ReminderScheduler iniciado")
+
+    # Startup: iniciar sync PNCP
+    await pncp_sync_service.start()
+    logger.info("PncpSyncService iniciado")
+
     yield
+
+    # Shutdown: parar sync PNCP
+    await pncp_sync_service.stop()
+    logger.info("PncpSyncService parado")
+
+    # Shutdown: parar scheduler de lembretes
+    await reminder_scheduler.stop()
+    logger.info("ReminderScheduler parado")
 
     # Shutdown: parar fila de processamento
     await processing_queue.stop()
@@ -98,7 +116,7 @@ async def lifespan(app: FastAPI):
 
 
 # Criar aplicação FastAPI
-# Desabilitar docs em producao
+# Desabilitar docs em produção
 _docs_url = "/docs" if ENVIRONMENT != "production" else None
 _redoc_url = "/redoc" if ENVIRONMENT != "production" else None
 
@@ -115,7 +133,7 @@ app = FastAPI(
 # 1. Rate Limiting (primeiro a executar, último a responder)
 app.add_middleware(RateLimitMiddleware)
 
-# 2. Security Headers (adiciona headers de seguranca a todas as respostas)
+# 2. Security Headers (adiciona headers de segurança a todas as respostas)
 if SECURITY_HEADERS_ENABLED:
     app.add_middleware(
         SecurityHeadersMiddleware,
@@ -131,7 +149,7 @@ if CSRF_PROTECTION_ENABLED:
     app.add_middleware(CSRFProtectionMiddleware, enabled=True)
     logger.info("CSRF Protection middleware habilitado")
 
-# 4. Compressao GZip (comprime respostas maiores que 1000 bytes)
+# 4. Compressão GZip (comprime respostas maiores que 1000 bytes)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # 5. Métricas HTTP (coleta métricas Prometheus para todas as requisições)
@@ -287,7 +305,7 @@ async def path_traversal_handler(request: Request, exc: PathTraversalError):
     logger.warning(f"[SECURITY] Path traversal attempt: {exc}")
     return JSONResponse(
         status_code=400,
-        content={"detail": "Caminho de arquivo invalido"}
+        content={"detail": "Caminho de arquivo inválido"}
     )
 
 
@@ -300,6 +318,11 @@ app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(atestados.router, prefix=API_PREFIX)
 app.include_router(analise.router, prefix=API_PREFIX)
 app.include_router(ai_status.router, prefix=API_PREFIX)
+app.include_router(licitacoes.router, prefix=API_PREFIX)
+app.include_router(lembretes.router, prefix=API_PREFIX)
+app.include_router(notificacoes.router, prefix=API_PREFIX)
+app.include_router(documentos.router, prefix=API_PREFIX)
+app.include_router(pncp.router, prefix=API_PREFIX)
 
 
 # Servir arquivos estáticos do frontend (CSS, JS)
@@ -333,10 +356,34 @@ def serve_analises():
     return FileResponse(os.path.join(frontend_path, "analises.html"))
 
 
+@app.get("/licitacoes.html")
+def serve_licitacoes():
+    """Gestão de licitações."""
+    return FileResponse(os.path.join(frontend_path, "licitacoes.html"))
+
+
 @app.get("/admin.html")
 def serve_admin():
     """Painel administrativo."""
     return FileResponse(os.path.join(frontend_path, "admin.html"))
+
+
+@app.get("/calendario.html")
+def serve_calendario():
+    """Calendário de lembretes."""
+    return FileResponse(os.path.join(frontend_path, "calendario.html"))
+
+
+@app.get("/documentos.html")
+def serve_documentos():
+    """Gestão documental."""
+    return FileResponse(os.path.join(frontend_path, "documentos.html"))
+
+
+@app.get("/monitoramento.html")
+def serve_monitoramento():
+    """Monitoramento PNCP."""
+    return FileResponse(os.path.join(frontend_path, "monitoramento.html"))
 
 
 @app.get("/perfil.html")
@@ -413,10 +460,10 @@ if METRICS_PUBLIC:
     @app.get("/metrics")
     def metrics():
         """
-        Endpoint de metricas Prometheus.
+        Endpoint de métricas Prometheus.
 
-        Expoe metricas de processamento, fila e requisicoes HTTP
-        no formato compativel com Prometheus/Grafana.
+        Expõe métricas de processamento, fila e requisições HTTP
+        no formato compatível com Prometheus/Grafana.
         """
         return Response(
             content=get_metrics(),
@@ -428,9 +475,9 @@ else:
         current_user=Depends(get_current_admin_user)
     ):
         """
-        Endpoint de metricas Prometheus (restrito a administradores).
+        Endpoint de métricas Prometheus (restrito a administradores).
 
-        Defina METRICS_PUBLIC=true para exposicao publica em ambiente
+        Defina METRICS_PUBLIC=true para exposição pública em ambiente
         com controle de rede (ex: scraping interno).
         """
         return Response(

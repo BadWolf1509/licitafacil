@@ -1,5 +1,5 @@
 """
-Configuração de logging para o LicitaFacil.
+Configuração de logging para o LicitaFácil.
 
 Uso:
     from logging_config import get_logger
@@ -476,18 +476,18 @@ def log_action(
     **extra
 ) -> None:
     """
-    Loga uma acao do usuario com campos estruturados padronizados.
+    Loga uma ação do usuário com campos estruturados padronizados.
 
-    Este e o helper recomendado para logs de acoes/auditoria.
-    Garante que os campos obrigatorios estejam sempre presentes.
+    Este é o helper recomendado para logs de ações/auditoria.
+    Garante que os campos obrigatórios estejam sempre presentes.
 
     Args:
         logger: Logger a usar
-        action: Acao realizada (ex: "create", "update", "delete", "login")
-        user_id: ID do usuario (opcional se nao autenticado)
+        action: Ação realizada (ex: "create", "update", "delete", "login")
+        user_id: ID do usuário (opcional se não autenticado)
         resource_type: Tipo do recurso (ex: "atestado", "analise")
         resource_id: ID do recurso afetado
-        level: Nivel de log (default: INFO)
+        level: Nível de log (default: INFO)
         **extra: Campos adicionais
 
     Example:
@@ -513,7 +513,7 @@ def log_action(
     # Adicionar campos extras
     context.update(extra)
 
-    # Construir mensagem legivel
+    # Construir mensagem legível
     msg_parts = [f"[{action.upper()}]"]
     if user_id:
         msg_parts.append(f"user={user_id}")
@@ -525,7 +525,7 @@ def log_action(
 
     message = " ".join(msg_parts)
 
-    # Logar com contexto estruturado
+    # Logar com contexto estruturado (log_action)
     log_with_context(logger, level, message, **context)
 
 
@@ -539,15 +539,15 @@ def log_request(
     **extra
 ) -> None:
     """
-    Loga uma requisicao HTTP com campos estruturados.
+    Loga uma requisição HTTP com campos estruturados.
 
     Args:
         logger: Logger a usar
-        method: Metodo HTTP (GET, POST, etc.)
-        path: Path da requisicao
-        status_code: Codigo de status HTTP
-        duration_ms: Duracao em milissegundos
-        user_id: ID do usuario (se autenticado)
+        method: Método HTTP (GET, POST, etc.)
+        path: Path da requisição
+        status_code: Código de status HTTP
+        duration_ms: Duração em milissegundos
+        user_id: ID do usuário (se autenticado)
         **extra: Campos adicionais
     """
     level = logging.INFO if status_code < 400 else logging.WARNING

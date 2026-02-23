@@ -1,7 +1,7 @@
 """
 Gerenciador de prompts para IA.
 
-Este modulo carrega prompts de arquivos externos para facilitar manutencao.
+Este módulo carrega prompts de arquivos externos para facilitar manutenção.
 """
 from functools import lru_cache
 from pathlib import Path
@@ -16,17 +16,17 @@ def load_prompt(name: str) -> str:
     Carrega um prompt de arquivo.
 
     Args:
-        name: Nome do prompt (sem extensao .txt)
+        name: Nome do prompt (sem extensão .txt)
 
     Returns:
-        Conteudo do prompt
+        Conteúdo do prompt
 
     Raises:
-        FileNotFoundError: Se o arquivo nao existir
+        FileNotFoundError: Se o arquivo não existir
     """
     prompt_path = PROMPTS_DIR / f"{name}.txt"
     if not prompt_path.exists():
-        raise FileNotFoundError(f"Prompt nao encontrado: {name}")
+        raise FileNotFoundError(f"Prompt não encontrado: {name}")
 
     with open(prompt_path, 'r', encoding='utf-8') as f:
         return f.read().strip()
@@ -34,10 +34,10 @@ def load_prompt(name: str) -> str:
 
 def get_atestado_vision_prompts() -> Dict[str, str]:
     """
-    Retorna os prompts para extracao de atestado via vision.
+    Retorna os prompts para extração de atestado via vision.
 
     Returns:
-        Dicionario com 'system' e 'user' prompts
+        Dicionário com 'system' e 'user' prompts
     """
     return {
         "system": load_prompt("atestado_vision_system"),
@@ -47,27 +47,27 @@ def get_atestado_vision_prompts() -> Dict[str, str]:
 
 def get_atestado_text_prompt() -> str:
     """
-    Retorna o prompt para extracao de atestado via texto.
+    Retorna o prompt para extração de atestado via texto.
 
     Returns:
-        Prompt de sistema para extracao de texto
+        Prompt de sistema para extração de texto
     """
     return load_prompt("atestado_text")
 
 
 def get_edital_prompt() -> str:
     """
-    Retorna o prompt para extracao de exigencias de edital.
+    Retorna o prompt para extração de exigências de edital.
 
     Returns:
-        Prompt de sistema para extracao de edital
+        Prompt de sistema para extração de edital
     """
     return load_prompt("edital_exigencias")
 
 
 def get_matching_prompt() -> str:
     """
-    Retorna o prompt para analise de matching.
+    Retorna o prompt para análise de matching.
 
     Returns:
         Prompt de sistema para matching

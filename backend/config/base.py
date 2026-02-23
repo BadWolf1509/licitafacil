@@ -183,3 +183,29 @@ def is_allowed_extension(filename: str, allowed: Optional[List[str]] = None) -> 
 def get_file_extension(filename: str) -> str:
     """Retorna a extensao do arquivo em minusculas."""
     return os.path.splitext(filename)[1].lower()
+
+
+# === SMTP (Email) ===
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = env_int("SMTP_PORT", 587)
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_USE_TLS = env_bool("SMTP_USE_TLS", True)
+SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "noreply@licitafacil.com")
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "LicitaFacil")
+EMAIL_ENABLED = env_bool("EMAIL_ENABLED", False)
+
+# === Reminder Scheduler ===
+REMINDER_CHECK_INTERVAL = env_int("REMINDER_CHECK_INTERVAL", 60)
+REMINDER_LOOKAHEAD_MINUTES = env_int("REMINDER_LOOKAHEAD_MINUTES", 5)
+
+# === Gestão Documental ===
+DOCUMENT_EXPIRY_CHECK_INTERVAL = env_int("DOCUMENT_EXPIRY_CHECK_INTERVAL", 3600)
+DOCUMENT_EXPIRY_WARNING_DAYS = env_int("DOCUMENT_EXPIRY_WARNING_DAYS", 30)
+
+# === PNCP ===
+PNCP_API_BASE_URL = os.getenv("PNCP_API_BASE_URL", "https://pncp.gov.br/api/consulta/v1")
+PNCP_TIMEOUT_SECONDS = env_float("PNCP_TIMEOUT_SECONDS", 30.0)
+PNCP_SYNC_ENABLED = env_bool("PNCP_SYNC_ENABLED", False)
+PNCP_SYNC_INTERVAL = env_int("PNCP_SYNC_INTERVAL", 3600)
+PNCP_SYNC_LOOKBACK_DAYS = env_int("PNCP_SYNC_LOOKBACK_DAYS", 7)

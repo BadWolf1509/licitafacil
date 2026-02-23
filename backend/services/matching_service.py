@@ -389,7 +389,7 @@ class MatchingService:
     def _build_empty_results(
         self, exigencias: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Gera resultados nao_atende para cada exigencia quando nao ha atestados."""
+        """Gera resultados nao_atende para cada exigência quando não há atestados."""
         results: List[Dict[str, Any]] = []
         for exig in exigencias:
             req_desc_raw = (exig.get("descricao") or exig.get("exigencia") or "").strip()

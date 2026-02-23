@@ -1,8 +1,8 @@
 """
 Sistema de cache com fallback.
 
-Usa Redis se disponivel, senao fallback para cache em memoria com TTL.
-Decorator @cached() para facilitar uso em funcoes.
+Usa Redis se disponível, senão fallback para cache em memória com TTL.
+Decorator @cached() para facilitar uso em funções.
 """
 
 import hashlib
@@ -18,12 +18,12 @@ from logging_config import get_logger
 
 logger = get_logger('services.cache')
 
-# Tipo generico para retorno de funcoes
+# Tipo genérico para retorno de funções
 T = TypeVar('T')
 
 
 class MemoryCache:
-    """Cache em memoria com suporte a TTL e evicao LRU."""
+    """Cache em memória com suporte a TTL e evição LRU."""
 
     def __init__(self, max_size: int = 1000):
         self._cache: OrderedDict[str, tuple[Any, Optional[float]]] = OrderedDict()
@@ -31,7 +31,7 @@ class MemoryCache:
         self._max_size = max_size
 
     def get(self, key: str) -> Optional[Any]:
-        """Obtem valor do cache se existir e nao expirou."""
+        """Obtém valor do cache se existir e não expirou."""
         with self._lock:
             if key not in self._cache:
                 return None
@@ -46,7 +46,7 @@ class MemoryCache:
             return value
 
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
-        """Define valor no cache com TTL opcional e evicao LRU."""
+        """Define valor no cache com TTL opcional e evição LRU."""
         with self._lock:
             # Limpar entradas expiradas se cache cheio
             if len(self._cache) >= self._max_size:
@@ -56,7 +56,7 @@ class MemoryCache:
             if len(self._cache) >= self._max_size:
                 self._cache.popitem(last=False)  # Remove o primeiro (mais antigo)
 
-            # Se a chave ja existe, remover para atualizar a ordem
+            # Se a chave já existe, remover para atualizar a ordem
             if key in self._cache:
                 del self._cache[key]
 
@@ -106,7 +106,7 @@ class MemoryCache:
             return len(keys_to_delete)
 
     def stats(self) -> dict:
-        """Retorna estatisticas do cache."""
+        """Retorna estatísticas do cache."""
         with self._lock:
             now = time.time()
             valid = sum(
@@ -128,12 +128,12 @@ class RedisCache:
         try:
             import redis
             self._client = redis.from_url(redis_url, decode_responses=True)
-            # Testar conexao
+            # Testar conexão
             self._client.ping()
             self._available = True
             logger.info("Redis cache conectado com sucesso")
         except Exception as e:
-            logger.warning(f"Redis nao disponivel, usando fallback: {e}")
+            logger.warning(f"Redis não disponível, usando fallback: {e}")
             self._client = None
             self._available = False
 
@@ -142,7 +142,7 @@ class RedisCache:
         return self._available
 
     def get(self, key: str) -> Optional[Any]:
-        """Obtem valor do cache."""
+        """Obtém valor do cache."""
         if not self._available:
             return None
         try:
@@ -178,7 +178,7 @@ class RedisCache:
             return False
 
     def clear(self) -> None:
-        """Limpa todo o cache (CUIDADO em producao)."""
+        """Limpa todo o cache (CUIDADO em produção)."""
         if not self._available:
             return
         try:
@@ -215,7 +215,7 @@ class RedisCache:
             return 0
 
     def stats(self) -> dict:
-        """Retorna estatisticas do cache."""
+        """Retorna estatísticas do cache."""
         if not self._available:
             return {"backend": "redis", "available": False}
         try:
@@ -233,10 +233,10 @@ class RedisCache:
 
 class CacheManager:
     """
-    Gerenciador de cache com fallback automatico.
+    Gerenciador de cache com fallback automático.
 
     Tenta usar Redis se REDIS_URL estiver configurado,
-    senao usa cache em memoria.
+    senão usa cache em memória.
     """
 
     def __init__(self):
@@ -258,7 +258,7 @@ class CacheManager:
         return "redis" if self._redis else "memory"
 
     def get(self, key: str) -> Optional[Any]:
-        """Obtem valor do cache."""
+        """Obtém valor do cache."""
         if self._redis:
             return self._redis.get(key)
         return self._memory.get(key)
@@ -297,18 +297,18 @@ class CacheManager:
         return self._memory.delete_by_prefix(prefix)
 
     def stats(self) -> dict:
-        """Retorna estatisticas do cache."""
+        """Retorna estatísticas do cache."""
         if self._redis:
             return self._redis.stats()
         return self._memory.stats()
 
 
-# Instancia global do cache
+# Instância global do cache
 _cache_manager: Optional[CacheManager] = None
 
 
 def get_cache() -> CacheManager:
-    """Obtem instancia global do cache."""
+    """Obtém instância global do cache."""
     global _cache_manager
     if _cache_manager is None:
         _cache_manager = CacheManager()
@@ -316,8 +316,8 @@ def get_cache() -> CacheManager:
 
 
 def _make_cache_key(prefix: str, func_name: str, args: tuple, kwargs: dict) -> str:
-    """Gera chave de cache unica baseada nos argumentos."""
-    # Serializar argumentos de forma deterministica
+    """Gera chave de cache única baseada nos argumentos."""
+    # Serializar argumentos de forma determinística
     key_data = {
         "func": func_name,
         "args": [str(a) for a in args],
@@ -334,12 +334,12 @@ def cached(
     key_func: Optional[Callable[..., str]] = None
 ) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """
-    Decorator para cachear resultado de funcoes.
+    Decorator para cachear resultado de funções.
 
     Args:
         ttl: Tempo de vida em segundos (default: 5 minutos)
         prefix: Prefixo para chave do cache
-        key_func: Funcao customizada para gerar chave (opcional)
+        key_func: Função customizada para gerar chave (opcional)
 
     Exemplo:
         @cached(ttl=60, prefix="user")
@@ -367,11 +367,11 @@ def cached(
                 logger.debug(f"Cache hit: {cache_key}")
                 return cached_value
 
-            # Executar funcao e cachear
+            # Executar função e cachear
             logger.debug(f"Cache miss: {cache_key}")
             result = func(*args, **kwargs)
 
-            # Nao cachear None
+            # Não cachear None
             if result is not None:
                 cache.set(cache_key, result, ttl)
 

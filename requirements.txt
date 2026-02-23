@@ -30,6 +30,9 @@ python-dotenv~=1.2.1
 pydantic[email]~=2.12.5
 pydantic-settings~=2.12.0
 
+# HTTP Client (PNCP integration)
+httpx>=0.25.0
+
 # Observabilidade
 prometheus-client~=0.21.0
 

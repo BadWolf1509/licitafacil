@@ -1,40 +1,40 @@
 """
-Configuracoes de seguranca do LicitaFacil.
-SECRET_KEY, JWT e validacoes de seguranca.
+Configurações de segurança do LicitaFácil.
+SECRET_KEY, JWT e validações de segurança.
 """
 import os
 import secrets
 
 from .base import ENVIRONMENT
 
-# === Seguranca ===
+# === Segurança ===
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 if ENVIRONMENT == "production":
-    # Producao: SECRET_KEY obrigatoria e segura
+    # Produção: SECRET_KEY obrigatória e segura
     if not SECRET_KEY:
         raise ValueError(
-            "CRITICO: SECRET_KEY nao definida em producao! "
-            "Defina a variavel de ambiente SECRET_KEY com uma chave segura de pelo menos 32 caracteres."
+            "CRÍTICO: SECRET_KEY não definida em produção! "
+            "Defina a variável de ambiente SECRET_KEY com uma chave segura de pelo menos 32 caracteres."
         )
     if SECRET_KEY.startswith("dev-"):
         raise ValueError(
-            "CRITICO: SECRET_KEY de desenvolvimento detectada em producao! "
+            "CRÍTICO: SECRET_KEY de desenvolvimento detectada em produção! "
             "Gere uma nova chave com: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
         )
     if len(SECRET_KEY) < 32:
         raise ValueError(
             f"SECRET_KEY muito curta ({len(SECRET_KEY)} chars). "
-            "Use pelo menos 32 caracteres em producao."
+            "Use pelo menos 32 caracteres em produção."
         )
 else:
-    # Desenvolvimento: gerar chave dinamica se nao definida
+    # Desenvolvimento: gerar chave dinâmica se não definida
     if not SECRET_KEY:
         import warnings
         SECRET_KEY = secrets.token_urlsafe(32)
         warnings.warn(
-            "SECRET_KEY nao definida! Gerada dinamicamente para esta sessao. "
-            "Defina SECRET_KEY em producao.",
+            "SECRET_KEY não definida! Gerada dinamicamente para esta sessão. "
+            "Defina SECRET_KEY em produção.",
             RuntimeWarning
         )
 
