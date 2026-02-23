@@ -1,13 +1,11 @@
 """Script para consultar serviços específicos no banco de dados."""
-import sys
 import os
-import json
+import sys
 
 # Adicionar o diretório pai ao path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from backend.database import SessionLocal
-from backend.models import Atestado
 from sqlalchemy import text
 
 # Serviços a buscar (descrição, quantidade necessária, unidade)
@@ -129,8 +127,8 @@ def buscar_servicos():
                 })
             else:
                 # Tentar busca mais ampla com menos keywords
-                print(f"\n   ❌ Nenhum resultado com todas as palavras-chave.")
-                print(f"   🔄 Tentando busca ampliada (keywords individuais)...")
+                print("\n   ❌ Nenhum resultado com todas as palavras-chave.")
+                print("   🔄 Tentando busca ampliada (keywords individuais)...")
 
                 encontrou_algo = False
                 for kw in keywords:
@@ -179,7 +177,7 @@ def buscar_servicos():
                                 print(f"         - Atestado #{d.atestado_id}: {d.descricao_servico[:80]}... | {qtd:,.2f} {d.unidade or 'N/A'}")
 
                 if not encontrou_algo:
-                    print(f"\n   ❌ NENHUM REGISTRO ENCONTRADO para este serviço.")
+                    print("\n   ❌ NENHUM REGISTRO ENCONTRADO para este serviço.")
 
                 resultados_resumo.append({
                     "servico": nome_servico,
