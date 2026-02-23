@@ -1,0 +1,269 @@
+/* Estilos especificos da pagina de documentos */
+
+/* === RESUMO CARDS === */
+.doc-resumo {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.doc-resumo-card {
+    text-align: center;
+    padding: var(--spacing-lg);
+    border-left: 4px solid var(--border);
+}
+
+.doc-resumo-card.doc-resumo-valido {
+    border-left-color: var(--success);
+}
+
+.doc-resumo-card.doc-resumo-vencendo {
+    border-left-color: var(--warning);
+}
+
+.doc-resumo-card.doc-resumo-vencido {
+    border-left-color: var(--error);
+}
+
+.doc-resumo-valor {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.doc-resumo-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* === STATUS BADGES === */
+.badge-valido {
+    background: var(--success-bg);
+    color: #065F46;
+}
+
+.badge-vencendo {
+    background: var(--warning-bg);
+    color: #92400E;
+}
+
+.badge-vencido {
+    background: var(--error-bg);
+    color: #991B1B;
+}
+
+.badge-nao-aplicavel {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+}
+
+/* === TABELA DE DOCUMENTOS === */
+.doc-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.doc-table th,
+.doc-table td {
+    padding: var(--spacing-md);
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.doc-table th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.doc-table tr:hover {
+    background: var(--bg-secondary);
+}
+
+.doc-table td:first-child {
+    white-space: normal;
+    min-width: 200px;
+    max-width: 300px;
+    word-break: break-word;
+}
+
+/* === UPLOAD AREA === */
+.upload-area {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    margin-bottom: var(--spacing-lg);
+    background: var(--bg-secondary);
+}
+
+.upload-area:hover,
+.upload-area.drag-over {
+    border-color: var(--primary);
+    background: var(--primary-light);
+}
+
+.upload-area input[type="file"] {
+    display: none;
+}
+
+.upload-area-icon {
+    font-size: 3rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+.upload-area p {
+    margin: var(--spacing-xs) 0;
+    color: var(--text-secondary);
+}
+
+/* === CHECKLIST === */
+.checklist-progress-wrapper {
+    padding: var(--spacing-md);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.checklist-progress {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.checklist-progress-bar {
+    height: 100%;
+    background: var(--success);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+    min-width: 0;
+}
+
+.checklist-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    background: var(--bg-card);
+    transition: var(--transition);
+}
+
+.checklist-item:hover {
+    border-color: var(--primary);
+}
+
+.checklist-item.pendente-obrigatorio {
+    border-left: 4px solid var(--warning);
+    background: rgba(245, 158, 11, 0.04);
+}
+
+.checklist-item.checklist-item-concluido {
+    border-left: 4px solid var(--success);
+    opacity: 0.8;
+}
+
+.checklist-item-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: 0.9375rem;
+}
+
+.checklist-item-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--success);
+}
+
+.checklist-item-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-shrink: 0;
+}
+
+/* === FILTROS BAR (reusa de licitacoes.css) === */
+.filtros-bar {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: var(--spacing-lg);
+}
+
+.filtros-bar .form-group {
+    flex: 1;
+    min-width: 150px;
+    margin-bottom: 0;
+}
+
+.filtros-bar .form-group.busca {
+    flex: 2;
+    min-width: 200px;
+}
+
+/* === FORM ROW (reusa de licitacoes.css) === */
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.form-row .form-group {
+    flex: 1;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+    .doc-resumo {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .filtros-bar {
+        flex-direction: column;
+    }
+
+    .filtros-bar .form-group {
+        min-width: 100%;
+    }
+
+    .form-row {
+        flex-direction: column;
+    }
+
+    .doc-table th,
+    .doc-table td {
+        padding: var(--spacing-sm);
+        font-size: 0.8125rem;
+    }
+
+    .checklist-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+
+    .checklist-item-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .doc-resumo {
+        grid-template-columns: 1fr;
+    }
+}

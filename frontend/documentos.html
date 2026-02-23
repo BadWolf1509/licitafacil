@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Documentos</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/documentos.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="monitoramento.html">Monitoramento PNCP</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html" class="active">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Resumo Cards -->
+        <div id="resumoContainer" class="doc-resumo"></div>
+
+        <!-- Header + Filtros -->
+        <div class="d-flex justify-between align-center mb-3">
+            <h1>Gestão Documental</h1>
+            <button class="btn btn-primary" id="btnNovoDocumento">+ Novo Documento</button>
+        </div>
+
+        <div class="filtros-bar">
+            <div class="form-group">
+                <label class="form-label">Tipo</label>
+                <select class="form-input" id="filtroTipo">
+                    <option value="">Todos</option>
+                    <option value="edital">Edital</option>
+                    <option value="certidao_negativa">Certidão Negativa</option>
+                    <option value="balanco">Balanço</option>
+                    <option value="contrato_social">Contrato Social</option>
+                    <option value="procuracao">Procuração</option>
+                    <option value="declaracao">Declaração</option>
+                    <option value="planilha">Planilha</option>
+                    <option value="atestado_capacidade">Atestado de Capacidade</option>
+                    <option value="comprovante_endereco">Comprovante de Endereço</option>
+                    <option value="certidao_fgts">Certidão FGTS</option>
+                    <option value="certidao_trabalhista">Certidão Trabalhista</option>
+                    <option value="certidao_federal">Certidão Federal</option>
+                    <option value="certidao_estadual">Certidão Estadual</option>
+                    <option value="certidao_municipal">Certidão Municipal</option>
+                    <option value="outro">Outro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-input" id="filtroStatus">
+                    <option value="">Todos</option>
+                    <option value="valido">Válido</option>
+                    <option value="vencendo">Vencendo</option>
+                    <option value="vencido">Vencido</option>
+                    <option value="nao_aplicavel">Não aplicável</option>
+                </select>
+            </div>
+            <div class="form-group busca">
+                <label class="form-label">Busca</label>
+                <input type="text" class="form-input" id="filtroBusca" placeholder="Nome ou observações...">
+            </div>
+        </div>
+
+        <!-- Lista de documentos -->
+        <div id="documentosContainer">
+            <div class="card empty-state">
+                <h3>Carregando documentos...</h3>
+            </div>
+        </div>
+
+        <!-- Paginacao -->
+        <div id="paginationContainer" class="d-flex gap-1 mt-3" style="justify-content: center;"></div>
+    </div>
+
+    <!-- Modal Upload Documento -->
+    <div class="modal" id="modalUploadDocumento">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Novo Documento</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formUploadDocumento">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-area-icon">&#128196;</div>
+                    <p>Arraste um arquivo aqui ou clique para selecionar</p>
+                    <p class="text-muted" style="font-size: 0.85rem;">PDF, DOC, DOCX, XLS, XLSX, JPG, PNG (máx. 20MB)</p>
+                    <input type="file" id="inputArquivo" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png">
+                </div>
+                <div id="uploadFileInfo" class="hidden mb-2" style="font-size: 0.875rem; color: var(--text-secondary);"></div>
+                <div class="form-group">
+                    <label class="form-label">Nome do Documento *</label>
+                    <input type="text" class="form-input" name="nome" id="uploadNome" required maxlength="300" placeholder="Ex: Certidão Negativa Federal">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Tipo *</label>
+                        <select class="form-input" name="tipo_documento" id="uploadTipo" required>
+                            <option value="">Selecione</option>
+                            <option value="edital">Edital</option>
+                            <option value="certidao_negativa">Certidão Negativa</option>
+                            <option value="balanco">Balanço</option>
+                            <option value="contrato_social">Contrato Social</option>
+                            <option value="procuracao">Procuração</option>
+                            <option value="declaracao">Declaração</option>
+                            <option value="planilha">Planilha</option>
+                            <option value="atestado_capacidade">Atestado de Capacidade</option>
+                            <option value="comprovante_endereco">Comprovante de Endereço</option>
+                            <option value="certidao_fgts">Certidão FGTS</option>
+                            <option value="certidao_trabalhista">Certidão Trabalhista</option>
+                            <option value="certidao_federal">Certidão Federal</option>
+                            <option value="certidao_estadual">Certidão Estadual</option>
+                            <option value="certidao_municipal">Certidão Municipal</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Licitação</label>
+                        <select class="form-input" name="licitacao_id" id="uploadLicitacao">
+                            <option value="">Nenhuma</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Data Emissão</label>
+                        <input type="date" class="form-input" name="data_emissao" id="uploadDataEmissao">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Validade</label>
+                        <input type="date" class="form-input" name="data_validade" id="uploadDataValidade">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-input" name="observacoes" id="uploadObservacoes" rows="2" placeholder="Observações sobre o documento"></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <span id="btnUploadText">Enviar Documento</span>
+                        <span id="btnUploadSpinner" class="spinner hidden"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Documento -->
+    <div class="modal" id="modalEditarDocumento">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Editar Documento</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formEditarDocumento">
+                <input type="hidden" name="id" id="editarDocId">
+                <div class="form-group">
+                    <label class="form-label">Nome do Documento</label>
+                    <input type="text" class="form-input" name="nome" id="editarDocNome" maxlength="300">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Tipo</label>
+                        <select class="form-input" name="tipo_documento" id="editarDocTipo">
+                            <option value="edital">Edital</option>
+                            <option value="certidao_negativa">Certidão Negativa</option>
+                            <option value="balanco">Balanço</option>
+                            <option value="contrato_social">Contrato Social</option>
+                            <option value="procuracao">Procuração</option>
+                            <option value="declaracao">Declaração</option>
+                            <option value="planilha">Planilha</option>
+                            <option value="atestado_capacidade">Atestado de Capacidade</option>
+                            <option value="comprovante_endereco">Comprovante de Endereço</option>
+                            <option value="certidao_fgts">Certidão FGTS</option>
+                            <option value="certidao_trabalhista">Certidão Trabalhista</option>
+                            <option value="certidao_federal">Certidão Federal</option>
+                            <option value="certidao_estadual">Certidão Estadual</option>
+                            <option value="certidao_municipal">Certidão Municipal</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Licitação</label>
+                        <select class="form-input" name="licitacao_id" id="editarDocLicitacao">
+                            <option value="">Nenhuma</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Data Emissão</label>
+                        <input type="date" class="form-input" name="data_emissao" id="editarDocDataEmissao">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Validade</label>
+                        <input type="date" class="form-input" name="data_validade" id="editarDocDataValidade">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-input" name="observacoes" id="editarDocObservacoes" rows="2"></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <span id="btnEditarDocText">Salvar Alterações</span>
+                        <span id="btnEditarDocSpinner" class="spinner hidden"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Checklist -->
+    <div class="modal" id="modalChecklist">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Checklist Documental</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Licitação *</label>
+                <select class="form-input" id="checklistLicitacao">
+                    <option value="">Selecione uma licitação</option>
+                </select>
+            </div>
+            <div id="checklistResumo" class="hidden mb-3"></div>
+            <div id="checklistContainer">
+                <div class="empty-state">
+                    <p class="text-muted">Selecione uma licitação para ver o checklist</p>
+                </div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary" id="btnAdicionarItensChecklist">+ Adicionar Itens</button>
+                <button type="button" class="btn btn-outline" data-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase JS (local) -->
+    <script src="js/lib/supabase.min.js"></script>
+    <script src="js/sanitize.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/error-handler.js"></script>
+    <script src="js/notificacoes.js"></script>
+    <script src="js/documentos.js"></script>
+</body>
+</html>
