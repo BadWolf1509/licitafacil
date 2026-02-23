@@ -6,8 +6,6 @@ pytest~=8.0.0
 pytest-asyncio~=0.23.0
 pytest-cov~=5.0.0
 
-# HTTP client para TestClient (compativel com supabase 2.0.x que exige httpx<0.25.0)
-httpx~=0.24.0
 
 # Type checking
 mypy~=1.8.0
