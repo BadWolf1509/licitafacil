@@ -368,7 +368,7 @@ class TestServicoAtestadoValidation:
 
     def test_empty_descricao_rejected(self):
         from schemas import ServicoAtestado
-        with pytest.raises(ValueError, match="descricao nao pode ser uma string vazia"):
+        with pytest.raises(ValueError, match="descrição não pode ser uma string vazia"):
             ServicoAtestado(descricao="   ", quantidade=100.0)
 
     def test_descricao_max_length(self):

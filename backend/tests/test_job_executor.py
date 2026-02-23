@@ -179,7 +179,7 @@ class TestJobExecutor:
 
         with patch('services.job_executor.os.path.exists', return_value=True):
             mock_processor = MagicMock()
-            mock_processor.process_atestado.side_effect = FileNotFoundError("Arquivo nao encontrado")
+            mock_processor.process_atestado.side_effect = FileNotFoundError("Arquivo não encontrado")
 
             with patch.object(executor, '_get_document_processor', return_value=mock_processor):
                 mock_ai = MagicMock()

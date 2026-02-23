@@ -19,7 +19,21 @@ from sqlalchemy.orm import Session, sessionmaker
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base
-from models import Analise, Atestado, AuditLog, ProcessingJobModel, Usuario
+from models import (
+    Analise,
+    Atestado,
+    AuditLog,
+    ChecklistEdital,
+    DocumentoLicitacao,
+    Lembrete,
+    Licitacao,
+    LicitacaoHistorico,
+    LicitacaoTag,
+    Notificacao,
+    PreferenciaNotificacao,
+    ProcessingJobModel,
+    Usuario,
+)
 
 # === Configuração do Banco de Dados de Teste ===
 
@@ -48,9 +62,17 @@ def db_session(test_engine) -> Generator[Session, None, None]:
     finally:
         session.rollback()
         # Limpar dados de teste
+        session.execute(PreferenciaNotificacao.__table__.delete())
+        session.execute(Notificacao.__table__.delete())
+        session.execute(Lembrete.__table__.delete())
         session.execute(AuditLog.__table__.delete())
         session.execute(ProcessingJobModel.__table__.delete())
+        session.execute(ChecklistEdital.__table__.delete())
+        session.execute(DocumentoLicitacao.__table__.delete())
+        session.execute(LicitacaoHistorico.__table__.delete())
+        session.execute(LicitacaoTag.__table__.delete())
         session.execute(Analise.__table__.delete())
+        session.execute(Licitacao.__table__.delete())
         session.execute(Atestado.__table__.delete())
         session.execute(Usuario.__table__.delete())
         session.commit()

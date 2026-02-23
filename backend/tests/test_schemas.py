@@ -32,7 +32,7 @@ def test_servico_atestado_valid_data():
 
 def test_servico_atestado_rejects_empty_descricao():
     """Whitespace-only descricao must be rejected by the model validator."""
-    with pytest.raises(ValidationError, match="descricao nao pode ser uma string vazia"):
+    with pytest.raises(ValidationError, match="descrição não pode ser uma string vazia"):
         ServicoAtestado(descricao="   ")
 
 

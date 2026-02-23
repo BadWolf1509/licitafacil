@@ -104,7 +104,7 @@ class TestValidateUploadFile:
         """Extensão inválida levanta ValueError."""
         with pytest.raises(ValueError) as exc_info:
             validate_upload_file('arquivo.exe')
-        assert "extensao" in str(exc_info.value).lower() or "extension" in str(exc_info.value).lower()
+        assert "extensão" in str(exc_info.value).lower() or "extension" in str(exc_info.value).lower()
 
     def test_no_filename_raises(self):
         """Arquivo sem nome levanta ValueError."""

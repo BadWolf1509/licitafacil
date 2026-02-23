@@ -81,7 +81,7 @@ class TestPathTraversalErrorHandler:
             path_traversal_handler(mock_request, exc)
         )
         body = json.loads(response.body.decode())
-        assert body["detail"] == "Caminho de arquivo invalido"
+        assert body["detail"] == "Caminho de arquivo inválido"
         assert "/etc/passwd" not in body["detail"]
 
     def test_path_traversal_handler_logs_warning(self):

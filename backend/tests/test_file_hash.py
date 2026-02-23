@@ -62,7 +62,7 @@ class TestComputeFileHash:
         """Levanta FileNotFoundError quando arquivo nao existe."""
         caminho_inexistente = tmp_path / "nao_existe.txt"
 
-        with pytest.raises(FileNotFoundError, match="Arquivo nao encontrado"):
+        with pytest.raises(FileNotFoundError, match="Arquivo não encontrado"):
             compute_file_hash(caminho_inexistente)
 
     def test_compute_file_hash_deterministic(self, tmp_path):
