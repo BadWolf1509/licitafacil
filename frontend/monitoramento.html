@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Monitoramento PNCP</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/monitoramento.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="monitoramento.html" class="active">Monitoramento PNCP</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="notificacoesBell"></div>
+        <div id="alertContainer"></div>
+
+        <!-- Page Header -->
+        <div class="page-header mb-3">
+            <h1>Monitoramento PNCP</h1>
+            <p class="text-muted">Monitore licitações do Portal Nacional de Contratações Públicas automaticamente</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="monitor-tabs">
+            <button class="monitor-tab active" data-action="switchTab" data-tab="monitores">Monitores</button>
+            <button class="monitor-tab" data-action="switchTab" data-tab="resultados">Resultados</button>
+            <button class="monitor-tab" data-action="switchTab" data-tab="busca">Busca Direta</button>
+        </div>
+
+        <!-- Tab: Monitores -->
+        <div class="tab-content active" id="tabMonitores">
+            <div class="toolbar">
+                <button class="btn btn-primary" data-action="novoMonitor">+ Novo Monitor</button>
+                <button class="btn btn-outline" data-action="sincronizar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Sincronizar
+                </button>
+            </div>
+            <div id="monitoresGrid" class="cards-grid">
+                <div class="card empty-state">
+                    <h3>Carregando monitores...</h3>
+                </div>
+            </div>
+            <div id="monitoresPaginacao" class="d-flex justify-center gap-1 mt-3"></div>
+        </div>
+
+        <!-- Tab: Resultados -->
+        <div class="tab-content" id="tabResultados">
+            <div class="filtros-bar">
+                <div class="form-group">
+                    <label class="form-label">Monitoramento</label>
+                    <select class="form-input" id="filtroMonitoramento">
+                        <option value="">Todos</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-input" id="filtroStatusResultado">
+                        <option value="">Todos</option>
+                        <option value="novo">Novo</option>
+                        <option value="interessante">Interessante</option>
+                        <option value="descartado">Descartado</option>
+                        <option value="importado">Importado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UF</label>
+                    <select class="form-input" id="filtroUFResultado">
+                        <option value="">Todas</option>
+                        <option value="AC">AC</option><option value="AL">AL</option>
+                        <option value="AP">AP</option><option value="AM">AM</option>
+                        <option value="BA">BA</option><option value="CE">CE</option>
+                        <option value="DF">DF</option><option value="ES">ES</option>
+                        <option value="GO">GO</option><option value="MA">MA</option>
+                        <option value="MT">MT</option><option value="MS">MS</option>
+                        <option value="MG">MG</option><option value="PA">PA</option>
+                        <option value="PB">PB</option><option value="PR">PR</option>
+                        <option value="PE">PE</option><option value="PI">PI</option>
+                        <option value="RJ">RJ</option><option value="RN">RN</option>
+                        <option value="RS">RS</option><option value="RO">RO</option>
+                        <option value="RR">RR</option><option value="SC">SC</option>
+                        <option value="SP">SP</option><option value="SE">SE</option>
+                        <option value="TO">TO</option>
+                    </select>
+                </div>
+                <div class="form-group busca">
+                    <label class="form-label">Busca</label>
+                    <input type="text" class="form-input" id="filtroBuscaResultado" placeholder="Número, órgão ou objeto...">
+                </div>
+            </div>
+            <div id="resultadosTabela">
+                <div class="card empty-state">
+                    <h3>Selecione filtros para ver resultados</h3>
+                </div>
+            </div>
+            <div id="resultadosPaginacao" class="d-flex justify-center gap-1 mt-3"></div>
+        </div>
+
+        <!-- Tab: Busca Direta -->
+        <div class="tab-content" id="tabBusca">
+            <div class="card busca-direta-form">
+                <h3>Buscar no PNCP</h3>
+                <p class="text-muted mb-3">Consulte diretamente o portal PNCP por período, UF e modalidade</p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Abertura De *</label>
+                        <input type="date" class="form-input" id="buscaDataInicial">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Abertura Até *</label>
+                        <input type="date" class="form-input" id="buscaDataFinal">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">UF</label>
+                        <select class="form-input" id="buscaUF">
+                            <option value="">Todas</option>
+                            <option value="AC">AC</option><option value="AL">AL</option>
+                            <option value="AP">AP</option><option value="AM">AM</option>
+                            <option value="BA">BA</option><option value="CE">CE</option>
+                            <option value="DF">DF</option><option value="ES">ES</option>
+                            <option value="GO">GO</option><option value="MA">MA</option>
+                            <option value="MT">MT</option><option value="MS">MS</option>
+                            <option value="MG">MG</option><option value="PA">PA</option>
+                            <option value="PB">PB</option><option value="PR">PR</option>
+                            <option value="PE">PE</option><option value="PI">PI</option>
+                            <option value="RJ">RJ</option><option value="RN">RN</option>
+                            <option value="RS">RS</option><option value="RO">RO</option>
+                            <option value="RR">RR</option><option value="SC">SC</option>
+                            <option value="SP">SP</option><option value="SE">SE</option>
+                            <option value="TO">TO</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Modalidade *</label>
+                        <select class="form-input" id="buscaModalidade">
+                            <option value="">Selecione...</option>
+                            <option value="6">Pregão Eletrônico</option>
+                            <option value="7">Pregão Presencial</option>
+                            <option value="4">Concorrência Eletrônica</option>
+                            <option value="5">Concorrência Presencial</option>
+                            <option value="8">Dispensa de Licitação</option>
+                            <option value="9">Inexigibilidade</option>
+                            <option value="1">Leilão</option>
+                            <option value="3">Concurso</option>
+                            <option value="2">Diálogo Competitivo</option>
+                            <option value="10">Manifestação de Interesse</option>
+                            <option value="11">Pré-qualificação</option>
+                            <option value="12">Credenciamento</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn btn-primary" data-action="buscarDireta">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Buscar
+                </button>
+            </div>
+            <div id="buscaResultados" class="mt-3"></div>
+        </div>
+    </div>
+
+    <!-- Modal Criar/Editar Monitor -->
+    <div class="modal" id="modalMonitor">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="modalMonitorTitulo">Novo Monitor</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formMonitor">
+                <input type="hidden" id="monitorId">
+                <div class="form-group">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" class="form-input" id="monitorNome" required maxlength="255"
+                        placeholder="Ex: Serviços de TI - SP">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Palavras-chave *</label>
+                    <textarea class="form-input" id="monitorPalavrasChave" rows="3" required
+                        placeholder="Separe por vírgula: tecnologia da informação, software, desenvolvimento"></textarea>
+                    <small class="text-muted">Separe as palavras-chave por vírgula</small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">UFs de interesse</label>
+                    <div class="ufs-grid" id="monitorUFs">
+                        <label class="uf-checkbox"><input type="checkbox" value="AC"> AC</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="AL"> AL</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="AP"> AP</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="AM"> AM</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="BA"> BA</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="CE"> CE</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="DF"> DF</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="ES"> ES</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="GO"> GO</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="MA"> MA</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="MT"> MT</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="MS"> MS</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="MG"> MG</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="PA"> PA</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="PB"> PB</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="PR"> PR</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="PE"> PE</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="PI"> PI</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="RJ"> RJ</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="RN"> RN</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="RS"> RS</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="RO"> RO</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="RR"> RR</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="SC"> SC</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="SP"> SP</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="SE"> SE</label>
+                        <label class="uf-checkbox"><input type="checkbox" value="TO"> TO</label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Valor Mínimo (R$)</label>
+                        <input type="number" class="form-input" id="monitorValorMinimo" step="0.01" min="0"
+                            placeholder="0,00">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Valor Máximo (R$)</label>
+                        <input type="number" class="form-input" id="monitorValorMaximo" step="0.01" min="0"
+                            placeholder="0,00">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="uf-checkbox">
+                        <input type="checkbox" id="monitorAtivo" checked>
+                        Monitor ativo
+                    </label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary" style="flex: 1;" data-action="salvarMonitor">
+                        <span id="btnSalvarMonitorText">Salvar Monitor</span>
+                        <span id="btnSalvarMonitorSpinner" class="spinner hidden"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Importar Resultado -->
+    <div class="modal" id="modalImportar">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Importar como Licitação</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div id="importarResumo" class="mb-3"></div>
+            <div class="form-group">
+                <label class="form-label">Observações</label>
+                <textarea class="form-input" id="importarObservacoes" rows="3"
+                    placeholder="Observações sobre esta importação (opcional)"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" style="flex: 1;" data-action="confirmarImportar">
+                    <span id="btnImportarText">Importar para Licitações</span>
+                    <span id="btnImportarSpinner" class="spinner hidden"></span>
+                </button>
+                <button class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/lib/supabase.min.js"></script>
+    <script src="js/sanitize.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/error-handler.js"></script>
+    <script src="js/notificacoes.js"></script>
+    <script src="js/monitoramento.js"></script>
+</body>
+</html>
