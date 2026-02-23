@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Licitações</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/licitacoes.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html" class="active">Gestão</a>
+                    <a href="monitoramento.html">Monitoramento PNCP</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="alertContainer"></div>
+
+        <!-- Estatisticas -->
+        <div id="statsContainer" class="stats-grid"></div>
+
+        <!-- Header + Filtros -->
+        <div class="d-flex justify-between align-center mb-3">
+            <h1>Gestão de Licitações</h1>
+            <button class="btn btn-primary" id="btnNovaLicitacao">+ Nova Licitação</button>
+        </div>
+
+        <div class="filtros-bar">
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select class="form-input" id="filtroStatus">
+                    <option value="">Todos</option>
+                    <option value="identificada">Identificada</option>
+                    <option value="em_analise">Em Análise</option>
+                    <option value="go_nogo">GO/NO-GO</option>
+                    <option value="elaborando_proposta">Elaborando Proposta</option>
+                    <option value="proposta_enviada">Proposta Enviada</option>
+                    <option value="em_disputa">Em Disputa</option>
+                    <option value="vencida">Vencida</option>
+                    <option value="perdida">Perdida</option>
+                    <option value="contrato_assinado">Contrato Assinado</option>
+                    <option value="em_execucao">Em Execução</option>
+                    <option value="concluida">Concluída</option>
+                    <option value="desistida">Desistida</option>
+                    <option value="cancelada">Cancelada</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">UF</label>
+                <select class="form-input" id="filtroUF">
+                    <option value="">Todas</option>
+                    <option value="AC">AC</option><option value="AL">AL</option>
+                    <option value="AP">AP</option><option value="AM">AM</option>
+                    <option value="BA">BA</option><option value="CE">CE</option>
+                    <option value="DF">DF</option><option value="ES">ES</option>
+                    <option value="GO">GO</option><option value="MA">MA</option>
+                    <option value="MT">MT</option><option value="MS">MS</option>
+                    <option value="MG">MG</option><option value="PA">PA</option>
+                    <option value="PB">PB</option><option value="PR">PR</option>
+                    <option value="PE">PE</option><option value="PI">PI</option>
+                    <option value="RJ">RJ</option><option value="RN">RN</option>
+                    <option value="RS">RS</option><option value="RO">RO</option>
+                    <option value="RR">RR</option><option value="SC">SC</option>
+                    <option value="SP">SP</option><option value="SE">SE</option>
+                    <option value="TO">TO</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Modalidade</label>
+                <select class="form-input" id="filtroModalidade">
+                    <option value="">Todas</option>
+                    <option value="Pregão Eletrônico">Pregão Eletrônico</option>
+                    <option value="Concorrência">Concorrência</option>
+                    <option value="Tomada de Preços">Tomada de Preços</option>
+                    <option value="Convite">Convite</option>
+                    <option value="RDC">RDC</option>
+                    <option value="Diálogo Competitivo">Diálogo Competitivo</option>
+                </select>
+            </div>
+            <div class="form-group busca">
+                <label class="form-label">Busca</label>
+                <input type="text" class="form-input" id="filtroBusca" placeholder="Número, órgão ou objeto...">
+            </div>
+        </div>
+
+        <!-- Lista de licitacoes -->
+        <div id="listaLicitacoes">
+            <div class="card empty-state">
+                <h3>Carregando licitações...</h3>
+            </div>
+        </div>
+
+        <!-- Paginacao -->
+        <div id="paginacao" class="d-flex justify-center gap-1 mt-3"></div>
+
+        <!-- Detalhe da licitacao -->
+        <div id="detalheLicitacao" class="hidden">
+            <div class="card">
+                <div class="detalhe-header">
+                    <h2 id="detalheNumero">Licitação</h2>
+                    <div class="d-flex gap-1">
+                        <button class="btn btn-outline btn-sm" id="btnMudarStatus">Mudar Status</button>
+                        <button class="btn btn-outline btn-sm" id="btnEditarLicitacao">Editar</button>
+                        <button class="btn btn-outline btn-sm" id="btnVoltarLista">Voltar</button>
+                    </div>
+                </div>
+
+                <div id="detalheStatusBadge" class="mb-3"></div>
+
+                <!-- Tabs -->
+                <div class="detalhe-tabs" id="detalheTabs">
+                    <button class="detalhe-tab active" data-tab="dados">Dados</button>
+                    <button class="detalhe-tab" data-tab="historico">Histórico</button>
+                    <button class="detalhe-tab" data-tab="tags">Tags</button>
+                </div>
+
+                <!-- Tab: Dados -->
+                <div class="detalhe-tab-content active" id="tabDados">
+                    <div class="detalhe-grid" id="detalheDados"></div>
+                </div>
+
+                <!-- Tab: Historico -->
+                <div class="detalhe-tab-content" id="tabHistorico">
+                    <div class="historico-timeline" id="detalheHistorico"></div>
+                </div>
+
+                <!-- Tab: Tags -->
+                <div class="detalhe-tab-content" id="tabTags">
+                    <div id="detalheTags"></div>
+                    <div class="tags-input-row">
+                        <input type="text" class="form-input" id="inputNovaTag" placeholder="Nova tag..." maxlength="100">
+                        <button class="btn btn-primary btn-sm" id="btnAdicionarTag">Adicionar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nova Licitacao -->
+    <div class="modal" id="modalNovaLicitacao">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Nova Licitação</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formNovaLicitacao">
+                <div class="form-group">
+                    <label class="form-label">Número *</label>
+                    <input type="text" class="form-input" name="numero" required maxlength="100"
+                        placeholder="Ex: PE 001/2026">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Órgão *</label>
+                    <input type="text" class="form-input" name="orgao" required maxlength="500"
+                        placeholder="Ex: Prefeitura Municipal de São Paulo">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Objeto *</label>
+                    <textarea class="form-input" name="objeto" required rows="3"
+                        placeholder="Descrição do objeto da licitação"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Modalidade *</label>
+                        <select class="form-input" name="modalidade" required>
+                            <option value="">Selecione</option>
+                            <option value="Pregão Eletrônico">Pregão Eletrônico</option>
+                            <option value="Concorrência">Concorrência</option>
+                            <option value="Tomada de Preços">Tomada de Preços</option>
+                            <option value="Convite">Convite</option>
+                            <option value="RDC">RDC</option>
+                            <option value="Diálogo Competitivo">Diálogo Competitivo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Valor Estimado</label>
+                        <input type="number" class="form-input" name="valor_estimado" step="0.01" min="0"
+                            placeholder="0,00">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">UF</label>
+                        <select class="form-input" name="uf">
+                            <option value="">Selecione</option>
+                            <option value="AC">AC</option><option value="AL">AL</option>
+                            <option value="AP">AP</option><option value="AM">AM</option>
+                            <option value="BA">BA</option><option value="CE">CE</option>
+                            <option value="DF">DF</option><option value="ES">ES</option>
+                            <option value="GO">GO</option><option value="MA">MA</option>
+                            <option value="MT">MT</option><option value="MS">MS</option>
+                            <option value="MG">MG</option><option value="PA">PA</option>
+                            <option value="PB">PB</option><option value="PR">PR</option>
+                            <option value="PE">PE</option><option value="PI">PI</option>
+                            <option value="RJ">RJ</option><option value="RN">RN</option>
+                            <option value="RS">RS</option><option value="RO">RO</option>
+                            <option value="RR">RR</option><option value="SC">SC</option>
+                            <option value="SP">SP</option><option value="SE">SE</option>
+                            <option value="TO">TO</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Município</label>
+                        <input type="text" class="form-input" name="municipio" maxlength="200"
+                            placeholder="Nome do município">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Esfera</label>
+                        <select class="form-input" name="esfera">
+                            <option value="">Selecione</option>
+                            <option value="federal">Federal</option>
+                            <option value="estadual">Estadual</option>
+                            <option value="municipal">Municipal</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Data Publicação</label>
+                        <input type="datetime-local" class="form-input" name="data_publicacao">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Abertura</label>
+                        <input type="datetime-local" class="form-input" name="data_abertura">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Link do Edital</label>
+                    <input type="url" class="form-input" name="link_edital" maxlength="1000"
+                        placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-input" name="observacoes" rows="2"
+                        placeholder="Observações gerais"></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <span id="btnCriarText">Criar Licitação</span>
+                        <span id="btnCriarSpinner" class="spinner hidden"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Editar Licitacao -->
+    <div class="modal" id="modalEditarLicitacao">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Editar Licitação</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formEditarLicitacao">
+                <input type="hidden" name="id" id="editarId">
+                <div class="form-group">
+                    <label class="form-label">Número</label>
+                    <input type="text" class="form-input" name="numero" id="editarNumero" maxlength="100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Órgão</label>
+                    <input type="text" class="form-input" name="orgao" id="editarOrgao" maxlength="500">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Objeto</label>
+                    <textarea class="form-input" name="objeto" id="editarObjeto" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Modalidade</label>
+                        <select class="form-input" name="modalidade" id="editarModalidade">
+                            <option value="Pregão Eletrônico">Pregão Eletrônico</option>
+                            <option value="Concorrência">Concorrência</option>
+                            <option value="Tomada de Preços">Tomada de Preços</option>
+                            <option value="Convite">Convite</option>
+                            <option value="RDC">RDC</option>
+                            <option value="Diálogo Competitivo">Diálogo Competitivo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Valor Estimado</label>
+                        <input type="number" class="form-input" name="valor_estimado" id="editarValorEstimado" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Valor Homologado</label>
+                        <input type="number" class="form-input" name="valor_homologado" id="editarValorHomologado" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Valor Proposta</label>
+                        <input type="number" class="form-input" name="valor_proposta" id="editarValorProposta" step="0.01" min="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">UF</label>
+                        <select class="form-input" name="uf" id="editarUF">
+                            <option value="">Selecione</option>
+                            <option value="AC">AC</option><option value="AL">AL</option>
+                            <option value="AP">AP</option><option value="AM">AM</option>
+                            <option value="BA">BA</option><option value="CE">CE</option>
+                            <option value="DF">DF</option><option value="ES">ES</option>
+                            <option value="GO">GO</option><option value="MA">MA</option>
+                            <option value="MT">MT</option><option value="MS">MS</option>
+                            <option value="MG">MG</option><option value="PA">PA</option>
+                            <option value="PB">PB</option><option value="PR">PR</option>
+                            <option value="PE">PE</option><option value="PI">PI</option>
+                            <option value="RJ">RJ</option><option value="RN">RN</option>
+                            <option value="RS">RS</option><option value="RO">RO</option>
+                            <option value="RR">RR</option><option value="SC">SC</option>
+                            <option value="SP">SP</option><option value="SE">SE</option>
+                            <option value="TO">TO</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Município</label>
+                        <input type="text" class="form-input" name="municipio" id="editarMunicipio" maxlength="200">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Data Publicação</label>
+                        <input type="datetime-local" class="form-input" name="data_publicacao" id="editarDataPublicacao">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Abertura</label>
+                        <input type="datetime-local" class="form-input" name="data_abertura" id="editarDataAbertura">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Data Encerramento</label>
+                        <input type="datetime-local" class="form-input" name="data_encerramento" id="editarDataEncerramento">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Data Resultado</label>
+                        <input type="datetime-local" class="form-input" name="data_resultado" id="editarDataResultado">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Link do Edital</label>
+                    <input type="url" class="form-input" name="link_edital" id="editarLinkEdital" maxlength="1000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-input" name="observacoes" id="editarObservacoes" rows="2"></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">
+                        <span id="btnEditarText">Salvar Alterações</span>
+                        <span id="btnEditarSpinner" class="spinner hidden"></span>
+                    </button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Mudar Status -->
+    <div class="modal" id="modalMudarStatus">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Mudar Status</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <form id="formMudarStatus">
+                <input type="hidden" id="statusLicitacaoId">
+                <div class="form-group">
+                    <label class="form-label">Novo Status *</label>
+                    <select class="form-input" id="selectNovoStatus" required>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observação</label>
+                    <textarea class="form-input" id="statusObservacao" rows="3"
+                        placeholder="Motivo da mudança de status..."></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Confirmar</button>
+                    <button type="button" class="btn btn-outline" data-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Supabase JS (local) -->
+    <script src="js/lib/supabase.min.js"></script>
+    <script src="js/sanitize.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/error-handler.js"></script>
+    <script src="js/notificacoes.js"></script>
+    <script src="js/licitacoes.js"></script>
+</body>
+</html>
