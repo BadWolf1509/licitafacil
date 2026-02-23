@@ -88,7 +88,7 @@ async function carregarUsuariosPendentes() {
         const container = document.getElementById('listaPendentes');
 
         if (!usuarios || usuarios.length === 0) {
-            container.innerHTML = '<div class="empty-state">Nenhum usuario pendente de aprovacao.</div>';
+            container.innerHTML = '<div class="empty-state">Nenhum usuário pendente de aprovação.</div>';
             return;
         }
 
@@ -106,7 +106,7 @@ async function carregarUsuariosPendentes() {
                 </div>
             </div>
         `).join('');
-    }, 'Erro ao carregar usuarios pendentes', { container: 'listaPendentes' });
+    }, 'Erro ao carregar usuários pendentes', { container: 'listaPendentes' });
 }
 
 async function carregarTodosUsuarios() {
@@ -116,7 +116,7 @@ async function carregarTodosUsuarios() {
         const container = document.getElementById('listaTodos');
 
         if (!usuarios || usuarios.length === 0) {
-            container.innerHTML = '<div class="empty-state">Nenhum usuario cadastrado.</div>';
+            container.innerHTML = '<div class="empty-state">Nenhum usuário cadastrado.</div>';
             return;
         }
 
@@ -167,56 +167,56 @@ async function carregarTodosUsuarios() {
                 </div>
             `;
         }).join('');
-    }, 'Erro ao carregar usuarios', { container: 'listaTodos' });
+    }, 'Erro ao carregar usuários', { container: 'listaTodos' });
 }
 
 async function aprovarUsuario(id) {
     try {
         await api.post(`/admin/usuarios/${id}/aprovar`);
-        ui.showAlert('Usuario aprovado com sucesso!', 'success');
+        ui.showAlert('Usuário aprovado com sucesso!', 'success');
         carregarEstatisticas();
         carregarUsuariosPendentes();
         carregarTodosUsuarios();
     } catch (error) {
-        ui.showAlert(error.message || 'Erro ao aprovar usuario', 'error');
+        ui.showAlert(error.message || 'Erro ao aprovar usuário', 'error');
     }
 }
 
 async function rejeitarUsuario(id) {
-    if (!await confirmAction('Tem certeza que deseja desativar este usuario?', { type: 'danger', confirmText: 'Desativar' })) return;
+    if (!await confirmAction('Tem certeza que deseja desativar este usuário?', { type: 'danger', confirmText: 'Desativar' })) return;
 
     try {
         await api.post(`/admin/usuarios/${id}/rejeitar`);
-        ui.showAlert('Usuario desativado com sucesso!', 'success');
+        ui.showAlert('Usuário desativado com sucesso!', 'success');
         carregarEstatisticas();
         carregarUsuariosPendentes();
         carregarTodosUsuarios();
     } catch (error) {
-        ui.showAlert(error.message || 'Erro ao desativar usuario', 'error');
+        ui.showAlert(error.message || 'Erro ao desativar usuário', 'error');
     }
 }
 
 async function reativarUsuario(id) {
     try {
         await api.post(`/admin/usuarios/${id}/reativar`);
-        ui.showAlert('Usuario reativado com sucesso!', 'success');
+        ui.showAlert('Usuário reativado com sucesso!', 'success');
         carregarEstatisticas();
         carregarTodosUsuarios();
     } catch (error) {
-        ui.showAlert(error.message || 'Erro ao reativar usuario', 'error');
+        ui.showAlert(error.message || 'Erro ao reativar usuário', 'error');
     }
 }
 
 async function excluirUsuario(id, nome) {
-    if (!await confirmAction(`Deseja excluir permanentemente o usuario "${nome}"? Todos os dados associados serao perdidos.`, { title: 'Excluir usuario', type: 'danger', confirmText: 'Excluir' })) return;
+    if (!await confirmAction(`Deseja excluir permanentemente o usuário "${nome}"? Todos os dados associados serão perdidos.`, { title: 'Excluir usuário', type: 'danger', confirmText: 'Excluir' })) return;
 
     try {
         await api.delete(`/admin/usuarios/${id}`);
-        ui.showAlert('Usuario excluido permanentemente!', 'success');
+        ui.showAlert('Usuário excluído permanentemente!', 'success');
         carregarEstatisticas();
         carregarUsuariosPendentes();
         carregarTodosUsuarios();
     } catch (error) {
-        ui.showAlert(error.message || 'Erro ao excluir usuario', 'error');
+        ui.showAlert(error.message || 'Erro ao excluir usuário', 'error');
     }
 }

@@ -492,11 +492,11 @@ const AtestadosModule = {
 
             if (atestados.length === 0) {
                 const emptyTitle = hasActiveJobs
-                    ? 'Nenhum atestado concluido ainda'
+                    ? 'Nenhum atestado concluído ainda'
                     : 'Nenhum atestado cadastrado';
                 const emptyText = hasActiveJobs
-                    ? 'Seus arquivos estao em processamento e aparecerao aqui ao concluir.'
-                    : 'Cadastre seu primeiro atestado de capacidade tecnica';
+                    ? 'Seus arquivos estão em processamento e aparecerão aqui ao concluir.'
+                    : 'Cadastre seu primeiro atestado de capacidade técnica';
                 container.innerHTML = `
                     <div class="card empty-state">
                         <div class="empty-state-icon">&#128203;</div>
@@ -520,12 +520,12 @@ const AtestadosModule = {
                      data-search="${searchText}">
                     <div class="atestado-card">
                         <div class="atestado-info">
-                            <h3>${Sanitize.escapeHtml(a.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
+                            <h3>${Sanitize.escapeHtml(a.descricao_servico || 'Atestado de Capacidade Técnica')}</h3>
                             ${a.contratante ? `<p class="text-muted">Contratante: ${Sanitize.escapeHtml(a.contratante)}</p>` : ''}
                             ${a.data_emissao ? `<p class="text-muted">Emitido em: ${formatarDataSemHora(a.data_emissao)}</p>` : ''}
                             ${a.servicos_json && a.servicos_json.length > 0 ?
-                                `<span class="badge">${a.servicos_json.length} servico(s) identificado(s)</span>` :
-                                '<span class="badge badge-secondary">Sem servicos detalhados</span>'
+                                `<span class="badge">${a.servicos_json.length} serviço(s) identificado(s)</span>` :
+                                '<span class="badge badge-secondary">Sem serviços detalhados</span>'
                             }
                         </div>
                         <div class="atestado-actions">
@@ -690,7 +690,7 @@ const AtestadosModule = {
         try {
             await api.delete(`/atestados/${id}`);
             state.openServicosByAtestado.delete(id);
-            ui.showAlert('Atestado excluido com sucesso!', 'success');
+            ui.showAlert('Atestado excluído com sucesso!', 'success');
             this.carregarAtestados();
         } catch (error) {
             ui.showAlert(error.message || 'Erro ao excluir atestado', 'error');
@@ -706,7 +706,7 @@ const AtestadosModule = {
             const atestado = await api.get(`/atestados/${atestadoId}`);
 
             if (!atestado.servicos_json || itemIndex >= atestado.servicos_json.length) {
-                ui.showAlert('Item nao encontrado', 'error');
+                ui.showAlert('Item não encontrado', 'error');
                 return;
             }
 
@@ -717,7 +717,7 @@ const AtestadosModule = {
                 servicos_json: novosServicos
             });
 
-            ui.showAlert('Item excluido com sucesso!', 'success');
+            ui.showAlert('Item excluído com sucesso!', 'success');
             this.carregarAtestados();
         } catch (error) {
             ui.showAlert(error.message || 'Erro ao excluir item', 'error');
@@ -725,7 +725,7 @@ const AtestadosModule = {
     },
 
     adicionarServicoItem(atestadoId) {
-        document.getElementById('modalServicoTitle').textContent = 'Adicionar Item de Servico';
+        document.getElementById('modalServicoTitle').textContent = 'Adicionar Item de Serviço';
         document.getElementById('editServicoAtestadoId').value = atestadoId;
         document.getElementById('editServicoIndex').value = -1;
         document.getElementById('editServicoItem').value = '';
@@ -740,14 +740,14 @@ const AtestadosModule = {
             const atestado = await api.get(`/atestados/${atestadoId}`);
 
             if (!atestado.servicos_json || itemIndex >= atestado.servicos_json.length) {
-                ui.showAlert('Item nao encontrado', 'error');
+                ui.showAlert('Item não encontrado', 'error');
                 return;
             }
 
             const servico = atestado.servicos_json[itemIndex];
             const parsed = extrairItemDescricao(servico);
 
-            document.getElementById('modalServicoTitle').textContent = 'Editar Item de Servico';
+            document.getElementById('modalServicoTitle').textContent = 'Editar Item de Serviço';
             document.getElementById('editServicoAtestadoId').value = atestadoId;
             document.getElementById('editServicoIndex').value = itemIndex;
             document.getElementById('editServicoItem').value = servico.item || parsed.item || '';
@@ -773,7 +773,7 @@ const AtestadosModule = {
         const unidade = document.getElementById('editServicoUnidade').value.trim();
 
         if (!descricao || isNaN(quantidade) || !unidade) {
-            ui.showAlert('Preencha todos os campos obrigatorios', 'error');
+            ui.showAlert('Preencha todos os campos obrigatórios', 'error');
             return;
         }
 
@@ -790,7 +790,7 @@ const AtestadosModule = {
                 });
             } else {
                 if (itemIndex >= novosServicos.length) {
-                    ui.showAlert('Item nao encontrado', 'error');
+                    ui.showAlert('Item não encontrado', 'error');
                     return;
                 }
                 novosServicos[itemIndex] = {
@@ -851,7 +851,7 @@ const AtestadosModule = {
                     <div class="filtro-servicos-inline">
                         <input type="text"
                                class="form-input form-input-sm"
-                               placeholder="Filtrar servicos..."
+                               placeholder="Filtrar serviços..."
                                data-action="filtrar-servicos" data-atestado-id="${atestado.id}"
                                data-total="${totalServicos}">
                     </div>

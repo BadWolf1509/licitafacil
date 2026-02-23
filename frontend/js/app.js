@@ -4,8 +4,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Configurar handlers globais (event delegation para onclick inline)
     setupGlobalHandlers();
 
-    // Configurar menu mobile
+    // Configurar menu mobile + dropdowns
     setupMobileNav();
+    setupDropdowns();
 
     // Aguardar configuração de autenticação carregar (inicializa Supabase)
     await loadAuthConfig();
@@ -63,7 +64,7 @@ function setupGlobalHandlers() {
 }
 
 /**
- * Configura o menu mobile (hamburger)
+ * Configura o menu mobile (hamburger) com suporte a dropdowns accordion.
  */
 function setupMobileNav() {
     const toggle = document.querySelector('.nav-toggle');
@@ -76,15 +77,25 @@ function setupMobileNav() {
         toggle.classList.toggle('active');
         toggle.setAttribute('aria-expanded', isOpen);
         toggle.setAttribute('aria-label', isOpen ? 'Fechar menu' : 'Abrir menu');
+
+        // Fechar dropdowns quando hamburger fecha
+        if (!isOpen) {
+            nav.querySelectorAll('.nav-dropdown.open').forEach(d => {
+                d.classList.remove('open');
+                const btn = d.querySelector('.nav-dropdown-toggle');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            });
+        }
     });
 
-    // Fechar ao clicar em link
-    nav.querySelectorAll('a, .nav-logout').forEach(link => {
-        link.addEventListener('click', () => {
+    // Fechar hamburger ao clicar em link real (nao dropdown toggle)
+    nav.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && nav.contains(link)) {
             nav.classList.remove('active');
             toggle.classList.remove('active');
             toggle.setAttribute('aria-expanded', 'false');
-        });
+        }
     });
 
     // Fechar ao clicar fora do menu
@@ -93,6 +104,96 @@ function setupMobileNav() {
             nav.classList.remove('active');
             toggle.classList.remove('active');
             toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+}
+
+/**
+ * Configura dropdowns de navegacao (hover desktop, click, teclado).
+ */
+function setupDropdowns() {
+    const isMobile = () => window.matchMedia('(max-width: 768px)').matches;
+
+    function closeAllDropdowns(except) {
+        document.querySelectorAll('.nav-dropdown.open').forEach(d => {
+            if (d !== except) {
+                d.classList.remove('open');
+                const btn = d.querySelector('.nav-dropdown-toggle');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // Click delegation para toggles
+    document.addEventListener('click', (e) => {
+        const toggle = e.target.closest('.nav-dropdown-toggle');
+        if (toggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dropdown = toggle.closest('.nav-dropdown');
+            if (!dropdown) return;
+
+            const isOpen = dropdown.classList.contains('open');
+            closeAllDropdowns(dropdown);
+            dropdown.classList.toggle('open', !isOpen);
+            toggle.setAttribute('aria-expanded', String(!isOpen));
+            return;
+        }
+
+        // Click fora fecha todos
+        if (!e.target.closest('.nav-dropdown')) {
+            closeAllDropdowns();
+        }
+    });
+
+    // Desktop: hover abre/fecha
+    document.querySelectorAll('.nav-dropdown').forEach(dropdown => {
+        let hoverTimeout;
+
+        dropdown.addEventListener('mouseenter', () => {
+            if (isMobile()) return;
+            clearTimeout(hoverTimeout);
+            closeAllDropdowns(dropdown);
+            dropdown.classList.add('open');
+            const btn = dropdown.querySelector('.nav-dropdown-toggle');
+            if (btn) btn.setAttribute('aria-expanded', 'true');
+        });
+
+        dropdown.addEventListener('mouseleave', () => {
+            if (isMobile()) return;
+            hoverTimeout = setTimeout(() => {
+                dropdown.classList.remove('open');
+                const btn = dropdown.querySelector('.nav-dropdown-toggle');
+                if (btn) btn.setAttribute('aria-expanded', 'false');
+            }, 150);
+        });
+    });
+
+    // Navegacao por teclado
+    document.addEventListener('keydown', (e) => {
+        const activeDropdown = document.querySelector('.nav-dropdown.open');
+        if (!activeDropdown) return;
+
+        const items = activeDropdown.querySelectorAll('.nav-dropdown-menu a');
+        if (items.length === 0) return;
+
+        const currentIndex = Array.from(items).indexOf(document.activeElement);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (currentIndex < 0) items[0].focus();
+            else if (currentIndex < items.length - 1) items[currentIndex + 1].focus();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (currentIndex > 0) items[currentIndex - 1].focus();
+            else activeDropdown.querySelector('.nav-dropdown-toggle')?.focus();
+        } else if (e.key === 'Escape') {
+            activeDropdown.classList.remove('open');
+            const btn = activeDropdown.querySelector('.nav-dropdown-toggle');
+            if (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+                btn.focus();
+            }
         }
     });
 }

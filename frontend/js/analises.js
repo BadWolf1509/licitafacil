@@ -33,8 +33,8 @@ const AnalisesModule = {
                 container.innerHTML = `
                     <div class="card empty-state">
                         <div class="empty-state-icon">&#128269;</div>
-                        <h3>Nenhuma analise realizada</h3>
-                        <p class="text-muted">Faca sua primeira analise de licitacao</p>
+                        <h3>Nenhuma análise realizada</h3>
+                        <p class="text-muted">Faça sua primeira análise de licitação</p>
                     </div>
                 `;
                 return;
@@ -62,8 +62,8 @@ const AnalisesModule = {
 
                 const statusText = {
                     'atende': 'Atende todos os requisitos', 'parcial': 'Atende parcialmente',
-                    'nao-atende': 'Nao atende', 'pendente': 'Aguardando processamento',
-                    'manual-falhou': 'Analise manual falhou', 'manual-vazio': 'Analise manual vazia'
+                    'nao-atende': 'Não atende', 'pendente': 'Aguardando processamento',
+                    'manual-falhou': 'Análise manual falhou', 'manual-vazio': 'Análise manual vazia'
                 }[status];
 
                 const badgeClass = {
@@ -91,7 +91,7 @@ const AnalisesModule = {
                     </div>
                 `;
             }).join('');
-        }, 'Erro ao carregar analises', { container: 'listaAnalises' });
+        }, 'Erro ao carregar análises', { container: 'listaAnalises' });
     },
 
     async carregarDetalheAnalise(id) {
@@ -110,19 +110,19 @@ const AnalisesModule = {
                 if (analise.arquivo_path) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <p>Esta analise ainda nao foi processada.</p>
+                            <p>Esta análise ainda não foi processada.</p>
                             <button class="btn btn-primary mt-2" data-action="processar" data-id="${id}">Processar Agora</button>
                         </div>
                     `;
                 } else if (hasExigencias) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="badge badge-error mb-2">&#10060; Analise falhou</div>
-                            <p>Esta analise manual nao conseguiu encontrar correspondencias.</p>
-                            <p class="text-muted"><strong>Possiveis causas:</strong></p>
+                            <div class="badge badge-error mb-2">&#10060; Análise falhou</div>
+                            <p>Esta análise manual não conseguiu encontrar correspondências.</p>
+                            <p class="text-muted"><strong>Possíveis causas:</strong></p>
                             <ul class="text-muted text-left">
-                                <li>Voce ainda nao cadastrou atestados</li>
-                                <li>Seus atestados nao possuem servicos compativeis</li>
+                                <li>Você ainda não cadastrou atestados</li>
+                                <li>Seus atestados não possuem serviços compatíveis</li>
                                 <li>Erro interno no processamento</li>
                             </ul>
                             <button class="btn btn-primary mt-2" data-action="processar" data-id="${id}">Reprocessar</button>
@@ -131,7 +131,7 @@ const AnalisesModule = {
                 } else {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <p>Esta analise manual esta vazia.</p>
+                            <p>Esta análise manual está vazia.</p>
                             <p class="text-muted">Crie uma nova analise com as exigencias desejadas.</p>
                         </div>
                     `;
@@ -142,7 +142,7 @@ const AnalisesModule = {
             container.innerHTML = analise.resultado_json.map(r => {
                 const statusIcon = r.status === 'atende' ? '&#9989;' : r.status === 'parcial' ? '&#9888;' : '&#10060;';
                 const statusClass = r.status === 'atende' ? 'success' : r.status === 'parcial' ? 'warning' : 'error';
-                const exigenciaDescricao = r.exigencia?.descricao || 'Exigencia sem descricao';
+                const exigenciaDescricao = r.exigencia?.descricao || 'Exigência sem descrição';
                 const exigenciaQuantidade = r.exigencia?.quantidade_minima;
                 const exigenciaUnidade = r.exigencia?.unidade || '-';
 
@@ -152,7 +152,7 @@ const AnalisesModule = {
                             <div>
                                 <h3>${exigenciaDescricao}</h3>
                                 <p class="text-muted">
-                                    Minimo exigido: ${formatarNumero(exigenciaQuantidade)} ${exigenciaUnidade}
+                                    Mínimo exigido: ${formatarNumero(exigenciaQuantidade)} ${exigenciaUnidade}
                                 </p>
                             </div>
                             <div class="resultado-status status-${statusClass}">
@@ -188,11 +188,11 @@ const AnalisesModule = {
                                     <span>${formatarNumero(r.soma_quantidades)} ${exigenciaUnidade}</span>
                                 </div>
                             </div>
-                        ` : '<p class="text-muted mt-2">Nenhum atestado compativel encontrado.</p>'}
+                        ` : '<p class="text-muted mt-2">Nenhum atestado compatível encontrado.</p>'}
                     </div>
                 `;
             }).join('');
-        }, 'Erro ao carregar analise', { container: 'resultadoAnalise' });
+        }, 'Erro ao carregar análise', { container: 'resultadoAnalise' });
     },
 
     voltarLista() {
@@ -259,7 +259,7 @@ const AnalisesModule = {
 
                 const result = await api.upload('/analises/?nome_licitacao=' + encodeURIComponent(nomeLicitacao), formData);
 
-                ui.showAlert('Analise criada com sucesso!', 'success');
+                ui.showAlert('Análise criada com sucesso!', 'success');
                 fecharModal('modalNovaAnalise');
                 self.arquivoSelecionado = null;
                 document.getElementById('formNovaAnalise').reset();
@@ -272,7 +272,7 @@ const AnalisesModule = {
                 }
 
             } catch (error) {
-                ui.showAlert(error.message || 'Erro ao criar analise', 'error');
+                ui.showAlert(error.message || 'Erro ao criar análise', 'error');
             } finally {
                 ui.setButtonLoading(button, false, 'btnAnaliseText', 'btnAnaliseSpinner');
             }
@@ -318,19 +318,19 @@ const AnalisesModule = {
         const exigenciaHtml = `
             <div class="exigencia-item" id="exigencia-${counter}">
                 <div class="exigencia-item-header">
-                    <span class="exigencia-item-numero">Exigencia ${counter}</span>
+                    <span class="exigencia-item-numero">Exigência ${counter}</span>
                     <button type="button" class="exigencia-item-remove" data-action="remover-exigencia" data-id="${counter}" title="Remover">
                         &times;
                     </button>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Descricao da exigencia *</label>
+                    <label class="form-label">Descrição da exigência *</label>
                     <input type="text" class="form-input" name="exigencia_descricao_${counter}" required
-                        placeholder="Ex: Execucao de pavimentacao asfaltica">
+                        placeholder="Ex: Execução de pavimentação asfáltica">
                 </div>
                 <div class="exigencia-row">
                     <div class="form-group">
-                        <label class="form-label">Quantidade minima *</label>
+                        <label class="form-label">Quantidade mínima *</label>
                         <input type="number" class="form-input" name="exigencia_quantidade_${counter}"
                             step="0.01" required placeholder="1000">
                     </div>
@@ -366,7 +366,7 @@ const AnalisesModule = {
         items.forEach((item, i) => {
             const numero = item.querySelector('.exigencia-item-numero');
             if (numero) {
-                numero.textContent = `Exigencia ${i + 1}`;
+                numero.textContent = `Exigência ${i + 1}`;
             }
         });
     },
@@ -409,7 +409,7 @@ const AnalisesModule = {
             const exigencias = self.coletarExigencias();
 
             if (exigencias.length === 0) {
-                ui.showAlert('Adicione pelo menos uma exigencia', 'error');
+                ui.showAlert('Adicione pelo menos uma exigência', 'error');
                 return;
             }
 
@@ -422,7 +422,7 @@ const AnalisesModule = {
                     exigencias: exigencias
                 });
 
-                ui.showAlert('Analise criada com sucesso!', 'success');
+                ui.showAlert('Análise criada com sucesso!', 'success');
                 fecharModal('modalNovaAnalise');
                 form.reset();
                 document.getElementById('listaExigencias').innerHTML = '';
@@ -436,7 +436,7 @@ const AnalisesModule = {
                 }
 
             } catch (error) {
-                ui.showAlert(error.message || 'Erro ao criar analise', 'error');
+                ui.showAlert(error.message || 'Erro ao criar análise', 'error');
             } finally {
                 ui.setButtonLoading(button, false, 'btnAnaliseManualText', 'btnAnaliseManualSpinner');
             }
@@ -447,24 +447,24 @@ const AnalisesModule = {
 
     async processarAnalise(id) {
         try {
-            ui.showAlert('Processando analise...', 'info');
+            ui.showAlert('Processando análise...', 'info');
             await api.post(`/analises/${id}/processar`);
-            ui.showAlert('Analise processada com sucesso!', 'success');
+            ui.showAlert('Análise processada com sucesso!', 'success');
             this.carregarAnalises();
         } catch (error) {
-            ui.showAlert(error.message || 'Erro ao processar analise', 'error');
+            ui.showAlert(error.message || 'Erro ao processar análise', 'error');
         }
     },
 
     async excluirAnalise(id) {
-        if (!await confirmAction('Tem certeza que deseja excluir esta analise?', { type: 'danger', confirmText: 'Excluir' })) return;
+        if (!await confirmAction('Tem certeza que deseja excluir esta análise?', { type: 'danger', confirmText: 'Excluir' })) return;
 
         try {
             await api.delete(`/analises/${id}`);
-            ui.showAlert('Analise excluida com sucesso!', 'success');
+            ui.showAlert('Análise excluída com sucesso!', 'success');
             this.carregarAnalises();
         } catch (error) {
-            ui.showAlert(error.message || 'Erro ao excluir analise', 'error');
+            ui.showAlert(error.message || 'Erro ao excluir análise', 'error');
         }
     }
 };

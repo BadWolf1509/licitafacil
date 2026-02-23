@@ -20,7 +20,7 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
 
     return `
         <div class="relatorio-header">
-            <h3>${Sanitize.escapeHtml(atestado.descricao_servico || 'Atestado de Capacidade Tecnica')}</h3>
+            <h3>${Sanitize.escapeHtml(atestado.descricao_servico || 'Atestado de Capacidade Técnica')}</h3>
             <div class="relatorio-info">
                 ${atestado.contratante ? `
                     <div class="relatorio-info-item">
@@ -30,7 +30,7 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
                 ` : ''}
                 ${atestado.data_emissao ? `
                     <div class="relatorio-info-item">
-                        <span class="relatorio-info-label">Data de Emissao</span>
+                        <span class="relatorio-info-label">Data de Emissão</span>
                         <span class="relatorio-info-value">${formatarDataSemHora(atestado.data_emissao)}</span>
                     </div>
                 ` : ''}
@@ -51,17 +51,17 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
                     <input type="text"
                            id="filtroResultadoInput"
                            class="form-input"
-                           placeholder="Filtrar por descricao do servico..."
+                           placeholder="Filtrar por descrição do serviço..."
                            data-action="filtrar-resultado">
                 </div>
             ` : ''}
-            <h4 class="relatorio-section-title">Servicos Consolidados (agrupados por descricao)</h4>
+            <h4 class="relatorio-section-title">Serviços Consolidados (agrupados por descrição)</h4>
             ${servicosConsolidados.length > 0 ? `
                 <table class="relatorio-table">
                     <thead>
                         <tr>
                             <th style="width: 40px;">#</th>
-                            <th>Descricao do Servico</th>
+                            <th>Descrição do Serviço</th>
                             <th style="width: 80px;">Unidade</th>
                             <th style="width: 120px;">Quantidade Total</th>
                         </tr>
@@ -77,7 +77,7 @@ export function gerarRelatorioAtestado(atestado, servicosConsolidados) {
                         `).join('')}
                     </tbody>
                 </table>
-            ` : '<p class="text-muted">Nenhum servico detalhado foi extraido deste documento.</p>'}
+            ` : '<p class="text-muted">Nenhum serviço detalhado foi extraído deste documento.</p>'}
         </div>
     `;
 }
@@ -109,17 +109,17 @@ export function gerarRelatorioGeral(dados) {
                 <input type="text"
                        id="filtroServicosInput"
                        class="form-input"
-                       placeholder="Filtrar por descricao do servico..."
+                       placeholder="Filtrar por descrição do serviço..."
                        data-action="filtrar-consolidados">
             </div>
-            <h4 class="relatorio-section-title">Servicos Consolidados de Todos os Atestados</h4>
-            <p class="text-muted" style="font-size: 0.85em; margin-bottom: 10px;">Clique em um servico para ver quais atestados compoem o total.</p>
+            <h4 class="relatorio-section-title">Serviços Consolidados de Todos os Atestados</h4>
+            <p class="text-muted" style="font-size: 0.85em; margin-bottom: 10px;">Clique em um serviço para ver quais atestados compõem o total.</p>
             ${servicosConsolidados.length > 0 ? `
                 <table class="relatorio-table">
                     <thead>
                         <tr>
                             <th style="width: 40px;">#</th>
-                            <th>Descricao do Servico</th>
+                            <th>Descrição do Serviço</th>
                             <th style="width: 80px;">Unidade</th>
                             <th style="width: 120px;">Quantidade Total</th>
                             <th style="width: 80px;">Atestados</th>
@@ -137,7 +137,7 @@ export function gerarRelatorioGeral(dados) {
                         `).join('')}
                     </tbody>
                 </table>
-            ` : '<p class="text-muted">Nenhum servico encontrado.</p>'}
+            ` : '<p class="text-muted">Nenhum serviço encontrado.</p>'}
         </div>
     `;
 }
@@ -159,7 +159,7 @@ export function gerarDetalhesServico(servico, formatarDataFn = formatarDataSemHo
                 <tr>
                     <th style="width: 40px;">#</th>
                     <th>Contratante</th>
-                    <th style="width: 120px;">Data Emissao</th>
+                    <th style="width: 120px;">Data Emissão</th>
                     <th style="width: 120px;">Quantidade</th>
                     <th style="width: 80px;">%</th>
                 </tr>

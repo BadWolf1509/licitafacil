@@ -23,11 +23,27 @@
 
         <nav class="header-nav" id="headerNav">
             <a href="dashboard.html">Dashboard</a>
-            <a href="atestados.html" class="active">Atestados</a>
-            <a href="analises.html">Análises</a>
-            <a href="admin.html" id="adminLink" class="hidden">Admin</a>
-            <a href="perfil.html">Perfil</a>
-            <a href="#" class="nav-logout">Sair</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="monitoramento.html">Monitoramento PNCP</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html" class="active">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
         </nav>
     </header>
 
@@ -40,7 +56,7 @@
             <h1>Meus Atestados</h1>
             <div class="d-flex gap-2">
                 <button class="btn btn-outline" id="btnRelatorioGeral" style="display: none;">
-                    Relatorio Geral
+                    Relatório Geral
                 </button>
                 <button class="btn btn-primary" id="btnNovoAtestado">+ Novo Atestado</button>
             </div>
@@ -51,7 +67,7 @@
             <input type="text"
                    id="filtroAtestadosInput"
                    class="form-input"
-                   placeholder="Filtrar atestados por descricao, contratante..."
+                   placeholder="Filtrar atestados por descrição, contratante..."
                    >
             <span class="filtro-contador" id="atestadosFiltradosCount"></span>
         </div>
@@ -82,7 +98,7 @@
     <div class="modal" id="modalRelatorioGeral">
         <div class="modal-content modal-relatorio-geral">
             <div class="modal-header">
-                <h2>Relatorio Consolidado - Todos os Atestados</h2>
+                <h2>Relatório Consolidado - Todos os Atestados</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div id="relatorioGeralContent">
@@ -95,7 +111,7 @@
     <div class="modal" id="modalDetalhesServico">
         <div class="modal-content modal-lg">
             <div class="modal-header">
-                <h2>Detalhes do Servico</h2>
+                <h2>Detalhes do Serviço</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <div id="detalhesServicoContent">
@@ -140,17 +156,17 @@
                 <form id="formAtestado">
                     <input type="hidden" id="atId">
                     <div class="form-group">
-                        <label class="form-label">Descricao da Obra *</label>
+                        <label class="form-label">Descrição da Obra *</label>
                         <input type="text" class="form-input" id="atDescricao" required
-                            placeholder="Ex: Execucao de pavimentacao asfaltica">
+                            placeholder="Ex: Execução de pavimentação asfáltica">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Contratante</label>
                         <input type="text" class="form-input" id="atContratante"
-                            placeholder="Nome do orgao/empresa contratante">
+                            placeholder="Nome do órgão/empresa contratante">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Data de Emissao</label>
+                        <label class="form-label">Data de Emissão</label>
                         <input type="date" class="form-input" id="atDataEmissao">
                     </div>
                     <div class="d-flex gap-2">
@@ -166,21 +182,21 @@
     <div class="modal" id="modalEditarServico">
         <div class="modal-content modal-sm">
             <div class="modal-header">
-                <h2 id="modalServicoTitle">Editar Item de Servico</h2>
+                <h2 id="modalServicoTitle">Editar Item de Serviço</h2>
                 <button class="modal-close">&times;</button>
             </div>
             <form id="formEditarServico">
                 <input type="hidden" id="editServicoAtestadoId">
                 <input type="hidden" id="editServicoIndex">
                 <div class="form-group">
-                    <label class="form-label">Item (codigo)</label>
+                    <label class="form-label">Item (código)</label>
                     <input type="text" class="form-input" id="editServicoItem"
                         placeholder="Ex: 001.03.11">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Descricao *</label>
+                    <label class="form-label">Descrição *</label>
                     <input type="text" class="form-input" id="editServicoDescricao" required
-                        placeholder="Ex: Execucao de pavimentacao asfaltica">
+                        placeholder="Ex: Execução de pavimentação asfáltica">
                 </div>
                 <div class="d-flex gap-2">
                     <div class="form-group" style="flex: 2;">
@@ -209,6 +225,7 @@
     <script src="js/realtime.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/notificacoes.js"></script>
     <script type="module" src="js/atestados/index.js"></script>
 </body>
 </html>

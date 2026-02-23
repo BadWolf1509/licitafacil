@@ -182,8 +182,8 @@ const api = {
     async request(endpoint, options = {}) {
         // Verificar conectividade antes de tentar requisicao
         if (!navigator.onLine) {
-            ui.showAlert('Sem conexao com a internet. Verifique sua conexao.', 'error');
-            throw new Error('Sem conexao com a internet');
+            ui.showAlert('Sem conexão com a internet. Verifique sua conexão.', 'error');
+            throw new Error('Sem conexão com a internet');
         }
 
         const url = CONFIG.API_URL + CONFIG.API_PREFIX + endpoint;
@@ -243,10 +243,10 @@ const api = {
                         window.location.href = 'index.html';
                         return; // Evita processamento adicional durante redirect
                     }
-                    throw new Error('Sessao expirada. Faca login novamente.');
+                    throw new Error('Sessão expirada. Faça login novamente.');
                 }
-                // Formatar mensagem de erro (pode ser string ou array de validacao do Pydantic)
-                let message = `Erro na requisicao (${response.status})`;
+                // Formatar mensagem de erro (pode ser string ou array de validação do Pydantic)
+                let message = `Erro na requisição (${response.status})`;
                 if (data && data.detail) {
                     if (Array.isArray(data.detail)) {
                         // Erro de validacao Pydantic - extrair mensagens
@@ -343,9 +343,9 @@ const api = {
                         window.location.href = 'index.html';
                         return; // Evita processamento adicional durante redirect
                     }
-                    throw new Error('Sessao expirada. Faca login novamente.');
+                    throw new Error('Sessão expirada. Faça login novamente.');
                 }
-                // Formatar mensagem de erro (pode ser string ou array de validacao do Pydantic)
+                // Formatar mensagem de erro (pode ser string ou array de validação do Pydantic)
                 let message = `Erro no upload (${response.status})`;
                 if (data && data.detail) {
                     if (Array.isArray(data.detail)) {
@@ -463,5 +463,5 @@ ui.debounce = function(fn, delay) {
 };
 
 // Deteccao de conectividade
-window.addEventListener('online', () => ui.showAlert('Conexao restaurada!', 'success'));
-window.addEventListener('offline', () => ui.showAlert('Conexao perdida. Algumas funcionalidades podem nao funcionar.', 'warning'));
+window.addEventListener('online', () => ui.showAlert('Conexão restaurada!', 'success'));
+window.addEventListener('offline', () => ui.showAlert('Conexão perdida. Algumas funcionalidades podem não funcionar.', 'warning'));

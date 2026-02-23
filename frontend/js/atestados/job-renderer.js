@@ -132,7 +132,7 @@ export function renderProcessingJobsList(jobs, lastRenderedJobs, moduleName = 'A
         const summaryParts = [];
         if (queuedCount > 0) summaryParts.push(`${queuedCount} na fila`);
         if (processingCount > 0) summaryParts.push(`${processingCount} processando`);
-        if (attentionCount > 0) summaryParts.push(`${attentionCount} com atencao`);
+        if (attentionCount > 0) summaryParts.push(`${attentionCount} com atenção`);
         const summaryText = summaryParts.join(' | ');
 
         const jobsHtml = jobs.map(job => {
@@ -186,7 +186,7 @@ export function renderProcessingJobsList(jobs, lastRenderedJobs, moduleName = 'A
                 const summaryParts = [];
                 if (queuedCount > 0) summaryParts.push(`${queuedCount} na fila`);
                 if (processingCount > 0) summaryParts.push(`${processingCount} processando`);
-                if (attentionCount > 0) summaryParts.push(`${attentionCount} com atencao`);
+                if (attentionCount > 0) summaryParts.push(`${attentionCount} com atenção`);
                 summaryElement.textContent = summaryParts.join(' | ');
             }
         }

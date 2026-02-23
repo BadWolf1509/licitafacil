@@ -23,11 +23,27 @@
 
         <nav class="header-nav" id="headerNav">
             <a href="dashboard.html">Dashboard</a>
-            <a href="atestados.html">Atestados</a>
-            <a href="analises.html">Análises</a>
-            <a href="admin.html" id="adminLink" class="hidden">Admin</a>
-            <a href="perfil.html" class="active">Perfil</a>
-            <a href="#" class="nav-logout">Sair</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Licitações <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="monitoramento.html">Monitoramento PNCP</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">Documentos <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg></button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html" class="active">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
         </nav>
     </header>
 
@@ -140,6 +156,7 @@
     <script src="js/config.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/notificacoes.js"></script>
     <script src="js/perfil.js"></script>
 </body>
 </html>
