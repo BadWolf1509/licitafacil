@@ -128,3 +128,38 @@ class PncpBuscaResponse(BaseModel):
 
 class PncpImportarRequest(BaseModel):
     observacoes: Optional[str] = None
+
+
+# ==================== Gerenciar ====================
+
+
+class GerenciarRequest(BaseModel):
+    """Payload para gerenciar uma licitação a partir de um item PNCP."""
+
+    # Dados do item PNCP
+    numero_controle_pncp: str = Field(..., min_length=1)
+    orgao_razao_social: str
+    objeto_compra: str
+    modalidade_nome: Optional[str] = None
+    uf: Optional[str] = None
+    municipio: Optional[str] = None
+    valor_estimado: Optional[Decimal] = None
+    data_abertura: Optional[datetime] = None
+    link_sistema_origem: Optional[str] = None
+    dados_completos: Optional[dict] = None
+
+    # Configurações de gerenciamento
+    status_inicial: str = "em_analise"
+    observacoes: Optional[str] = None
+    criar_lembrete: bool = True
+    antecedencia_horas: int = Field(default=24, ge=0)
+
+    # Referência ao resultado armazenado (opcional)
+    pncp_resultado_id: Optional[int] = None
+
+
+class GerenciarResponse(BaseModel):
+    licitacao_id: int
+    lembrete_id: Optional[int] = None
+    licitacao_ja_existia: bool
+    mensagem: str

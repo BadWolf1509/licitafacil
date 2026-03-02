@@ -75,3 +75,6 @@ class Messages:
     PNCP_RESULTADO_JA_IMPORTADO = "Este resultado já foi importado como licitação"
     PNCP_SYNC_INICIADA = "Sincronização manual iniciada"
     PNCP_BUSCA_ERRO = "Erro ao buscar no PNCP. Tente novamente."
+    PNCP_GERENCIAR_CRIADO = "Licitação criada e lembrete agendado."
+    PNCP_GERENCIAR_JA_EXISTIA = "Licitação já existia no sistema."
+    PNCP_GERENCIAR_SEM_DATA = "Licitação criada. Sem data de abertura para criar lembrete."

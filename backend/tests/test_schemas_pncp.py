@@ -283,3 +283,94 @@ class TestPncpResultadoStatusConstants:
         assert PncpResultadoStatus.IMPORTADO == "importado"
         assert len(PncpResultadoStatus.ALL) == 4
         assert set(PncpResultadoStatus.ALL) == {"novo", "interessante", "descartado", "importado"}
+
+
+# ==================== GerenciarRequest ====================
+
+
+class TestGerenciarRequest:
+
+    def test_valid_minimal(self):
+        from schemas.pncp import GerenciarRequest
+        data = GerenciarRequest(
+            numero_controle_pncp="01.001.000/0001-01-0001234/2026-1",
+            orgao_razao_social="Prefeitura de São Paulo",
+            objeto_compra="Contratação de TI",
+        )
+        assert data.numero_controle_pncp == "01.001.000/0001-01-0001234/2026-1"
+        assert data.criar_lembrete is True
+        assert data.antecedencia_horas == 24
+        assert data.status_inicial == "em_analise"
+
+    def test_valid_full(self):
+        from datetime import datetime
+        from decimal import Decimal
+        from schemas.pncp import GerenciarRequest
+        data = GerenciarRequest(
+            numero_controle_pncp="01.001.000/0001-01-0001234/2026-1",
+            orgao_razao_social="Prefeitura de São Paulo",
+            objeto_compra="Contratação de TI",
+            modalidade_nome="Pregão Eletrônico",
+            uf="SP",
+            municipio="São Paulo",
+            valor_estimado=Decimal("250000.00"),
+            data_abertura=datetime(2026, 3, 15, 10, 0),
+            link_sistema_origem="https://pncp.gov.br/test",
+            status_inicial="identificada",
+            observacoes="Observação teste",
+            criar_lembrete=False,
+            antecedencia_horas=48,
+            pncp_resultado_id=5,
+        )
+        assert data.criar_lembrete is False
+        assert data.antecedencia_horas == 48
+        assert data.pncp_resultado_id == 5
+
+    def test_missing_numero_controle_raises(self):
+        from pydantic import ValidationError
+        from schemas.pncp import GerenciarRequest
+        with pytest.raises(ValidationError):
+            GerenciarRequest(
+                orgao_razao_social="Prefeitura",
+                objeto_compra="TI",
+            )
+
+    def test_antecedencia_negativa_raises(self):
+        from pydantic import ValidationError
+        from schemas.pncp import GerenciarRequest
+        with pytest.raises(ValidationError):
+            GerenciarRequest(
+                numero_controle_pncp="1234",
+                orgao_razao_social="Prefeitura",
+                objeto_compra="TI",
+                antecedencia_horas=-1,
+            )
+
+
+# ==================== GerenciarResponse ====================
+
+
+class TestGerenciarResponse:
+
+    def test_valid_with_lembrete(self):
+        from schemas.pncp import GerenciarResponse
+        data = GerenciarResponse(
+            licitacao_id=42,
+            lembrete_id=7,
+            licitacao_ja_existia=False,
+            mensagem="Licitação criada com sucesso.",
+        )
+        assert data.licitacao_id == 42
+        assert data.lembrete_id == 7
+        assert data.licitacao_ja_existia is False
+
+    def test_valid_sem_lembrete(self):
+        from schemas.pncp import GerenciarResponse
+        data = GerenciarResponse(
+            licitacao_id=42,
+            lembrete_id=None,
+            licitacao_ja_existia=True,
+            mensagem="Licitação já existia.",
+        )
+        assert data.lembrete_id is None
+        assert data.licitacao_ja_existia is True
