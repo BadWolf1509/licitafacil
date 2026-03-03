@@ -16,6 +16,7 @@ Endpoints:
     POST   /pncp/sincronizar                 - Sincronização manual
 """
 import asyncio
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, status
@@ -26,7 +27,10 @@ from config import Messages
 from database import get_db
 from logging_config import get_logger, log_action
 from models import Licitacao, Usuario
+from models.lembrete import Lembrete, LembreteTipo
 from models.pncp import PncpMonitoramento, PncpResultadoStatus
+from repositories.lembrete_repository import lembrete_repository
+from repositories.licitacao_repository import licitacao_repository
 from repositories.pncp_repository import (
     pncp_monitoramento_repository,
     pncp_resultado_repository,
@@ -34,6 +38,8 @@ from repositories.pncp_repository import (
 from routers.base import AuthenticatedRouter
 from schemas import Mensagem
 from schemas.pncp import (
+    GerenciarRequest,
+    GerenciarResponse,
     PaginatedMonitoramentoResponse,
     PaginatedResultadoResponse,
     PncpBuscaResponse,
@@ -403,3 +409,122 @@ async def sincronizar_pncp(
         user_id=current_user.id,
     )
     return Mensagem(mensagem=Messages.PNCP_SYNC_INICIADA, sucesso=True)
+
+
+# ===================== Gerenciar =====================
+
+
+@router.post("/gerenciar", response_model=GerenciarResponse, status_code=201)
+def gerenciar_licitacao(
+    dados: GerenciarRequest,
+    current_user: Usuario = Depends(get_current_approved_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Cria atomicamente uma Licitação (M1) + Lembrete no calendário (M2)
+    a partir de dados de um item PNCP.
+
+    - Se a licitação já existe (mesmo numero_controle_pncp), retorna a existente.
+    - Se criar_lembrete=True e data_abertura presente, cria Lembrete com
+      data = data_abertura - antecedencia_horas.
+    - Se pncp_resultado_id fornecido, marca o PncpResultado como 'importado'.
+    """
+    from fastapi.responses import JSONResponse
+
+    # 1. Verificar duplicata
+    existente = licitacao_repository.get_by_numero_controle_pncp(
+        db, current_user.id, dados.numero_controle_pncp,
+    )
+    if existente:
+        log_action(
+            logger, "pncp_gerenciar_existente",
+            user_id=current_user.id,
+            resource_type="licitacao",
+            resource_id=existente.id,
+        )
+        return JSONResponse(
+            status_code=200,
+            content=GerenciarResponse(
+                licitacao_id=existente.id,
+                lembrete_id=None,
+                licitacao_ja_existia=True,
+                mensagem=Messages.PNCP_GERENCIAR_JA_EXISTIA,
+            ).model_dump(),
+        )
+
+    # 2. Criar Licitacao
+    numero_controle = dados.numero_controle_pncp
+    numero = (
+        f"PNCP-{numero_controle[-10:]}"
+        if len(numero_controle) > 10
+        else f"PNCP-{numero_controle}"
+    )
+    licitacao = Licitacao(
+        user_id=current_user.id,
+        numero=numero,
+        objeto=dados.objeto_compra,
+        orgao=dados.orgao_razao_social,
+        modalidade=dados.modalidade_nome or "Não informada",
+        fonte="pncp",
+        status=dados.status_inicial,
+        numero_controle_pncp=numero_controle,
+        valor_estimado=dados.valor_estimado,
+        data_abertura=dados.data_abertura,
+        uf=dados.uf,
+        municipio=dados.municipio,
+        link_sistema_origem=dados.link_sistema_origem,
+        observacoes=dados.observacoes or f"Importado do PNCP. Controle: {numero_controle}",
+    )
+    db.add(licitacao)
+    db.commit()
+    db.refresh(licitacao)
+
+    # 3. Criar Lembrete (se solicitado e data disponível)
+    lembrete_id = None
+    if dados.criar_lembrete and dados.data_abertura:
+        data_lembrete = dados.data_abertura - timedelta(hours=dados.antecedencia_horas)
+        titulo = f"Abertura: {dados.objeto_compra[:80]}"
+        lembrete = Lembrete(
+            user_id=current_user.id,
+            licitacao_id=licitacao.id,
+            titulo=titulo,
+            descricao=f"Abertura da disputa — {dados.orgao_razao_social}",
+            data_lembrete=data_lembrete,
+            data_evento=dados.data_abertura,
+            tipo=LembreteTipo.ABERTURA_LICITACAO,
+            canais=["app"],
+        )
+        db.add(lembrete)
+        db.commit()
+        db.refresh(lembrete)
+        lembrete_id = lembrete.id
+
+    # 4. Atualizar PncpResultado se fornecido
+    if dados.pncp_resultado_id:
+        from models.pncp import PncpResultadoStatus
+        resultado = pncp_resultado_repository.get_by_id_for_user(
+            db, dados.pncp_resultado_id, current_user.id,
+        )
+        if resultado:
+            resultado.status = PncpResultadoStatus.IMPORTADO
+            resultado.licitacao_id = licitacao.id
+            db.commit()
+
+    log_action(
+        logger, "pncp_gerenciar",
+        user_id=current_user.id,
+        resource_type="licitacao",
+        resource_id=licitacao.id,
+    )
+
+    mensagem = (
+        Messages.PNCP_GERENCIAR_CRIADO
+        if lembrete_id
+        else Messages.PNCP_GERENCIAR_SEM_DATA
+    )
+    return GerenciarResponse(
+        licitacao_id=licitacao.id,
+        lembrete_id=lembrete_id,
+        licitacao_ja_existia=False,
+        mensagem=mensagem,
+    )

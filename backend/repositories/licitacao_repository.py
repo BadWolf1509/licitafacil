@@ -144,5 +144,18 @@ class LicitacaoRepository(BaseRepository[Licitacao]):
             .all()
         )
 
+    def get_by_numero_controle_pncp(
+        self, db: Session, user_id: int, numero_controle_pncp: str
+    ) -> Optional["Licitacao"]:
+        """Retorna licitação pelo numero_controle_pncp para um usuário."""
+        return (
+            db.query(Licitacao)
+            .filter(
+                Licitacao.user_id == user_id,
+                Licitacao.numero_controle_pncp == numero_controle_pncp,
+            )
+            .first()
+        )
+
 
 licitacao_repository = LicitacaoRepository()

@@ -521,3 +521,88 @@ class TestSincronizar:
         assert response.status_code == 200
         data = response.json()
         assert data["sucesso"] is True
+
+
+# ===========================================================================
+# POST /pncp/gerenciar
+# ===========================================================================
+
+
+class TestGerenciar:
+    """Testa o endpoint POST /pncp/gerenciar."""
+
+    BASE_PAYLOAD = {
+        "numero_controle_pncp": "01.001.000/0001-01-0001/2026-1",
+        "orgao_razao_social": "Prefeitura de São Paulo",
+        "objeto_compra": "Contratação de TI",
+        "modalidade_nome": "Pregão Eletrônico",
+        "uf": "SP",
+        "valor_estimado": 250000.00,
+        "data_abertura": "2026-03-15T10:00:00",
+        "criar_lembrete": True,
+        "antecedencia_horas": 24,
+    }
+
+    @patch("routers.pncp.log_action")
+    @patch("routers.pncp.licitacao_repository")
+    def test_gerenciar_cria_licitacao_e_lembrete(
+        self, mock_lic_repo, mock_log, client, mock_db
+    ):
+        """Deve criar licitação nova + lembrete e retornar IDs."""
+        mock_lic_repo.get_by_numero_controle_pncp.return_value = None
+
+        id_counter = [0]
+        def mock_refresh(obj):
+            id_counter[0] += 1
+            obj.id = id_counter[0]
+        mock_db.refresh = mock_refresh
+
+        response = client.post("/pncp/gerenciar", json=self.BASE_PAYLOAD)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["licitacao_ja_existia"] is False
+        assert "licitacao_id" in data
+
+    @patch("routers.pncp.log_action")
+    @patch("routers.pncp.licitacao_repository")
+    def test_gerenciar_licitacao_ja_existia(
+        self, mock_lic_repo, mock_log, client
+    ):
+        """Se licitação já existe, retorna existente com licitacao_ja_existia=True."""
+        mock_existente = MagicMock()
+        mock_existente.id = 99
+        mock_lic_repo.get_by_numero_controle_pncp.return_value = mock_existente
+
+        response = client.post("/pncp/gerenciar", json=self.BASE_PAYLOAD)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["licitacao_ja_existia"] is True
+        assert data["licitacao_id"] == 99
+
+    @patch("routers.pncp.log_action")
+    @patch("routers.pncp.licitacao_repository")
+    def test_gerenciar_sem_data_abertura_nao_cria_lembrete(
+        self, mock_lic_repo, mock_log, client, mock_db
+    ):
+        """Se data_abertura ausente, cria licitação mas não cria lembrete."""
+        mock_lic_repo.get_by_numero_controle_pncp.return_value = None
+        payload = {**self.BASE_PAYLOAD, "data_abertura": None, "criar_lembrete": True}
+
+        id_counter = [0]
+        def mock_refresh(obj):
+            id_counter[0] += 1
+            obj.id = id_counter[0]
+        mock_db.refresh = mock_refresh
+
+        response = client.post("/pncp/gerenciar", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["lembrete_id"] is None
+
+    def test_gerenciar_payload_invalido(self, client):
+        """Payload sem numero_controle_pncp → 422."""
+        response = client.post("/pncp/gerenciar", json={
+            "orgao_razao_social": "Pref",
+            "objeto_compra": "TI",
+        })
+        assert response.status_code == 422
