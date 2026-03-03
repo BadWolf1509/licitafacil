@@ -51,6 +51,7 @@ from schemas.pncp import (
     PncpResultadoResponse,
     PncpResultadoStatusUpdate,
 )
+from services.pncp.client import pncp_client
 from services.pncp.mapper import pncp_mapper
 from utils.pagination import PaginationParams, paginate_query
 
@@ -301,35 +302,41 @@ def importar_resultado(
 async def buscar_pncp(
     data_inicial: str = Query(..., description="Data abertura inicial YYYYMMDD"),
     data_final: str = Query(..., description="Data abertura final YYYYMMDD"),
-    codigo_modalidade: str = Query(..., description="Código da modalidade (obrigatório na API PNCP)"),
+    codigo_modalidade: Optional[str] = Query(
+        None,
+        description="Código da modalidade PNCP. Se omitido, busca nas modalidades padrão.",
+    ),
     uf: Optional[str] = Query(None),
+    valor_minimo: Optional[float] = Query(None, description="Filtro client-side de valor mínimo"),
+    valor_maximo: Optional[float] = Query(None, description="Filtro client-side de valor máximo"),
     current_user: Usuario = Depends(get_current_approved_user),
 ):
-    """Busca no PNCP filtrando por data de abertura de proposta."""
+    """Busca no PNCP com filtros ricos. Filtragem por valor é client-side."""
     from datetime import datetime, timedelta
 
-    from services.pncp.client import pncp_client
+    # Modalidades a iterar
+    MODALIDADES_PADRAO = ["4", "5", "6", "7", "8"]
+    modalidades = [codigo_modalidade] if codigo_modalidade else MODALIDADES_PADRAO
 
     try:
-        # A API PNCP só filtra por data de publicação.
-        # Na prática, publicação e abertura diferem em 0-7 dias.
-        # Recuamos 7 dias na publicação e filtramos por abertura.
         dt_ini = datetime.strptime(data_inicial, "%Y%m%d")
         dt_fim = datetime.strptime(data_final, "%Y%m%d")
         pub_inicial = (dt_ini - timedelta(days=7)).strftime("%Y%m%d")
 
-        kwargs = {"codigo_modalidade": codigo_modalidade}
-        if uf:
-            kwargs["uf"] = uf
+        todos_items = []
+        for modalidade in modalidades:
+            kwargs = {"codigo_modalidade": modalidade}
+            if uf:
+                kwargs["uf"] = uf
+            items = await pncp_client.buscar_todas_paginas(
+                data_inicial=pub_inicial,
+                data_final=data_final,
+                max_paginas=3,
+                **kwargs,
+            )
+            todos_items.extend(items)
 
-        todos_items = await pncp_client.buscar_todas_paginas(
-            data_inicial=pub_inicial,
-            data_final=data_final,
-            max_paginas=5,
-            **kwargs,
-        )
-
-        # Filtrar por dataAberturaProposta dentro do range solicitado
+        # Filtrar por dataAberturaProposta dentro do range
         filtrados = []
         for item in todos_items:
             abertura_str = item.get("dataAberturaProposta")
@@ -339,12 +346,31 @@ async def buscar_pncp(
                 abertura = datetime.fromisoformat(abertura_str)
             except (ValueError, TypeError):
                 continue
-            if dt_ini <= abertura <= dt_fim.replace(hour=23, minute=59, second=59):
-                filtrados.append(item)
+            if not (dt_ini <= abertura <= dt_fim.replace(hour=23, minute=59, second=59)):
+                continue
+
+            # Filtrar por valor (client-side)
+            valor = item.get("valorTotalEstimado")
+            if valor_minimo is not None and valor is not None and float(valor) < valor_minimo:
+                continue
+            if valor_maximo is not None and valor is not None and float(valor) > valor_maximo:
+                continue
+
+            filtrados.append(item)
+
+        # Deduplicar por numeroControlePNCP (somente quando presente e não vazio)
+        vistos = set()
+        unicos = []
+        for item in filtrados:
+            chave = item.get("numeroControlePNCP") or None
+            if chave is None or chave not in vistos:
+                if chave is not None:
+                    vistos.add(chave)
+                unicos.append(item)
 
         return PncpBuscaResponse(
-            data=filtrados,
-            total_registros=len(filtrados),
+            data=unicos,
+            total_registros=len(unicos),
             total_paginas=1,
             numero_pagina=1,
             paginas_restantes=0,

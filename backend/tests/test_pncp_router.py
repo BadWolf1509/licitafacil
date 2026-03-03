@@ -402,12 +402,17 @@ class TestBuscaPncp:
         response = client.get("/pncp/busca")
         assert response.status_code == 422
 
-    def test_busca_missing_modalidade(self, client):
-        """codigo_modalidade is required by PNCP API."""
-        response = client.get(
-            "/pncp/busca?data_inicial=20260101&data_final=20260115"
-        )
-        assert response.status_code == 422
+    def test_busca_sem_modalidade_retorna_200(self, client):
+        """codigo_modalidade é opcional — quando omitido, endpoint usa modalidades padrão."""
+        with patch(
+            "services.pncp.client.pncp_client.buscar_todas_paginas",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            response = client.get(
+                "/pncp/busca?data_inicial=20260101&data_final=20260115"
+            )
+        assert response.status_code == 200
 
     def test_busca_filters_by_abertura_date(self, client):
         """Results are filtered by dataAberturaProposta within requested range."""
@@ -662,3 +667,83 @@ class TestGerenciar:
         data = response.json()
         assert data["licitacao_ja_existia"] is False
         mock_resultado_repo.get_by_id_for_user.assert_called_once()
+
+
+# ===========================================================================
+# GET /busca — enhanced
+# ===========================================================================
+
+
+class TestBuscaEnhanced:
+    """Testa a versão aprimorada do endpoint GET /busca."""
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_sem_modalidade_usa_default(self, mock_client, client):
+        """Sem codigo_modalidade, deve iterar modalidades padrão."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[])
+
+        response = client.get("/pncp/busca?data_inicial=20260301&data_final=20260331")
+        assert response.status_code == 200
+        # Client deve ter sido chamado múltiplas vezes (1 por modalidade padrão)
+        assert mock_client.buscar_todas_paginas.call_count >= 1
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_com_modalidade_especifica(self, mock_client, client):
+        """Com codigo_modalidade, deve usar apenas essa modalidade."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[])
+
+        response = client.get(
+            "/pncp/busca?data_inicial=20260301&data_final=20260331&codigo_modalidade=6"
+        )
+        assert response.status_code == 200
+        assert mock_client.buscar_todas_paginas.call_count == 1
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_filtra_por_valor_minimo(self, mock_client, client):
+        """Itens abaixo de valor_minimo devem ser excluídos."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 10000,
+                "numeroControlePNCP": "A",
+            },
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 200000,
+                "numeroControlePNCP": "B",
+            },
+        ])
+
+        response = client.get(
+            "/pncp/busca?data_inicial=20260301&data_final=20260331"
+            "&codigo_modalidade=6&valor_minimo=50000"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_registros"] == 1
+        assert data["data"][0]["numeroControlePNCP"] == "B"
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_filtra_por_valor_maximo(self, mock_client, client):
+        """Itens acima de valor_maximo devem ser excluídos."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 100000,
+                "numeroControlePNCP": "C",
+            },
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 2000000,
+                "numeroControlePNCP": "D",
+            },
+        ])
+
+        response = client.get(
+            "/pncp/busca?data_inicial=20260301&data_final=20260331"
+            "&codigo_modalidade=6&valor_maximo=500000"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_registros"] == 1
+        assert data["data"][0]["numeroControlePNCP"] == "C"
