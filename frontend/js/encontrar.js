@@ -114,6 +114,11 @@ const EncontrarModule = {
         document.getElementById('resultadosFilterMonitor')?.addEventListener('change', () => {
             self.carregarResultadosAuto(1);
         });
+
+        // Ordenação dos resultados de busca
+        document.getElementById('resultadosOrdem')?.addEventListener('change', e => {
+            self.ordenarResultados(e.target.value);
+        });
     },
 
     // === FILTROS ===
@@ -216,6 +221,10 @@ const EncontrarModule = {
             const totalPaginas = Math.ceil(total / this.pageSize) || 1;
 
             this.resultados = items; // guarda todos para paginação
+            this._resultadosAtuais = [...items]; // cópia imutável para re-ordenação
+            // Resetar select de ordem ao fazer nova busca
+            const ordemEl = document.getElementById('resultadosOrdem');
+            if (ordemEl) ordemEl.value = 'data_publicacao_desc';
             this.renderResultados(pagItems);
             this.renderToolbar(total);
             this.renderPaginacao('buscaPaginacao', pagina, totalPaginas);
@@ -338,6 +347,39 @@ const EncontrarModule = {
         if (!toolbar || !count) return;
         toolbar.classList.remove('hidden');
         count.textContent = `${total.toLocaleString('pt-BR')} resultado${total !== 1 ? 's' : ''}`;
+    },
+
+    ordenarResultados(criterio) {
+        if (!this._resultadosAtuais?.length) return;
+        const sorted = [...this._resultadosAtuais];
+        switch (criterio) {
+            case 'data_abertura_asc':
+                sorted.sort((a, b) => {
+                    const da = a.dataAberturaProposta ? new Date(a.dataAberturaProposta) : new Date(0);
+                    const db = b.dataAberturaProposta ? new Date(b.dataAberturaProposta) : new Date(0);
+                    return da - db;
+                });
+                break;
+            case 'valor_desc':
+                sorted.sort((a, b) => (Number(b.valorTotalEstimado) || 0) - (Number(a.valorTotalEstimado) || 0));
+                break;
+            case 'valor_asc':
+                sorted.sort((a, b) => (Number(a.valorTotalEstimado) || 0) - (Number(b.valorTotalEstimado) || 0));
+                break;
+            case 'data_publicacao_desc':
+            default:
+                sorted.sort((a, b) => {
+                    const da = a.dataPublicacao ? new Date(a.dataPublicacao) : new Date(0);
+                    const db = b.dataPublicacao ? new Date(b.dataPublicacao) : new Date(0);
+                    return db - da;
+                });
+        }
+        this.resultados = sorted;
+        this.paginaAtual = 1;
+        const pagItems = sorted.slice(0, this.pageSize);
+        const totalPaginas = Math.ceil(sorted.length / this.pageSize) || 1;
+        this.renderResultados(pagItems);
+        this.renderPaginacao('buscaPaginacao', 1, totalPaginas);
     },
 
     renderPaginacao(containerId, paginaAtual, totalPaginas) {
