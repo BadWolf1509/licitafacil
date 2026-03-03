@@ -685,7 +685,7 @@ class TestBuscaEnhanced:
         response = client.get("/pncp/busca?data_inicial=20260301&data_final=20260331")
         assert response.status_code == 200
         # Client deve ter sido chamado múltiplas vezes (1 por modalidade padrão)
-        assert mock_client.buscar_todas_paginas.call_count >= 1
+        assert mock_client.buscar_todas_paginas.call_count == 5  # len(MODALIDADES_PADRAO)
 
     @patch("routers.pncp.pncp_client")
     def test_busca_com_modalidade_especifica(self, mock_client, client):
@@ -747,3 +747,59 @@ class TestBuscaEnhanced:
         data = response.json()
         assert data["total_registros"] == 1
         assert data["data"][0]["numeroControlePNCP"] == "C"
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_deduplica_por_numero_controle(self, mock_client, client):
+        """Itens com mesmo numeroControlePNCP devem ser deduplicados."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 100000,
+                "numeroControlePNCP": "DUPLICADO-01",
+            },
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 200000,
+                "numeroControlePNCP": "DUPLICADO-01",  # duplicado
+            },
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 300000,
+                "numeroControlePNCP": "UNICO-02",
+            },
+        ])
+
+        response = client.get(
+            "/pncp/busca?data_inicial=20260301&data_final=20260331&codigo_modalidade=6"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_registros"] == 2  # DUPLICADO-01 aparece só uma vez
+        numeros = [item["numeroControlePNCP"] for item in data["data"]]
+        assert numeros.count("DUPLICADO-01") == 1
+
+    @patch("routers.pncp.pncp_client")
+    def test_busca_item_sem_valor_passa_filtro(self, mock_client, client):
+        """Itens sem valorTotalEstimado passam mesmo quando filtro de valor está ativo."""
+        mock_client.buscar_todas_paginas = AsyncMock(return_value=[
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "numeroControlePNCP": "SEM-VALOR",
+                # valorTotalEstimado ausente
+            },
+            {
+                "dataAberturaProposta": "2026-03-15T10:00:00",
+                "valorTotalEstimado": 5000,
+                "numeroControlePNCP": "ABAIXO-MINIMO",
+            },
+        ])
+
+        response = client.get(
+            "/pncp/busca?data_inicial=20260301&data_final=20260331"
+            "&codigo_modalidade=6&valor_minimo=50000"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        # Item sem valor passa; item abaixo do mínimo é excluído
+        assert data["total_registros"] == 1
+        assert data["data"][0]["numeroControlePNCP"] == "SEM-VALOR"

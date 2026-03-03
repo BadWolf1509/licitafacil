@@ -16,7 +16,7 @@ Endpoints:
     POST   /pncp/sincronizar                 - Sincronização manual
 """
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, status
@@ -57,6 +57,8 @@ from utils.pagination import PaginationParams, paginate_query
 
 logger = get_logger("routers.pncp")
 router = AuthenticatedRouter(prefix="/pncp", tags=["PNCP"])
+
+MODALIDADES_PADRAO = ["4", "5", "6", "7", "8"]
 
 
 # ===================== Monitoramentos =====================
@@ -312,15 +314,13 @@ async def buscar_pncp(
     current_user: Usuario = Depends(get_current_approved_user),
 ):
     """Busca no PNCP com filtros ricos. Filtragem por valor é client-side."""
-    from datetime import datetime, timedelta
-
     # Modalidades a iterar
-    MODALIDADES_PADRAO = ["4", "5", "6", "7", "8"]
     modalidades = [codigo_modalidade] if codigo_modalidade else MODALIDADES_PADRAO
 
     try:
         dt_ini = datetime.strptime(data_inicial, "%Y%m%d")
         dt_fim = datetime.strptime(data_final, "%Y%m%d")
+        # Lookback de 7 dias na publicação para capturar licitações publicadas antes do período de abertura
         pub_inicial = (dt_ini - timedelta(days=7)).strftime("%Y%m%d")
 
         todos_items = []
@@ -350,6 +350,7 @@ async def buscar_pncp(
                 continue
 
             # Filtrar por valor (client-side)
+            # Nota: itens sem valorTotalEstimado passam sem filtrar (valor não declarado)
             valor = item.get("valorTotalEstimado")
             if valor_minimo is not None and valor is not None and float(valor) < valor_minimo:
                 continue
@@ -375,6 +376,8 @@ async def buscar_pncp(
             numero_pagina=1,
             paginas_restantes=0,
         )
+    except HTTPException:
+        raise
     except Exception:
         logger.error("Erro na busca PNCP", exc_info=True)
         raise HTTPException(
