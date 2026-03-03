@@ -665,10 +665,27 @@ const EncontrarModule = {
             if (response.licitacao_ja_existia) {
                 ui.showToast('Esta licitação já está no seu gerenciamento.', 'warning');
             } else {
+                const licitacaoId = response.licitacao_id;
                 const lembreteMsg = response.lembrete_id
-                    ? ` Lembrete criado no Calendário.`
+                    ? ' Lembrete criado no Calendário.'
                     : '';
-                ui.showToast(`Licitação adicionada!${lembreteMsg}`, 'success');
+                // Build a DOM-based toast with clickable link (ui.showToast uses textContent — no HTML)
+                const toastEl = document.createElement('div');
+                toastEl.className = 'alert alert-success';
+                toastEl.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;min-width:200px;max-width:360px;';
+                toastEl.setAttribute('role', 'alert');
+                const msg = document.createElement('span');
+                msg.textContent = `Licitação adicionada!${lembreteMsg} `;
+                toastEl.appendChild(msg);
+                if (licitacaoId) {
+                    const link = document.createElement('a');
+                    link.href = `licitacoes.html?id=${encodeURIComponent(licitacaoId)}`;
+                    link.textContent = 'Ver em Gestão →';
+                    link.style.fontWeight = '600';
+                    toastEl.appendChild(link);
+                }
+                document.body.appendChild(toastEl);
+                setTimeout(() => toastEl.remove(), 6000);
 
                 // Marcar o card como gerenciado
                 this._marcarCardGerenciado(item.numeroControlePNCP);
