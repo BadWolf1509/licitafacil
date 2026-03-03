@@ -399,6 +399,23 @@ const ui = {
     },
 
     /**
+     * Exibe um toast flutuante (não requer container fixo na página)
+     * @param {string} message - Mensagem do toast
+     * @param {string} type - Tipo: success, error, warning, info
+     */
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type}`;
+        toast.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;min-width:200px;max-width:360px;';
+        toast.setAttribute('role', 'alert');
+        const span = document.createElement('span');
+        span.textContent = message;
+        toast.appendChild(span);
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), CONFIG.TIMEOUTS.TOAST_DURATION);
+    },
+
+    /**
      * Mostra/esconde loading em um botão
      * @param {HTMLButtonElement} button - Botão
      * @param {boolean} loading - Se está carregando

@@ -15,10 +15,13 @@ const EncontrarModule = {
 
     // === INICIALIZAÇÃO ===
 
-    init() {
+    async init() {
         this.setupEventDelegation();
         this.setupFiltros();
         this.setDefaultDates();
+        // Aguardar Supabase inicializar antes de chamar API
+        // (evita race condition: mesma razão que notificacoes.js usa await loadAuthConfig())
+        await loadAuthConfig();
         this.carregarAlertas();
     },
 
@@ -503,15 +506,18 @@ const EncontrarModule = {
     },
 
     async excluirAlerta(id) {
-        confirmAction('Excluir este alerta permanentemente?', async () => {
-            try {
-                await api.delete(`/pncp/monitoramentos/${id}`);
-                ui.showToast('Alerta removido', 'success');
-                this.carregarAlertas();
-            } catch (err) {
-                ui.showToast('Erro ao excluir alerta', 'error');
-            }
+        const confirmed = await confirmAction('Excluir este alerta permanentemente?', {
+            type: 'danger',
+            confirmText: 'Excluir',
         });
+        if (!confirmed) return;
+        try {
+            await api.delete(`/pncp/monitoramentos/${id}`);
+            ui.showToast('Alerta removido', 'success');
+            this.carregarAlertas();
+        } catch (err) {
+            ui.showToast('Erro ao excluir alerta', 'error');
+        }
     },
 
     // === MODAL GERENCIAR ===
