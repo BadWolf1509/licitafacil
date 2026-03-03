@@ -13,6 +13,9 @@ const EncontrarModule = {
     // Item selecionado para gerenciar
     itemParaGerenciar: null,
 
+    // Set de numeroControlePNCP já gerenciados pelo usuário
+    licitacoesGerenciadas: new Set(),
+
     // === INICIALIZAÇÃO ===
 
     async init() {
@@ -22,7 +25,21 @@ const EncontrarModule = {
         // Aguardar Supabase inicializar antes de chamar API
         // (evita race condition: mesma razão que notificacoes.js usa await loadAuthConfig())
         await loadAuthConfig();
+        await this.carregarLicitacoesGerenciadas();
         this.carregarAlertas();
+    },
+
+    async carregarLicitacoesGerenciadas() {
+        try {
+            const data = await api.get('/licitacoes?fonte=pncp&page_size=100');
+            this.licitacoesGerenciadas = new Set(
+                (data.items || [])
+                    .map(l => l.numero_controle_pncp)
+                    .filter(Boolean)
+            );
+        } catch {
+            this.licitacoesGerenciadas = new Set();
+        }
     },
 
     // === EVENT DELEGATION ===
@@ -309,6 +326,12 @@ const EncontrarModule = {
         else if (modalidadeLower.includes('concorrência')) modalidadeClass = 'concorrencia';
         else if (modalidadeLower.includes('dispensa') || modalidadeLower.includes('inexigibilidade')) modalidadeClass = 'dispensa';
 
+        const jaGerenciada = this.licitacoesGerenciadas?.has(item.numeroControlePNCP);
+
+        const gerenciarBtn = jaGerenciada
+            ? `<span class="badge-gerenciada">&#x2713; Já gerenciada</span>`
+            : `<button class="card-btn-gerenciar" data-action="abrirGerenciar" data-index="${idx}">→ Gerenciar</button>`;
+
         if (this.viewMode === 'lista') {
             return `
             <div class="licitacao-card card-lista">
@@ -318,7 +341,7 @@ const EncontrarModule = {
                 <div class="card-meta-item">⏱ ${aberturaTexto}</div>
                 <div class="card-actions">
                     ${linkEdital !== '#' ? `<a href="${linkEdital}" target="_blank" rel="noopener noreferrer" class="card-btn-edital">Edital ↗</a>` : ''}
-                    <button class="card-btn-gerenciar" data-action="abrirGerenciar" data-index="${idx}">→ Gerenciar</button>
+                    ${gerenciarBtn}
                 </div>
             </div>`;
         }
@@ -336,7 +359,7 @@ const EncontrarModule = {
             <div class="card-abertura">⏱ Abertura: <strong>${aberturaTexto}</strong></div>
             <div class="card-actions">
                 ${linkEdital !== '#' ? `<a href="${linkEdital}" target="_blank" rel="noopener noreferrer" class="card-btn-edital">Ver Edital ↗</a>` : '<span></span>'}
-                <button class="card-btn-gerenciar" data-action="abrirGerenciar" data-index="${idx}">→ Gerenciar</button>
+                ${gerenciarBtn}
             </div>
         </div>`;
     },
@@ -728,6 +751,11 @@ const EncontrarModule = {
                 }
                 document.body.appendChild(toastEl);
                 setTimeout(() => toastEl.remove(), 6000);
+
+                // Atualizar o Set de gerenciadas para refletir em re-renderizações futuras
+                if (item.numeroControlePNCP) {
+                    this.licitacoesGerenciadas.add(item.numeroControlePNCP);
+                }
 
                 // Marcar o card como gerenciado
                 this._marcarCardGerenciado(item.numeroControlePNCP);

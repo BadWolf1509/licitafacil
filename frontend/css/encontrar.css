@@ -439,6 +439,18 @@
     cursor: default;
 }
 
+.badge-gerenciada {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--success, #16a34a);
+    background: #dcfce7;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+}
+
 /* === LISTA VIEW === */
 
 .licitacao-card.card-lista {
