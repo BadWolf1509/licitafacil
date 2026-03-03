@@ -565,6 +565,20 @@
     font-size: 0.875rem;
 }
 
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
 /* === PAGINATION === */
 
 .pagination {

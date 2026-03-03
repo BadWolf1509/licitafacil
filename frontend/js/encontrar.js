@@ -468,6 +468,7 @@ const EncontrarModule = {
         document.getElementById('alertaUFs').value = '';
         document.getElementById('alertaValMin').value = '';
         document.getElementById('alertaValMax').value = '';
+        document.querySelectorAll('#alertaModalidades input, #alertaEsferas input').forEach(el => el.checked = false);
         abrirModal('modalAlerta');
     },
 
@@ -481,6 +482,17 @@ const EncontrarModule = {
             document.getElementById('alertaUFs').value = (monitor.ufs || []).join(', ');
             document.getElementById('alertaValMin').value = monitor.valor_minimo || '';
             document.getElementById('alertaValMax').value = monitor.valor_maximo || '';
+            // Clear all checkboxes first
+            document.querySelectorAll('#alertaModalidades input, #alertaEsferas input').forEach(el => el.checked = false);
+            // Check the ones saved in the alert
+            (monitor.modalidades || []).forEach(v => {
+                const el = document.querySelector(`#alertaModalidades input[value="${CSS.escape(v)}"]`);
+                if (el) el.checked = true;
+            });
+            (monitor.esferas || []).forEach(v => {
+                const el = document.querySelector(`#alertaEsferas input[value="${CSS.escape(v)}"]`);
+                if (el) el.checked = true;
+            });
             abrirModal('modalAlerta');
         } catch (err) {
             ui.showToast('Erro ao carregar alerta', 'error');
@@ -503,6 +515,9 @@ const EncontrarModule = {
         const valMin = document.getElementById('alertaValMin')?.value;
         const valMax = document.getElementById('alertaValMax')?.value;
 
+        const modalidades = [...document.querySelectorAll('#alertaModalidades input:checked')].map(el => el.value);
+        const esferas = [...document.querySelectorAll('#alertaEsferas input:checked')].map(el => el.value);
+
         const payload = {
             nome,
             palavras_chave: palavrasStr ? palavrasStr.split(',').map(s => s.trim()).filter(Boolean) : null,
@@ -510,6 +525,8 @@ const EncontrarModule = {
             valor_minimo: valMin ? parseFloat(valMin) : null,
             valor_maximo: valMax ? parseFloat(valMax) : null,
         };
+        if (modalidades.length) payload.modalidades = modalidades;
+        if (esferas.length) payload.esferas = esferas;
 
         try {
             if (this._alertaEditId) {

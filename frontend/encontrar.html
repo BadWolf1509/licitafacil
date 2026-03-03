@@ -325,6 +325,25 @@
                         <input type="number" id="alertaValMax" class="form-control" min="0" step="1000">
                     </div>
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Modalidades (em branco = todas as principais)</label>
+                    <div class="checkbox-group" id="alertaModalidades">
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="6"> Pregão Eletrônico</label>
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="7"> Pregão Presencial</label>
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="4"> Concorrência Eletrônica</label>
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="5"> Concorrência Presencial</label>
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="8"> Dispensa de Licitação</label>
+                        <label class="checkbox-label"><input type="checkbox" name="modalidade" value="9"> Inexigibilidade</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Esfera</label>
+                    <div class="checkbox-group" id="alertaEsferas">
+                        <label class="checkbox-label"><input type="checkbox" name="esfera" value="F"> Federal</label>
+                        <label class="checkbox-label"><input type="checkbox" name="esfera" value="E"> Estadual</label>
+                        <label class="checkbox-label"><input type="checkbox" name="esfera" value="M"> Municipal</label>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" data-action="fecharModalAlerta">Cancelar</button>
