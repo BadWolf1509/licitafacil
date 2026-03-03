@@ -157,6 +157,10 @@
                 Meus Alertas
                 <span class="tab-badge tab-badge-blue hidden" id="alertasBadge">0</span>
             </button>
+            <button class="encontrar-tab" data-action="switchTab" data-tab="resultados">
+                Resultados Automáticos
+                <span class="tab-badge tab-badge-green hidden" id="resultadosBadge">0</span>
+            </button>
         </div>
 
         <!-- Tab: Busca -->
@@ -209,6 +213,33 @@
                     <p>Crie alertas para receber novos resultados automaticamente.</p>
                 </div>
             </div>
+        </div>
+
+        <!-- Tab: Resultados Automáticos -->
+        <div id="tabResultados" class="tab-content hidden">
+            <div class="resultados-auto-toolbar">
+                <p class="text-muted">Licitações encontradas automaticamente pelos seus alertas</p>
+                <div class="resultados-auto-filters">
+                    <select id="resultadosFilterStatus" class="filter-select">
+                        <option value="">Todos os status</option>
+                        <option value="novo">Novos</option>
+                        <option value="interessante">Interessantes</option>
+                        <option value="descartado">Descartados</option>
+                        <option value="importado">Importados</option>
+                    </select>
+                    <select id="resultadosFilterMonitor" class="filter-select">
+                        <option value="">Todos os alertas</option>
+                        <!-- preenchido via JS -->
+                    </select>
+                </div>
+            </div>
+            <div id="resultadosAutoGrid" class="resultados-auto-grid">
+                <div class="empty-state" id="emptyStateResultados">
+                    <p>Nenhum resultado encontrado pelos alertas automáticos.</p>
+                    <p>Configure alertas em "Meus Alertas" para receber resultados automaticamente.</p>
+                </div>
+            </div>
+            <div class="pagination hidden" id="resultadosPaginacao"></div>
         </div>
     </div>
 

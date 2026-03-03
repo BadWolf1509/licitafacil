@@ -81,6 +81,18 @@ const EncontrarModule = {
                 case 'paginaBusca':
                     self.buscar(parseInt(btn.dataset.page));
                     break;
+                case 'marcarInteressante':
+                    self.marcarStatusResultado(btn.dataset.id, 'interessante');
+                    break;
+                case 'marcarDescartado':
+                    self.marcarStatusResultado(btn.dataset.id, 'descartado');
+                    break;
+                case 'importarResultado':
+                    self.importarResultado(btn.dataset.id);
+                    break;
+                case 'paginacaoResultadosAuto':
+                    self.carregarResultadosAuto(parseInt(btn.dataset.page));
+                    break;
             }
         });
 
@@ -93,6 +105,14 @@ const EncontrarModule = {
         document.getElementById('gerenciarCriarLembrete')?.addEventListener('change', function () {
             const config = document.getElementById('lembreteConfig');
             if (config) config.classList.toggle('hidden', !this.checked);
+        });
+
+        // Filtros de Resultados Automáticos
+        document.getElementById('resultadosFilterStatus')?.addEventListener('change', () => {
+            self.carregarResultadosAuto(1);
+        });
+        document.getElementById('resultadosFilterMonitor')?.addEventListener('change', () => {
+            self.carregarResultadosAuto(1);
         });
     },
 
@@ -350,8 +370,10 @@ const EncontrarModule = {
         });
         document.getElementById('tabBusca').classList.toggle('hidden', tab !== 'busca');
         document.getElementById('tabAlertas').classList.toggle('hidden', tab !== 'alertas');
+        document.getElementById('tabResultados').classList.toggle('hidden', tab !== 'resultados');
 
         if (tab === 'alertas') this.carregarAlertas();
+        if (tab === 'resultados') this.carregarResultadosAuto();
     },
 
     // === VIEW MODE ===
@@ -383,6 +405,14 @@ const EncontrarModule = {
             if (badge && monitores.length > 0) {
                 badge.textContent = monitores.length;
                 badge.classList.remove('hidden');
+            }
+
+            // Preencher select de monitor no filtro de Resultados Automáticos
+            const filterMonitor = document.getElementById('resultadosFilterMonitor');
+            if (filterMonitor) {
+                const valorAtual = filterMonitor.value;
+                filterMonitor.innerHTML = '<option value="">Todos os alertas</option>' +
+                    monitores.map(m => `<option value="${m.id}"${m.id == valorAtual ? ' selected' : ''}>${Sanitize.escapeHtml(m.nome)}</option>`).join('');
             }
         }, 'Erro ao carregar alertas', { container: 'alertasGrid' });
     },
@@ -654,6 +684,149 @@ const EncontrarModule = {
                 }
             }
         });
+    },
+
+    // === RESULTADOS AUTOMÁTICOS ===
+
+    async carregarResultadosAuto(page = 1) {
+        const status = document.getElementById('resultadosFilterStatus')?.value || '';
+        const monitorId = document.getElementById('resultadosFilterMonitor')?.value || '';
+        const params = new URLSearchParams({ page, page_size: 20 });
+        if (status) params.set('status', status);
+        if (monitorId) params.set('monitoramento_id', monitorId);
+        try {
+            const data = await api.get(`/pncp/resultados?${params}`);
+            this.renderResultadosAuto(data.items || []);
+            this.renderPaginacaoResultados(data, page);
+            const badge = document.getElementById('resultadosBadge');
+            if (badge) {
+                badge.textContent = data.total || 0;
+                badge.classList.toggle('hidden', !data.total);
+            }
+        } catch (err) {
+            ui.showAlert('resultadosAutoGrid', 'Erro ao carregar resultados automáticos', 'error');
+        }
+    },
+
+    renderResultadosAuto(resultados) {
+        const container = document.getElementById('resultadosAutoGrid');
+        if (!container) return;
+
+        if (!resultados || resultados.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" id="emptyStateResultados">
+                    <p>Nenhum resultado encontrado pelos alertas automáticos.</p>
+                    <p>Configure alertas em "Meus Alertas" para receber resultados automaticamente.</p>
+                </div>`;
+            return;
+        }
+
+        const statusLabels = {
+            novo: 'Novo',
+            interessante: 'Interessante',
+            descartado: 'Descartado',
+            importado: 'Importado',
+        };
+
+        container.innerHTML = resultados.map(r => {
+            const objeto = Sanitize.escapeHtml(r.objeto_compra || 'Sem descrição');
+            const orgao = Sanitize.escapeHtml(r.orgao_razao_social || 'Órgão não informado');
+            const uf = Sanitize.escapeHtml(r.uf || '');
+            const municipio = Sanitize.escapeHtml(r.municipio || '');
+            const modalidade = Sanitize.escapeHtml(r.modalidade_nome || '');
+            const status = r.status || 'novo';
+            const statusLabel = statusLabels[status] || status;
+
+            const localTexto = [uf, municipio].filter(Boolean).join(' — ');
+
+            const valorTexto = r.valor_estimado != null
+                ? `R$ ${parseFloat(r.valor_estimado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                : 'Valor não estimado';
+
+            let aberturaTexto = '';
+            if (r.data_abertura) {
+                const dt = new Date(r.data_abertura);
+                aberturaTexto = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+
+            // Botões de ação
+            const acoes = [];
+            if (status !== 'interessante') {
+                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarInteressante" data-id="${r.id}" title="Marcar como interessante">&#9733; Interessante</button>`);
+            }
+            if (status !== 'descartado') {
+                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarDescartado" data-id="${r.id}" title="Descartar">Descartar</button>`);
+            }
+            if (r.licitacao_id) {
+                acoes.push(`<a href="licitacoes.html?id=${r.licitacao_id}" class="btn btn-sm btn-ghost">Ver em Gestão &rarr;</a>`);
+            } else if (status !== 'importado') {
+                acoes.push(`<button class="btn btn-sm btn-primary" data-action="importarResultado" data-id="${r.id}" title="Importar para Gestão">&rarr; Gerenciar</button>`);
+            }
+            if (r.link_sistema_origem) {
+                const link = Sanitize.escapeHtml(r.link_sistema_origem);
+                acoes.push(`<a href="${link}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-ghost">Ver no PNCP &#8599;</a>`);
+            }
+
+            return `
+            <div class="resultado-auto-card">
+                <div class="card-title">${objeto}</div>
+                <div class="card-meta">${orgao}${localTexto ? ` &nbsp;&middot;&nbsp; ${localTexto}` : ''}</div>
+                ${modalidade ? `<div class="card-meta">${modalidade}</div>` : ''}
+                <div class="card-footer">
+                    <div>
+                        <span class="status-badge status-${status}">${statusLabel}</span>
+                        ${aberturaTexto ? `<span class="card-meta" style="margin-left:0.5rem">Abertura: ${aberturaTexto}</span>` : ''}
+                    </div>
+                    <div class="card-meta" style="font-weight:600;color:var(--text-primary)">${valorTexto}</div>
+                </div>
+                <div class="resultado-acoes">${acoes.join('')}</div>
+            </div>`;
+        }).join('');
+    },
+
+    renderPaginacaoResultados(data, currentPage) {
+        const container = document.getElementById('resultadosPaginacao');
+        if (!container) return;
+        const totalPaginas = data.total_pages || 1;
+        if (totalPaginas <= 1) {
+            container.classList.add('hidden');
+            return;
+        }
+        container.classList.remove('hidden');
+        const paginas = [];
+        paginas.push(`<button ${currentPage === 1 ? 'disabled' : ''} data-action="paginacaoResultadosAuto" data-page="${currentPage - 1}">&#8249;</button>`);
+        for (let i = 1; i <= totalPaginas; i++) {
+            if (i === 1 || i === totalPaginas || Math.abs(i - currentPage) <= 2) {
+                paginas.push(`<button class="${i === currentPage ? 'active' : ''}" data-action="paginacaoResultadosAuto" data-page="${i}">${i}</button>`);
+            } else if (Math.abs(i - currentPage) === 3) {
+                paginas.push(`<span style="padding:0 4px;color:var(--text-muted)">&hellip;</span>`);
+            }
+        }
+        paginas.push(`<button ${currentPage === totalPaginas ? 'disabled' : ''} data-action="paginacaoResultadosAuto" data-page="${currentPage + 1}">&#8250;</button>`);
+        container.innerHTML = paginas.join('');
+    },
+
+    async marcarStatusResultado(id, status) {
+        try {
+            await api.patch(`/pncp/resultados/${id}/status`, { status });
+            ui.showToast(`Status atualizado para "${status}"`, 'success');
+            this.carregarResultadosAuto();
+        } catch (err) {
+            ui.showToast('Erro ao atualizar status', 'error');
+        }
+    },
+
+    async importarResultado(id) {
+        try {
+            const response = await api.post(`/pncp/resultados/${id}/importar`, { observacoes: '' });
+            const licitacaoId = response.licitacao_id;
+            const link = licitacaoId ? ` <a href="licitacoes.html?id=${licitacaoId}" style="color:inherit;text-decoration:underline">Ver licitação</a>` : '';
+            ui.showToast(`Licitação importada com sucesso!${link}`, 'success');
+            this.carregarResultadosAuto();
+        } catch (err) {
+            const msg = err?.detail || 'Erro ao importar resultado';
+            ui.showToast(Sanitize.escapeHtml(msg), 'error');
+        }
     },
 };
 
