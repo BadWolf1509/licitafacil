@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LicitaFácil - Encontrar Licitações</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/encontrar.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="dashboard.html" class="header-logo">LicitaFácil</a>
+        <button class="nav-toggle" aria-label="Abrir menu" aria-expanded="false">
+            <span class="hamburger"></span>
+        </button>
+        <nav class="header-nav" id="headerNav">
+            <a href="dashboard.html">Dashboard</a>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle active" aria-haspopup="true" aria-expanded="false">
+                    Licitações
+                    <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg>
+                </button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="licitacoes.html">Gestão</a>
+                    <a href="encontrar.html" class="active">Encontrar Licitações</a>
+                    <a href="calendario.html">Calendário</a>
+                </div>
+            </div>
+            <div class="nav-dropdown" data-dropdown>
+                <button class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false">
+                    Documentos
+                    <svg class="nav-dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5l3 3 3-3"/></svg>
+                </button>
+                <div class="nav-dropdown-menu" role="menu">
+                    <a href="atestados.html">Atestados</a>
+                    <a href="analises.html">Análises</a>
+                    <a href="documentos.html">Documentos</a>
+                </div>
+            </div>
+            <div class="nav-utility">
+                <a href="admin.html" id="adminLink" class="hidden">Admin</a>
+                <a href="perfil.html">Perfil</a>
+                <a href="#" class="nav-logout">Sair</a>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container">
+        <div id="notificacoesBell"></div>
+
+        <!-- Page Header -->
+        <div class="page-header">
+            <h1>Encontrar Licitações</h1>
+            <p>Busque oportunidades no Portal Nacional de Contratações Públicas (PNCP)</p>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="encontrar-search-bar">
+            <div class="search-input-wrapper">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="9" r="7"/><path d="M16 16l-3.5-3.5"/>
+                </svg>
+                <input
+                    type="text"
+                    id="searchKeywords"
+                    class="search-input"
+                    placeholder="Buscar por objeto, palavras-chave..."
+                    autocomplete="off"
+                />
+            </div>
+            <button class="btn btn-primary search-btn" data-action="buscar">Buscar</button>
+        </div>
+
+        <!-- Quick Filters -->
+        <div class="encontrar-filters">
+            <div class="filter-group">
+                <label class="filter-label">UF</label>
+                <select id="filterUF" class="filter-select" multiple size="1">
+                    <option value="">Todas</option>
+                    <option value="AC">AC</option><option value="AL">AL</option>
+                    <option value="AP">AP</option><option value="AM">AM</option>
+                    <option value="BA">BA</option><option value="CE">CE</option>
+                    <option value="DF">DF</option><option value="ES">ES</option>
+                    <option value="GO">GO</option><option value="MA">MA</option>
+                    <option value="MT">MT</option><option value="MS">MS</option>
+                    <option value="MG">MG</option><option value="PA">PA</option>
+                    <option value="PB">PB</option><option value="PR">PR</option>
+                    <option value="PE">PE</option><option value="PI">PI</option>
+                    <option value="RJ">RJ</option><option value="RN">RN</option>
+                    <option value="RS">RS</option><option value="RO">RO</option>
+                    <option value="RR">RR</option><option value="SC">SC</option>
+                    <option value="SP">SP</option><option value="SE">SE</option>
+                    <option value="TO">TO</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Modalidade</label>
+                <select id="filterModalidade" class="filter-select">
+                    <option value="">Todas</option>
+                    <option value="6">Pregão Eletrônico</option>
+                    <option value="8">Pregão Presencial</option>
+                    <option value="1">Concorrência</option>
+                    <option value="4">Concorrência Eletrônica</option>
+                    <option value="5">Concurso</option>
+                    <option value="2">Diálogo Competitivo</option>
+                    <option value="3">Dispensa</option>
+                    <option value="7">Inexigibilidade</option>
+                    <option value="9">Leilão</option>
+                    <option value="10">Manifestação de Interesse</option>
+                    <option value="11">Pré-qualificação</option>
+                    <option value="12">Credenciamento</option>
+                </select>
+            </div>
+            <!-- Filtros Avançados (collapse) -->
+            <button class="btn btn-ghost filter-toggle" data-action="toggleFiltrosAvancados">
+                + Mais filtros
+            </button>
+            <button class="btn btn-ghost filter-clear hidden" data-action="limparFiltros">
+                Limpar
+            </button>
+        </div>
+
+        <!-- Advanced Filters (collapsed by default) -->
+        <div class="encontrar-filters-avancados hidden" id="filtrosAvancados">
+            <div class="filter-group">
+                <label class="filter-label">Valor mínimo (R$)</label>
+                <input type="number" id="filterValorMin" class="filter-input" placeholder="0" min="0" step="1000">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Valor máximo (R$)</label>
+                <input type="number" id="filterValorMax" class="filter-input" placeholder="Sem limite" min="0" step="1000">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Abertura de</label>
+                <input type="date" id="filterDataIni" class="filter-input">
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">Abertura até</label>
+                <input type="date" id="filterDataFim" class="filter-input">
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="encontrar-tabs">
+            <button class="encontrar-tab active" data-action="switchTab" data-tab="busca">
+                Busca
+                <span class="tab-badge hidden" id="buscaBadge">0</span>
+            </button>
+            <button class="encontrar-tab" data-action="switchTab" data-tab="alertas">
+                Meus Alertas
+                <span class="tab-badge tab-badge-blue hidden" id="alertasBadge">0</span>
+            </button>
+        </div>
+
+        <!-- Tab: Busca -->
+        <div id="tabBusca" class="tab-content active">
+            <!-- Toolbar -->
+            <div class="resultados-toolbar hidden" id="resultadosToolbar">
+                <span class="resultados-count" id="resultadosCount"></span>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-action="setView" data-view="grade" title="Grade">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+                            <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
+                        </svg>
+                    </button>
+                    <button class="view-btn" data-action="setView" data-view="lista" title="Lista">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <rect x="1" y="2" width="14" height="2" rx="1"/>
+                            <rect x="1" y="7" width="14" height="2" rx="1"/>
+                            <rect x="1" y="12" width="14" height="2" rx="1"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results area -->
+            <div id="resultadosGrid" class="resultados-grid">
+                <!-- Empty state inicial -->
+                <div class="empty-state" id="emptyStateBusca">
+                    <svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+                        <circle cx="28" cy="28" r="20"/><path d="M44 44l8 8"/>
+                    </svg>
+                    <h3>Busque licitações no PNCP</h3>
+                    <p>Digite palavras-chave, selecione filtros e clique em <strong>Buscar</strong></p>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination hidden" id="buscaPaginacao"></div>
+        </div>
+
+        <!-- Tab: Meus Alertas -->
+        <div id="tabAlertas" class="tab-content hidden">
+            <div class="alertas-toolbar">
+                <p class="text-muted">Alertas salvos que buscam automaticamente no PNCP</p>
+                <button class="btn btn-primary" data-action="novoAlerta">+ Novo Alerta</button>
+            </div>
+            <div id="alertasGrid" class="alertas-grid">
+                <div class="empty-state" id="emptyStateAlertas">
+                    <p>Nenhum alerta configurado.</p>
+                    <p>Crie alertas para receber novos resultados automaticamente.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Gerenciar Licitação -->
+    <div class="modal-overlay hidden" id="modalGerenciar" role="dialog" aria-modal="true" aria-labelledby="modalGerenciarTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalGerenciarTitle">Gerenciar Licitação</h2>
+                <button class="modal-close" data-action="fecharModalGerenciar" aria-label="Fechar">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="gerenciar-info" id="gerenciarInfo">
+                    <!-- preenchido via JS -->
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status inicial</label>
+                    <select id="gerenciarStatus" class="form-control">
+                        <option value="identificada">Identificada</option>
+                        <option value="em_analise" selected>Em análise</option>
+                        <option value="go_nogo">GO/NO-GO</option>
+                    </select>
+                </div>
+                <div class="form-group" id="lembreteSection">
+                    <label class="form-label">
+                        <input type="checkbox" id="gerenciarCriarLembrete" checked>
+                        Criar lembrete no Calendário
+                    </label>
+                    <div class="lembrete-config" id="lembreteConfig">
+                        <p class="lembrete-data" id="lembreteDataTexto"></p>
+                        <div class="form-row">
+                            <label class="form-label-inline">Avisar com</label>
+                            <select id="gerenciarAntecedencia" class="form-control form-control-sm">
+                                <option value="1">1 hora</option>
+                                <option value="2">2 horas</option>
+                                <option value="6">6 horas</option>
+                                <option value="24" selected>24 horas</option>
+                                <option value="48">48 horas</option>
+                                <option value="72">3 dias</option>
+                            </select>
+                            <label class="form-label-inline">de antecedência</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="gerenciarObs">Observações (opcional)</label>
+                    <textarea id="gerenciarObs" class="form-control" rows="2" placeholder="Anotações sobre esta licitação..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-action="fecharModalGerenciar">Cancelar</button>
+                <button class="btn btn-primary" data-action="confirmarGerenciar">→ Gerenciar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Novo/Editar Alerta (reutiliza lógica do M3) -->
+    <div class="modal-overlay hidden" id="modalAlerta" role="dialog" aria-modal="true" aria-labelledby="modalAlertaTitle">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalAlertaTitle">Novo Alerta</h2>
+                <button class="modal-close" data-action="fecharModalAlerta" aria-label="Fechar">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="alertaNome">Nome do alerta *</label>
+                    <input type="text" id="alertaNome" class="form-control" placeholder="Ex: TI – São Paulo" maxlength="200">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="alertaPalavras">Palavras-chave (separadas por vírgula)</label>
+                    <input type="text" id="alertaPalavras" class="form-control" placeholder="tecnologia, informação, suporte">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="alertaUFs">UF(s)</label>
+                        <input type="text" id="alertaUFs" class="form-control" placeholder="SP, RJ, MG">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="alertaValMin">Valor mín. (R$)</label>
+                        <input type="number" id="alertaValMin" class="form-control" min="0" step="1000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="alertaValMax">Valor máx. (R$)</label>
+                        <input type="number" id="alertaValMax" class="form-control" min="0" step="1000">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-action="fecharModalAlerta">Cancelar</button>
+                <button class="btn btn-primary" data-action="salvarAlerta">Salvar Alerta</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/notificacoes.js"></script>
+    <script src="js/encontrar.js"></script>
+</body>
+</html>
