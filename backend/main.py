@@ -382,8 +382,14 @@ def serve_documentos():
 
 @app.get("/monitoramento.html")
 def serve_monitoramento():
-    """Monitoramento PNCP."""
+    """Monitoramento PNCP (redireciona para encontrar.html via meta refresh)."""
     return FileResponse(os.path.join(frontend_path, "monitoramento.html"))
+
+
+@app.get("/encontrar.html")
+def serve_encontrar():
+    """Encontrar Licitações."""
+    return FileResponse(os.path.join(frontend_path, "encontrar.html"))
 
 
 @app.get("/perfil.html")
