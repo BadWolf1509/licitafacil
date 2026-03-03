@@ -773,7 +773,7 @@ const EncontrarModule = {
     },
 
     _marcarCardGerenciado(numeroControle) {
-        // Encontrar o botão do card e marcá-lo como gerenciado
+        // Encontrar o botão do card pelo índice e substituir pelo badge usado em renderCard()
         const cards = document.querySelectorAll('.licitacao-card');
         cards.forEach(card => {
             const btn = card.querySelector('.card-btn-gerenciar');
@@ -781,10 +781,10 @@ const EncontrarModule = {
                 const idx = parseInt(btn.dataset.index, 10);
                 const item = this.resultados[idx];
                 if (item && item.numeroControlePNCP === numeroControle) {
-                    btn.textContent = '✓ Gerenciado';
-                    btn.classList.add('gerenciado');
-                    btn.disabled = true;
-                    btn.removeAttribute('data-action');
+                    const badge = document.createElement('span');
+                    badge.className = 'badge-gerenciada';
+                    badge.innerHTML = '&#x2713; Já gerenciada';
+                    btn.parentNode.replaceChild(badge, btn);
                 }
             }
         });
@@ -825,7 +825,7 @@ const EncontrarModule = {
                 }
             }
         } catch (err) {
-            ui.showAlert('resultadosAutoGrid', 'Erro ao carregar resultados automáticos', 'error');
+            ui.showAlert('Erro ao carregar resultados automáticos', 'error', 'resultadosAutoGrid');
         }
     },
 
