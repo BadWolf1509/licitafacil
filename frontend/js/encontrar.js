@@ -734,8 +734,10 @@ const EncontrarModule = {
             const uf = Sanitize.escapeHtml(r.uf || '');
             const municipio = Sanitize.escapeHtml(r.municipio || '');
             const modalidade = Sanitize.escapeHtml(r.modalidade_nome || '');
-            const status = r.status || 'novo';
-            const statusLabel = statusLabels[status] || status;
+            const status = Sanitize.escapeHtml(r.status || 'novo');
+            const statusLabel = Sanitize.escapeHtml(statusLabels[r.status] || r.status || 'novo');
+            const rid = Sanitize.escapeHtml(String(r.id));
+            const licitacaoId = Sanitize.escapeHtml(String(r.licitacao_id));
 
             const localTexto = [uf, municipio].filter(Boolean).join(' — ');
 
@@ -752,15 +754,15 @@ const EncontrarModule = {
             // Botões de ação
             const acoes = [];
             if (status !== 'interessante') {
-                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarInteressante" data-id="${r.id}" title="Marcar como interessante">&#9733; Interessante</button>`);
+                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarInteressante" data-id="${rid}" title="Marcar como interessante">&#9733; Interessante</button>`);
             }
             if (status !== 'descartado') {
-                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarDescartado" data-id="${r.id}" title="Descartar">Descartar</button>`);
+                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarDescartado" data-id="${rid}" title="Descartar">Descartar</button>`);
             }
             if (r.licitacao_id) {
-                acoes.push(`<a href="licitacoes.html?id=${r.licitacao_id}" class="btn btn-sm btn-ghost">Ver em Gestão &rarr;</a>`);
+                acoes.push(`<a href="licitacoes.html?id=${licitacaoId}" class="btn btn-sm btn-ghost">Ver em Gestão &rarr;</a>`);
             } else if (status !== 'importado') {
-                acoes.push(`<button class="btn btn-sm btn-primary" data-action="importarResultado" data-id="${r.id}" title="Importar para Gestão">&rarr; Gerenciar</button>`);
+                acoes.push(`<button class="btn btn-sm btn-primary" data-action="importarResultado" data-id="${rid}" title="Importar para Gestão">&rarr; Gerenciar</button>`);
             }
             if (r.link_sistema_origem) {
                 const link = Sanitize.escapeHtml(r.link_sistema_origem);
