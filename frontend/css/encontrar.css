@@ -704,8 +704,8 @@
 }
 
 .resultado-auto-card {
-    background: var(--card-bg, #fff);
-    border: 1px solid var(--border-color, #e5e7eb);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
     border-radius: 0.5rem;
     padding: 1rem;
     display: flex;

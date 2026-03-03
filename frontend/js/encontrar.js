@@ -689,6 +689,10 @@ const EncontrarModule = {
     // === RESULTADOS AUTOMÁTICOS ===
 
     async carregarResultadosAuto(page = 1) {
+        this._resultadosPage = page;
+        const grid = document.getElementById('resultadosAutoGrid');
+        if (grid) grid.innerHTML = '<div class="loading-spinner" style="margin:2rem auto;text-align:center">Carregando...</div>';
+
         const status = document.getElementById('resultadosFilterStatus')?.value || '';
         const monitorId = document.getElementById('resultadosFilterMonitor')?.value || '';
         const params = new URLSearchParams({ page, page_size: 20 });
@@ -698,10 +702,23 @@ const EncontrarModule = {
             const data = await api.get(`/pncp/resultados?${params}`);
             this.renderResultadosAuto(data.items || []);
             this.renderPaginacaoResultados(data, page);
-            const badge = document.getElementById('resultadosBadge');
-            if (badge) {
-                badge.textContent = data.total || 0;
-                badge.classList.toggle('hidden', !data.total);
+
+            // Badge shows only "novo" count when no status filter is active
+            if (!status) {
+                try {
+                    const novosData = await api.get('/pncp/resultados?status=novo&page_size=1');
+                    const badge = document.getElementById('resultadosBadge');
+                    if (badge) {
+                        badge.textContent = novosData.total || 0;
+                        badge.classList.toggle('hidden', !novosData.total);
+                    }
+                } catch {}
+            } else {
+                const badge = document.getElementById('resultadosBadge');
+                if (badge) {
+                    badge.textContent = data.total || 0;
+                    badge.classList.toggle('hidden', !data.total);
+                }
             }
         } catch (err) {
             ui.showAlert('resultadosAutoGrid', 'Erro ao carregar resultados automáticos', 'error');
@@ -737,7 +754,7 @@ const EncontrarModule = {
             const status = Sanitize.escapeHtml(r.status || 'novo');
             const statusLabel = Sanitize.escapeHtml(statusLabels[r.status] || r.status || 'novo');
             const rid = Sanitize.escapeHtml(String(r.id));
-            const licitacaoId = Sanitize.escapeHtml(String(r.licitacao_id));
+            const licitacaoId = r.licitacao_id != null ? Sanitize.escapeHtml(String(r.licitacao_id)) : null;
 
             const localTexto = [uf, municipio].filter(Boolean).join(' — ');
 
@@ -757,7 +774,7 @@ const EncontrarModule = {
                 acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarInteressante" data-id="${rid}" title="Marcar como interessante">&#9733; Interessante</button>`);
             }
             if (status !== 'descartado') {
-                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarDescartado" data-id="${rid}" title="Descartar">Descartar</button>`);
+                acoes.push(`<button class="btn btn-sm btn-ghost" data-action="marcarDescartado" data-id="${rid}" title="Descartar">&#x2715; Descartar</button>`);
             }
             if (r.licitacao_id) {
                 acoes.push(`<a href="licitacoes.html?id=${licitacaoId}" class="btn btn-sm btn-ghost">Ver em Gestão &rarr;</a>`);
@@ -812,7 +829,7 @@ const EncontrarModule = {
         try {
             await api.patch(`/pncp/resultados/${id}/status`, { status });
             ui.showToast(`Status atualizado para "${status}"`, 'success');
-            this.carregarResultadosAuto();
+            this.carregarResultadosAuto(this._resultadosPage || 1);
         } catch (err) {
             ui.showToast('Erro ao atualizar status', 'error');
         }
@@ -822,12 +839,26 @@ const EncontrarModule = {
         try {
             const response = await api.post(`/pncp/resultados/${id}/importar`, { observacoes: '' });
             const licitacaoId = response.licitacao_id;
-            const link = licitacaoId ? ` <a href="licitacoes.html?id=${licitacaoId}" style="color:inherit;text-decoration:underline">Ver licitação</a>` : '';
-            ui.showToast(`Licitação importada com sucesso!${link}`, 'success');
-            this.carregarResultadosAuto();
+            // Build toast with DOM (not innerHTML string) so we get a real clickable link
+            const toastEl = document.createElement('div');
+            toastEl.className = 'alert alert-success';
+            toastEl.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;min-width:200px;max-width:400px;';
+            toastEl.setAttribute('role', 'alert');
+            const msg = document.createElement('span');
+            msg.textContent = 'Licitação importada com sucesso!';
+            toastEl.appendChild(msg);
+            if (licitacaoId) {
+                const link = document.createElement('a');
+                link.href = `licitacoes.html?id=${encodeURIComponent(licitacaoId)}`;
+                link.textContent = ' Ver em Gestão →';
+                link.style.fontWeight = '600';
+                toastEl.appendChild(link);
+            }
+            document.body.appendChild(toastEl);
+            setTimeout(() => toastEl.remove(), 6000);
+            this.carregarResultadosAuto(this._resultadosPage || 1);
         } catch (err) {
-            const msg = err?.detail || 'Erro ao importar resultado';
-            ui.showToast(Sanitize.escapeHtml(msg), 'error');
+            ui.showToast('Erro ao importar resultado', 'error');
         }
     },
 };
