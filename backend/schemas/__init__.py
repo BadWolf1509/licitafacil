@@ -88,6 +88,8 @@ from schemas.licitacao import (
 from schemas.pncp import (
     PaginatedMonitoramentoResponse,
     PaginatedResultadoResponse,
+    GerenciarRequest,
+    GerenciarResponse,
     PncpBuscaResponse,
     PncpImportarRequest,
     PncpMonitoramentoCreate,
@@ -167,6 +169,7 @@ __all__ = [
     "PaginatedMonitoramentoResponse",
     "PncpResultadoResponse", "PaginatedResultadoResponse",
     "PncpResultadoStatusUpdate", "PncpBuscaResponse", "PncpImportarRequest",
+    "GerenciarRequest", "GerenciarResponse",
     # Admin
     "AdminStatsResponse",
 ]
