@@ -157,6 +157,15 @@ class GerenciarRequest(BaseModel):
     # Referência ao resultado armazenado (opcional)
     pncp_resultado_id: Optional[int] = None
 
+    @field_validator("status_inicial")
+    @classmethod
+    def validar_status_inicial(cls, v: str) -> str:
+        from models.licitacao import LicitacaoStatus
+        valid = list(LicitacaoStatus.TRANSITIONS.keys())
+        if v not in valid:
+            raise ValueError(f"Status inválido. Valores permitidos: {valid}")
+        return v
+
 
 class GerenciarResponse(BaseModel):
     licitacao_id: int

@@ -146,7 +146,7 @@ class LicitacaoRepository(BaseRepository[Licitacao]):
 
     def get_by_numero_controle_pncp(
         self, db: Session, user_id: int, numero_controle_pncp: str
-    ) -> Optional["Licitacao"]:
+    ) -> Optional[Licitacao]:
         """Retorna licitação pelo numero_controle_pncp para um usuário."""
         return (
             db.query(Licitacao)

@@ -562,6 +562,7 @@ class TestGerenciar:
         data = response.json()
         assert data["licitacao_ja_existia"] is False
         assert "licitacao_id" in data
+        assert data["lembrete_id"] is not None
 
     @patch("routers.pncp.log_action")
     @patch("routers.pncp.licitacao_repository")
@@ -578,6 +579,7 @@ class TestGerenciar:
         data = response.json()
         assert data["licitacao_ja_existia"] is True
         assert data["licitacao_id"] == 99
+        assert data["lembrete_id"] is None
 
     @patch("routers.pncp.log_action")
     @patch("routers.pncp.licitacao_repository")
@@ -606,3 +608,57 @@ class TestGerenciar:
             "objeto_compra": "TI",
         })
         assert response.status_code == 422
+
+    @patch("routers.pncp.log_action")
+    @patch("routers.pncp.pncp_resultado_repository")
+    @patch("routers.pncp.licitacao_repository")
+    def test_gerenciar_atualiza_pncp_resultado(
+        self, mock_lic_repo, mock_resultado_repo, mock_log, client, mock_db
+    ):
+        """Quando pncp_resultado_id fornecido e encontrado, marca resultado como IMPORTADO."""
+        from models.pncp import PncpResultadoStatus
+
+        mock_lic_repo.get_by_numero_controle_pncp.return_value = None
+
+        mock_resultado = MagicMock()
+        mock_resultado.id = 10
+        mock_resultado.status = PncpResultadoStatus.NOVO
+        mock_resultado_repo.get_by_id_for_user.return_value = mock_resultado
+
+        id_counter = [0]
+        def mock_refresh(obj):
+            id_counter[0] += 1
+            obj.id = id_counter[0]
+        mock_db.refresh = mock_refresh
+
+        payload = {**self.BASE_PAYLOAD, "pncp_resultado_id": 10}
+        response = client.post("/pncp/gerenciar", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["licitacao_ja_existia"] is False
+        mock_resultado_repo.get_by_id_for_user.assert_called_once()
+        assert mock_resultado.status == PncpResultadoStatus.IMPORTADO
+        assert mock_db.commit.called
+
+    @patch("routers.pncp.log_action")
+    @patch("routers.pncp.pncp_resultado_repository")
+    @patch("routers.pncp.licitacao_repository")
+    def test_gerenciar_pncp_resultado_nao_encontrado(
+        self, mock_lic_repo, mock_resultado_repo, mock_log, client, mock_db
+    ):
+        """Quando pncp_resultado_id fornecido mas não encontrado, retorna 201 sem erro."""
+        mock_lic_repo.get_by_numero_controle_pncp.return_value = None
+        mock_resultado_repo.get_by_id_for_user.return_value = None
+
+        id_counter = [0]
+        def mock_refresh(obj):
+            id_counter[0] += 1
+            obj.id = id_counter[0]
+        mock_db.refresh = mock_refresh
+
+        payload = {**self.BASE_PAYLOAD, "pncp_resultado_id": 999}
+        response = client.post("/pncp/gerenciar", json=payload)
+        assert response.status_code == 201
+        data = response.json()
+        assert data["licitacao_ja_existia"] is False
+        mock_resultado_repo.get_by_id_for_user.assert_called_once()

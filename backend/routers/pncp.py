@@ -20,6 +20,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from auth import get_current_approved_user
@@ -429,8 +430,6 @@ def gerenciar_licitacao(
       data = data_abertura - antecedencia_horas.
     - Se pncp_resultado_id fornecido, marca o PncpResultado como 'importado'.
     """
-    from fastapi.responses import JSONResponse
-
     # 1. Verificar duplicata
     existente = licitacao_repository.get_by_numero_controle_pncp(
         db, current_user.id, dados.numero_controle_pncp,
@@ -501,7 +500,6 @@ def gerenciar_licitacao(
 
     # 4. Atualizar PncpResultado se fornecido
     if dados.pncp_resultado_id:
-        from models.pncp import PncpResultadoStatus
         resultado = pncp_resultado_repository.get_by_id_for_user(
             db, dados.pncp_resultado_id, current_user.id,
         )
