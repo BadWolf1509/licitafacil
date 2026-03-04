@@ -2,8 +2,9 @@
 
 ## Requisitos
 
-- Python 3.10 ou superior
+- Python 3.13 ou superior
 - pip (gerenciador de pacotes Python)
+- Acesso a banco PostgreSQL via Supabase (obrigatório)
 
 ## Instalação
 
@@ -48,6 +49,9 @@ Edite o arquivo `.env`:
 # Obrigatório - gere uma chave segura
 SECRET_KEY=<gere com: openssl rand -hex 32>
 
+# Obrigatório - PostgreSQL via Supabase (Transaction mode, porta 6543)
+DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
+
 # Admin inicial (opcional - tem valores padrão)
 ADMIN_EMAIL=admin@licitafacil.com.br
 ADMIN_PASSWORD=admin123
@@ -90,15 +94,19 @@ python main.py
 licitafacil/
 ├── backend/
 │   ├── alembic/       # Migrations
+│   ├── models/        # Modelos SQLAlchemy (package)
+│   ├── schemas/       # Schemas Pydantic (package)
+│   ├── repositories/  # Repositórios de dados
 │   ├── routers/       # Endpoints da API
 │   ├── services/      # Lógica de negócio
-│   ├── tests/         # Testes unitários
+│   ├── tests/         # Testes automatizados (1372+)
 │   ├── main.py        # Ponto de entrada
-│   ├── models.py      # Modelos do banco
-│   ├── schemas.py     # Schemas Pydantic
 │   ├── auth.py        # Autenticação JWT
 │   ├── database.py    # Conexão com banco
 │   └── seed.py        # Script para criar admin
+├── docs/
+│   ├── planos/        # Planos de implementação
+│   └── referencias/   # Referências técnicas
 ├── frontend/
 │   ├── css/           # Estilos
 │   ├── js/            # JavaScript
@@ -106,9 +114,12 @@ licitafacil/
 │   ├── dashboard.html # Dashboard
 │   ├── atestados.html # Gestão de atestados
 │   ├── analises.html  # Análises
+│   ├── licitacoes.html   # Gestão de licitações (M1)
+│   ├── calendario.html   # Calendário e lembretes (M2)
+│   ├── encontrar.html    # Monitoramento PNCP (M3)
+│   ├── documentos.html   # Gestão documental (M4)
 │   ├── admin.html     # Painel admin
 │   └── perfil.html    # Perfil do usuário
-├── uploads/           # Arquivos enviados
 ├── requirements.txt   # Dependências
 └── .env.example       # Exemplo de config
 ```

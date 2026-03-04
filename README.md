@@ -15,10 +15,11 @@ O LicitaFácil automatiza o processo de análise de qualificação técnica em l
 
 ### Backend
 - **Framework:** FastAPI + SQLAlchemy
-- **Banco:** SQLite (desenvolvimento) / PostgreSQL (produção)
+- **Banco:** PostgreSQL via Supabase (obrigatório)
 - **Migrations:** Alembic
 - **Extração PDF:** pdfplumber + PyMuPDF
 - **OCR:** EasyOCR + Tesseract (fallback)
+- **IA:** Claude API (Anthropic) — análise e matching
 
 ### Frontend
 - HTML5, CSS3, JavaScript (vanilla)
@@ -27,20 +28,40 @@ O LicitaFácil automatiza o processo de análise de qualificação técnica em l
 
 ## Funcionalidades
 
-### Atestados
+### Atestados (Core)
 - Upload de PDF e imagens (PNG, JPG, JPEG, WEBP)
 - Extração automática de tabela de serviços
 - Reprocessamento de documentos
 - Edição manual de serviços extraídos
 
-### Análises
+### Análises (Core)
 - Upload de página de edital com quantitativos
 - Matching determinístico por similaridade de descrição
 - Soma de atestados para atingir exigências
 - Visualização de cobertura por exigência
 
+### M1 — Gestão de Licitações
+- Pipeline de status com 13 estados e transições validadas
+- Tags, histórico e estatísticas por usuário
+- Vinculação de análises a licitações
+
+### M2 — Calendário e Lembretes
+- Lembretes com notificação por e-mail
+- Calendário mensal de eventos
+- Preferências de notificação por tipo
+
+### M3 — Monitoramento PNCP
+- Alertas automáticos com sync periódico
+- Busca direta dual-endpoint (`/proposta` + `/publicacao`)
+- Fluxo "Gerenciar" que cria Licitação + Lembrete atomicamente
+
+### M4 — Gestão Documental
+- Checklist de documentos por licitação
+- Upload e versionamento de documentos
+- Status e observações por item
+
 ### Usuários
-- Autenticação JWT
+- Autenticação JWT com Supabase
 - Aprovação de novos usuários por admin
 - Página de perfil com alteração de senha
 - Preferência de tema (claro/escuro)
@@ -84,11 +105,14 @@ uvicorn main:app --reload --port 8000
 SECRET_KEY=<gere com: openssl rand -hex 32>
 ```
 
+### Obrigatórias (além de SECRET_KEY)
+```env
+# Banco de dados — PostgreSQL via Supabase (Transaction mode, porta 6543)
+DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
+```
+
 ### Opcionais
 ```env
-# Banco de dados (default: SQLite local)
-DATABASE_URL=sqlite:///./licitafacil.db
-
 # Admin inicial
 ADMIN_EMAIL=admin@licitafacil.com.br
 ADMIN_PASSWORD=admin123
@@ -112,22 +136,27 @@ licitafacil/
 ├── backend/
 │   ├── alembic/           # Migrations de banco
 │   ├── config/            # Configurações
-│   ├── docs/              # Documentação técnica
-│   ├── prompts/           # Prompts (legado)
+│   ├── models/            # Modelos SQLAlchemy (package — M1–M4)
+│   ├── schemas/           # Schemas Pydantic (package — M1–M4)
 │   ├── repositories/      # Repositórios de dados
 │   ├── routers/           # Endpoints da API
 │   ├── services/          # Lógica de negócio
 │   │   ├── aditivo/       # Processamento de aditivos
 │   │   ├── atestado/      # Processamento de atestados
 │   │   ├── extraction/    # Módulos de extração
-│   │   ├── processors/    # Processadores de texto
-│   │   └── table_extraction/  # Extração de tabelas
-│   ├── tests/             # Testes automatizados
+│   │   ├── notification/  # E-mail e agendamento (M2)
+│   │   ├── pncp/          # Cliente e sync PNCP (M3)
+│   │   └── processors/    # Processadores de texto
+│   ├── tests/             # 1372+ testes automatizados
 │   └── utils/             # Utilitários
+├── docs/
+│   ├── planos/            # Planos de implementação por módulo
+│   └── referencias/       # Referências técnicas (PNCP API, etc.)
 ├── frontend/
 │   ├── css/               # Estilos
 │   ├── js/                # JavaScript
-│   └── *.html             # Páginas
+│   └── *.html             # dashboard, atestados, licitacoes, calendario,
+│                          #   encontrar, documentos, admin, perfil...
 ├── requirements.txt       # Dependências Python
 └── .env.example           # Exemplo de configuração
 ```
@@ -231,9 +260,13 @@ alembic current
 alembic history
 ```
 
-### Migrações recentes
-- `c3e7f58106ee` - Adiciona campos de bloqueio de conta (failed_login_attempts, locked_until)
-- `d4f8g69217ff` - Adiciona tabela de audit logs para registro de ações administrativas
+### Migrações aplicadas (ordem cronológica)
+- `c3e7f58106ee` — bloqueio de conta (failed_login_attempts, locked_until)
+- `d4f8g69217ff` — audit logs
+- `i9d3l24762kk` — M1: tabelas licitacoes, licitacao_tags, licitacao_historico
+- `j0e4m35873ll` — M2: tabelas lembretes, notificacoes, preferencia_notificacao
+- `k1f5n46984mm` — M4: tabelas documentos, checklist
+- `l2g6o57095nn` — M3: tabelas pncp_monitoramentos, pncp_resultados
 
 ### Criar nova migração
 ```bash

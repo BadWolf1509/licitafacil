@@ -438,24 +438,6 @@ Quando `codigo_modalidade` não informado, busca em todas as `MODALIDADES_PADRAO
 
 ---
 
-## ⚠️ Bug Conhecido: Códigos de Modalidade em `encontrar.html`
-
-O filtro de modalidade no frontend (`frontend/encontrar.html`) contém **mapeamentos incorretos**:
-
-| Label no filtro | Código usado | Código correto |
-|-----------------|-------------|----------------|
-| Pregão Eletrônico | `6` | ✅ correto |
-| Pregão **Presencial** | `8` | ❌ `8` = Dispensa; correto = **`7`** |
-| Concorrência (genérica) | `1` | ❌ `1` = Leilão Eletrônico; não existe código genérico |
-| Concorrência Eletrônica | `4` | ✅ correto |
-| **Concurso** | `5` | ❌ `5` = Concorrência Presencial; correto = **`3`** |
-| **Dispensa** | `3` | ❌ `3` = Concurso; correto = **`8`** |
-| **Inexigibilidade** | `7` | ❌ `7` = Pregão Presencial; correto = **`9`** |
-| Leilão | `9` | ❌ `9` = Inexigibilidade; correto = **`1`** (eletrônico) ou **`13`** (presencial) |
-
-**Arquivo:** `frontend/encontrar.html`, linhas 104–117.
-
----
 
 ## Documentação Oficial
 

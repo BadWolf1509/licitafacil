@@ -98,11 +98,13 @@ Ao final de cada sessão, anotar:
 ```
 licitafacil/
 ├── backend/           # API FastAPI
+│   ├── models/        # Modelos SQLAlchemy (package)
+│   ├── schemas/       # Schemas Pydantic (package)
+│   ├── repositories/  # Repositórios de dados
 │   ├── routers/       # Endpoints
 │   ├── services/      # Lógica de negócio
-│   ├── models.py      # Modelos SQLAlchemy
-│   ├── schemas.py     # Schemas Pydantic
-│   └── tests/         # Testes pytest
+│   └── tests/         # Testes pytest (1372+)
+├── docs/              # Documentação do projeto
 ├── frontend/          # Interface web
 │   ├── js/            # JavaScript
 │   ├── css/           # Estilos
@@ -115,5 +117,5 @@ licitafacil/
 ## Contatos e Recursos
 
 - **Banco de Dados**: Supabase PostgreSQL
-- **Deploy Backend**: Render
-- **Deploy Frontend**: Vercel
+- **Deploy**: Vercel (frontend + serverless functions)
+- **Ref deploy**: ver `DEPLOY_VERCEL.md`
