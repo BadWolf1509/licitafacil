@@ -28,9 +28,10 @@ class PncpClient:
         codigo_modalidade: Optional[str] = None,
         uf: Optional[str] = None,
         cnpj: Optional[str] = None,
+        endpoint: str = "publicacao",
     ) -> Dict[str, Any]:
         """
-        Busca contratações publicadas no PNCP.
+        Busca contratações no PNCP.
 
         Args:
             data_inicial: Data inicial no formato YYYYMMDD
@@ -40,9 +41,12 @@ class PncpClient:
             codigo_modalidade: Código da modalidade de contratação
             uf: Sigla da UF
             cnpj: CNPJ do órgão
+            endpoint: "publicacao" (filtra por dataPublicacao) ou "proposta"
+                      (filtra por dataEncerramentoProposta, apenas datas futuras)
 
         Returns:
             Dict com data, totalRegistros, totalPaginas, etc.
+            Retorna empty dict se 204 ou 422 (proposta com datas passadas).
         """
         await self._rate_limit()
 
@@ -59,13 +63,13 @@ class PncpClient:
         if cnpj:
             params["cnpjOrgao"] = cnpj
 
-        url = f"{PNCP_API_BASE_URL}/contratacoes/publicacao"
+        url = f"{PNCP_API_BASE_URL}/contratacoes/{endpoint}"
 
         async with httpx.AsyncClient(timeout=PNCP_TIMEOUT_SECONDS) as client:
             response = await client.get(url, params=params)
-            response.raise_for_status()
-            if response.status_code == 204:
+            if response.status_code in (204, 422):
                 return {"data": [], "totalRegistros": 0, "totalPaginas": 0, "paginasRestantes": 0, "empty": True}
+            response.raise_for_status()
             return response.json()
 
     async def buscar_todas_paginas(
@@ -73,10 +77,14 @@ class PncpClient:
         data_inicial: str,
         data_final: str,
         max_paginas: int = 5,
+        endpoint: str = "publicacao",
         **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
         Busca todas as páginas de resultados (até max_paginas).
+
+        Args:
+            endpoint: "publicacao" ou "proposta" — repassado a buscar_contratacoes.
 
         Returns:
             Lista flat de todos os itens encontrados.
@@ -90,10 +98,11 @@ class PncpClient:
                     data_inicial=data_inicial,
                     data_final=data_final,
                     pagina=pagina,
+                    endpoint=endpoint,
                     **kwargs,
                 )
             except (httpx.HTTPError, httpx.TimeoutException) as e:
-                logger.warning(f"Erro ao buscar página {pagina}: {e}")
+                logger.warning(f"Erro ao buscar página {pagina} ({endpoint}): {e}")
                 break
 
             data = resultado.get("data", [])

@@ -304,10 +304,11 @@ const EncontrarModule = {
         const dataPublicacao = item.dataPublicacao ? new Date(item.dataPublicacao) : null;
         const isNovo = dataPublicacao && dataPublicacao >= limite48h;
 
-        // Formatação de data abertura
+        // Formatação de data sessão (encerramento = data da sessão/abertura das propostas)
+        const dataSessao = item.dataEncerramentoProposta || item.dataAberturaProposta;
         let aberturaTexto = 'Data não informada';
-        if (item.dataAberturaProposta) {
-            const dt = new Date(item.dataAberturaProposta);
+        if (dataSessao) {
+            const dt = new Date(dataSessao);
             aberturaTexto = dt.toLocaleString('pt-BR', {
                 day: '2-digit', month: '2-digit', year: 'numeric',
                 hour: '2-digit', minute: '2-digit',
@@ -356,7 +357,7 @@ const EncontrarModule = {
             <div class="card-objeto">${objeto}</div>
             <div class="card-orgao">${orgaoNome}${orgao.cnpj ? ` — CNPJ ${Sanitize.escapeHtml(orgao.cnpj)}` : ''}</div>
             <div class="card-valor">${valorTexto}</div>
-            <div class="card-abertura">⏱ Abertura: <strong>${aberturaTexto}</strong></div>
+            <div class="card-abertura">⏱ Sessão: <strong>${aberturaTexto}</strong></div>
             <div class="card-actions">
                 ${linkEdital !== '#' ? `<a href="${linkEdital}" target="_blank" rel="noopener noreferrer" class="card-btn-edital">Ver Edital ↗</a>` : '<span></span>'}
                 ${gerenciarBtn}
@@ -378,8 +379,10 @@ const EncontrarModule = {
         switch (criterio) {
             case 'data_abertura_asc':
                 sorted.sort((a, b) => {
-                    const da = a.dataAberturaProposta ? new Date(a.dataAberturaProposta) : new Date(0);
-                    const db = b.dataAberturaProposta ? new Date(b.dataAberturaProposta) : new Date(0);
+                    const daStr = a.dataEncerramentoProposta || a.dataAberturaProposta;
+                    const dbStr = b.dataEncerramentoProposta || b.dataAberturaProposta;
+                    const da = daStr ? new Date(daStr) : new Date(0);
+                    const db = dbStr ? new Date(dbStr) : new Date(0);
                     return da - db;
                 });
                 break;
@@ -658,8 +661,9 @@ const EncontrarModule = {
             `;
         }
 
-        // Lembrete section
-        const dataAbertura = item.dataAberturaProposta ? new Date(item.dataAberturaProposta) : null;
+        // Lembrete section — usa dataEncerramentoProposta (data da sessão) como referência
+        const dataSessaoStr = item.dataEncerramentoProposta || item.dataAberturaProposta;
+        const dataAbertura = dataSessaoStr ? new Date(dataSessaoStr) : null;
         const lembreteSection = document.getElementById('lembreteSection');
         const lembreteDataTexto = document.getElementById('lembreteDataTexto');
 
@@ -709,7 +713,7 @@ const EncontrarModule = {
             uf: unidade.ufSigla || null,
             municipio: unidade.municipioNome || null,
             valor_estimado: item.valorTotalEstimado || null,
-            data_abertura: item.dataAberturaProposta || null,
+            data_abertura: item.dataEncerramentoProposta || item.dataAberturaProposta || null,
             link_sistema_origem: item.linkSistemaOrigem || null,
             dados_completos: item,
             status_inicial: statusInicial,

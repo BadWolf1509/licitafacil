@@ -302,8 +302,8 @@ def importar_resultado(
 
 @router.get("/busca", response_model=PncpBuscaResponse)
 async def buscar_pncp(
-    data_inicial: str = Query(..., description="Data abertura inicial YYYYMMDD"),
-    data_final: str = Query(..., description="Data abertura final YYYYMMDD"),
+    data_inicial: str = Query(..., description="Data sessão inicial YYYYMMDD"),
+    data_final: str = Query(..., description="Data sessão final YYYYMMDD"),
     codigo_modalidade: Optional[str] = Query(
         None,
         description="Código da modalidade PNCP. Se omitido, busca nas modalidades padrão.",
@@ -313,32 +313,57 @@ async def buscar_pncp(
     valor_maximo: Optional[float] = Query(None, description="Filtro client-side de valor máximo"),
     current_user: Usuario = Depends(get_current_approved_user),
 ):
-    """Busca no PNCP com filtros ricos. Filtragem por valor é client-side."""
-    # Modalidades a iterar
+    """
+    Busca no PNCP com filtros ricos usando estratégia dual-endpoint:
+    - /proposta: filtra por dataEncerramentoProposta (data da sessão) no range solicitado
+    - /publicacao: filtra por publicações com dataAberturaProposta no range (lookback 1 dia)
+    Resultados são mesclados e deduplicados por numeroControlePNCP.
+    """
     modalidades = [codigo_modalidade] if codigo_modalidade else MODALIDADES_PADRAO
 
     try:
         dt_ini = datetime.strptime(data_inicial, "%Y%m%d")
         dt_fim = datetime.strptime(data_final, "%Y%m%d")
-        # Lookback de 7 dias na publicação para capturar licitações publicadas antes do período de abertura
-        pub_inicial = (dt_ini - timedelta(days=7)).strftime("%Y%m%d")
+        dt_fim_fim = dt_fim.replace(hour=23, minute=59, second=59)
+        # Lookback de 1 dia em publicacao para capturar publicações do dia anterior ao período
+        pub_inicial = (dt_ini - timedelta(days=1)).strftime("%Y%m%d")
 
-        todos_items = []
-        for modalidade in modalidades:
-            kwargs = {"codigo_modalidade": modalidade}
+        async def buscar_modalidade_proposta(modalidade: str) -> list:
+            kwargs: dict = {"codigo_modalidade": modalidade}
             if uf:
                 kwargs["uf"] = uf
-            items = await pncp_client.buscar_todas_paginas(
+            return await pncp_client.buscar_todas_paginas(
+                data_inicial=data_inicial,
+                data_final=data_final,
+                max_paginas=3,
+                endpoint="proposta",
+                **kwargs,
+            )
+
+        async def buscar_modalidade_publicacao(modalidade: str) -> list:
+            kwargs: dict = {"codigo_modalidade": modalidade}
+            if uf:
+                kwargs["uf"] = uf
+            return await pncp_client.buscar_todas_paginas(
                 data_inicial=pub_inicial,
                 data_final=data_final,
                 max_paginas=3,
+                endpoint="publicacao",
                 **kwargs,
             )
-            todos_items.extend(items)
 
-        # Filtrar por dataAberturaProposta dentro do range
-        filtrados = []
-        for item in todos_items:
+        # Executar todas as chamadas em paralelo (proposta + publicacao para cada modalidade)
+        tarefas_proposta = [buscar_modalidade_proposta(m) for m in modalidades]
+        tarefas_publicacao = [buscar_modalidade_publicacao(m) for m in modalidades]
+        resultados = await asyncio.gather(*tarefas_proposta, *tarefas_publicacao)
+
+        n = len(modalidades)
+        items_proposta = [item for lista in resultados[:n] for item in lista]
+        items_publicacao_raw = [item for lista in resultados[n:] for item in lista]
+
+        # Filtrar publicacao por dataAberturaProposta dentro do range
+        items_publicacao = []
+        for item in items_publicacao_raw:
             abertura_str = item.get("dataAberturaProposta")
             if not abertura_str:
                 continue
@@ -346,32 +371,37 @@ async def buscar_pncp(
                 abertura = datetime.fromisoformat(abertura_str)
             except (ValueError, TypeError):
                 continue
-            if not (dt_ini <= abertura <= dt_fim.replace(hour=23, minute=59, second=59)):
-                continue
+            if dt_ini <= abertura <= dt_fim_fim:
+                items_publicacao.append(item)
 
-            # Filtrar por valor (client-side)
-            # Nota: itens sem valorTotalEstimado passam sem filtrar (valor não declarado)
+        # Mesclar: proposta primeiro (prioridade), depois publicacao não duplicadas
+        vistos: set = set()
+        todos_items = []
+        for item in items_proposta:
+            chave = item.get("numeroControlePNCP") or None
+            if chave and chave not in vistos:
+                vistos.add(chave)
+            todos_items.append(item)
+        for item in items_publicacao:
+            chave = item.get("numeroControlePNCP") or None
+            if chave is None or chave not in vistos:
+                if chave is not None:
+                    vistos.add(chave)
+                todos_items.append(item)
+
+        # Filtrar por valor (client-side)
+        filtrados = []
+        for item in todos_items:
             valor = item.get("valorTotalEstimado")
             if valor_minimo is not None and valor is not None and float(valor) < valor_minimo:
                 continue
             if valor_maximo is not None and valor is not None and float(valor) > valor_maximo:
                 continue
-
             filtrados.append(item)
 
-        # Deduplicar por numeroControlePNCP (somente quando presente e não vazio)
-        vistos = set()
-        unicos = []
-        for item in filtrados:
-            chave = item.get("numeroControlePNCP") or None
-            if chave is None or chave not in vistos:
-                if chave is not None:
-                    vistos.add(chave)
-                unicos.append(item)
-
         return PncpBuscaResponse(
-            data=unicos,
-            total_registros=len(unicos),
+            data=filtrados,
+            total_registros=len(filtrados),
             total_paginas=1,
             numero_pagina=1,
             paginas_restantes=0,
