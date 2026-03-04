@@ -414,29 +414,39 @@ class TestBuscaPncp:
             )
         assert response.status_code == 200
 
-    def test_busca_filters_by_abertura_date(self, client):
-        """Results are filtered by dataAberturaProposta within requested range."""
-        items = [
-            {"dataAberturaProposta": "2026-01-05T09:00:00", "objetoCompra": "Fora do range"},
-            {"dataAberturaProposta": "2026-01-10T09:00:00", "objetoCompra": "Dentro do range"},
-            {"dataAberturaProposta": "2026-01-14T09:00:00", "objetoCompra": "Dentro do range 2"},
-            {"dataAberturaProposta": "2026-01-20T09:00:00", "objetoCompra": "Fora do range"},
-            {"objetoCompra": "Sem data abertura"},
+    def test_busca_dual_endpoint(self, client):
+        """Dual-endpoint: /proposta items returned directly, /publicacao filtered by abertura."""
+        proposta_items = [
+            {"dataEncerramentoProposta": "2026-01-10T09:00:00", "objetoCompra": "Via proposta", "numeroControlePNCP": "P1"},
         ]
+        publicacao_items = [
+            {"dataAberturaProposta": "2026-01-05T09:00:00", "objetoCompra": "Fora do range", "numeroControlePNCP": "X1"},
+            {"dataAberturaProposta": "2026-01-10T09:00:00", "objetoCompra": "Via publicacao", "numeroControlePNCP": "X2"},
+            {"dataAberturaProposta": "2026-01-20T09:00:00", "objetoCompra": "Fora do range", "numeroControlePNCP": "X3"},
+            {"objetoCompra": "Sem data abertura", "numeroControlePNCP": "X4"},
+        ]
+
+        async def mock_buscar(data_inicial, data_final, max_paginas=5, endpoint="publicacao", **kwargs):
+            if endpoint == "proposta":
+                return proposta_items
+            return publicacao_items
+
         with patch(
             "services.pncp.client.pncp_client.buscar_todas_paginas",
             new_callable=AsyncMock,
-            return_value=items,
+            side_effect=mock_buscar,
         ):
             response = client.get(
                 "/pncp/busca?data_inicial=20260108&data_final=20260115&codigo_modalidade=6"
             )
         assert response.status_code == 200
         data = response.json()
+        # 1 from /proposta + 1 from /publicacao (only one in-range)
         assert data["total_registros"] == 2
         assert len(data["data"]) == 2
-        assert data["data"][0]["objetoCompra"] == "Dentro do range"
-        assert data["data"][1]["objetoCompra"] == "Dentro do range 2"
+        objetos = [d["objetoCompra"] for d in data["data"]]
+        assert "Via proposta" in objetos
+        assert "Via publicacao" in objetos
 
     def test_busca_empty_results(self, client):
         """Empty results from PNCP returns empty list."""
@@ -679,24 +689,25 @@ class TestBuscaEnhanced:
 
     @patch("routers.pncp.pncp_client")
     def test_busca_sem_modalidade_usa_default(self, mock_client, client):
-        """Sem codigo_modalidade, deve iterar modalidades padrão."""
+        """Sem codigo_modalidade, deve iterar modalidades padrão × 2 endpoints."""
         mock_client.buscar_todas_paginas = AsyncMock(return_value=[])
 
         response = client.get("/pncp/busca?data_inicial=20260301&data_final=20260331")
         assert response.status_code == 200
-        # Client deve ter sido chamado múltiplas vezes (1 por modalidade padrão)
-        assert mock_client.buscar_todas_paginas.call_count == 5  # len(MODALIDADES_PADRAO)
+        # 2 endpoints (proposta + publicacao) × 5 modalidades padrão = 10
+        assert mock_client.buscar_todas_paginas.call_count == 10
 
     @patch("routers.pncp.pncp_client")
     def test_busca_com_modalidade_especifica(self, mock_client, client):
-        """Com codigo_modalidade, deve usar apenas essa modalidade."""
+        """Com codigo_modalidade, deve usar essa modalidade × 2 endpoints."""
         mock_client.buscar_todas_paginas = AsyncMock(return_value=[])
 
         response = client.get(
             "/pncp/busca?data_inicial=20260301&data_final=20260331&codigo_modalidade=6"
         )
         assert response.status_code == 200
-        assert mock_client.buscar_todas_paginas.call_count == 1
+        # 2 endpoints × 1 modalidade = 2
+        assert mock_client.buscar_todas_paginas.call_count == 2
 
     @patch("routers.pncp.pncp_client")
     def test_busca_filtra_por_valor_minimo(self, mock_client, client):

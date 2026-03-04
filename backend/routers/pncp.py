@@ -379,9 +379,10 @@ async def buscar_pncp(
         todos_items = []
         for item in items_proposta:
             chave = item.get("numeroControlePNCP") or None
-            if chave and chave not in vistos:
-                vistos.add(chave)
-            todos_items.append(item)
+            if chave is None or chave not in vistos:
+                if chave is not None:
+                    vistos.add(chave)
+                todos_items.append(item)
         for item in items_publicacao:
             chave = item.get("numeroControlePNCP") or None
             if chave is None or chave not in vistos:
