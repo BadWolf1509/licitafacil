@@ -305,6 +305,7 @@ class TestGerenciarRequest:
     def test_valid_full(self):
         from datetime import datetime
         from decimal import Decimal
+
         from schemas.pncp import GerenciarRequest
         data = GerenciarRequest(
             numero_controle_pncp="01.001.000/0001-01-0001234/2026-1",
@@ -328,6 +329,7 @@ class TestGerenciarRequest:
 
     def test_missing_numero_controle_raises(self):
         from pydantic import ValidationError
+
         from schemas.pncp import GerenciarRequest
         with pytest.raises(ValidationError):
             GerenciarRequest(
@@ -337,6 +339,7 @@ class TestGerenciarRequest:
 
     def test_antecedencia_negativa_raises(self):
         from pydantic import ValidationError
+
         from schemas.pncp import GerenciarRequest
         with pytest.raises(ValidationError):
             GerenciarRequest(

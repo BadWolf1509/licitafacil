@@ -86,10 +86,10 @@ from schemas.licitacao import (
 
 # PNCP
 from schemas.pncp import (
-    PaginatedMonitoramentoResponse,
-    PaginatedResultadoResponse,
     GerenciarRequest,
     GerenciarResponse,
+    PaginatedMonitoramentoResponse,
+    PaginatedResultadoResponse,
     PncpBuscaResponse,
     PncpImportarRequest,
     PncpMonitoramentoCreate,

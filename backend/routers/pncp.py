@@ -30,7 +30,6 @@ from logging_config import get_logger, log_action
 from models import Licitacao, Usuario
 from models.lembrete import Lembrete, LembreteTipo
 from models.pncp import PncpMonitoramento, PncpResultadoStatus
-from repositories.lembrete_repository import lembrete_repository
 from repositories.licitacao_repository import licitacao_repository
 from repositories.pncp_repository import (
     pncp_monitoramento_repository,
