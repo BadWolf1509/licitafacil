@@ -45,7 +45,10 @@ def detect_grid_rows(image_bytes: bytes) -> Tuple[List[Tuple[int, int]], Dict[st
     _, bw = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     def detect_rows_by_projection() -> Tuple[List[Tuple[int, int]], Dict[str, Any]]:
-        row_sum = (bw > 0).sum(axis=1)
+        # count_nonzero em vez de (bw > 0).sum(): os stubs do numpy 2.x nao
+        # expoem .sum em NDArray[np.bool] e o mypy barra. Equivalente aqui,
+        # porque bw e uint8 pos-threshold, entao "> 0" e "!= 0" coincidem.
+        row_sum = np.count_nonzero(bw, axis=1)
         threshold = max(10, int(width * 0.02))
         segments: List[Tuple[int, int]] = []
         in_row = False
