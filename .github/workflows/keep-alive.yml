@@ -1,9 +1,21 @@
 name: Keep Supabase Alive
 
+# Projetos Supabase no plano Free pausam apos ~7 dias sem atividade de banco.
+# Este workflow gera essa atividade a cada 3 dias.
+#
+# Historico: entre 22/04 e 08/08/2026 este ping falhou silenciosamente
+# (curl exit 6, couldn't resolve host) e o projeto acabou pausado por 7 dias.
+# Ninguem percebeu porque workflow agendado que falha nao avisa ninguem.
+# Dai as duas mudancas principais: diagnostico explicito de cada modo de falha,
+# e uma issue aberta automaticamente quando o ping quebra.
+
 on:
   schedule:
-    - cron: '0 9 */3 * *'  # A cada 3 dias às 9h (UTC)
-  workflow_dispatch:        # Permite execução manual pelo GitHub
+    - cron: '0 9 */3 * *'  # A cada 3 dias as 9h (UTC)
+  workflow_dispatch:        # Permite execucao manual pelo GitHub
+
+permissions:
+  issues: write             # Necessario para abrir a issue de alerta
 
 jobs:
   ping:
@@ -11,18 +23,121 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ping Supabase REST API
+      - name: Validar secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/atestados?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          erro=0
+
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "::error::Secret SUPABASE_URL nao esta definido."
+            erro=1
+          elif ! echo "$SUPABASE_URL" | grep -qE '^https://'; then
+            echo "::error::SUPABASE_URL deve comecar com https:// (valor atual nao bate)."
+            erro=1
+          elif echo "$SUPABASE_URL" | grep -qE '^https://db\.'; then
+            # Foi a causa mais provavel da falha de 22/04: host do banco no lugar do host da API.
+            echo "::error::SUPABASE_URL aponta para o host do BANCO (db.<ref>.supabase.co)."
+            echo "::error::Use o host da API: https://<ref>.supabase.co"
+            erro=1
+          fi
+
+          if [ -z "$SERVICE_KEY" ]; then
+            echo "::error::Secret SUPABASE_SERVICE_KEY nao esta definido."
+            echo "::error::Pegue em Settings > API > service_role no painel do Supabase."
+            erro=1
+          fi
+
+          exit $erro
+
+      - name: Ping Supabase REST API
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          # Sem `bash -e` implicito matando o passo antes do diagnostico:
+          # o curl pode falhar e a gente quer reportar POR QUE.
+          set +e
+
+          BASE="${SUPABASE_URL%/}"   # remove barra final se houver
+
+          # service_role e usado de proposito. O papel `anon` perdeu todo acesso
+          # as tabelas na migracao 003, entao um ping com a chave anonima
+          # retornaria 401 e nunca tocaria o Postgres - que e justamente a
+          # atividade que impede a pausa.
+          STATUS=$(curl -sS -o /tmp/resposta.txt -w "%{http_code}" --max-time 30 \
+            "$BASE/rest/v1/atestados?select=id&limit=1" \
+            -H "apikey: $SERVICE_KEY" \
+            -H "Authorization: Bearer $SERVICE_KEY" 2>/tmp/curl_err.txt)
+          CURL_RC=$?
+
+          if [ $CURL_RC -ne 0 ]; then
+            echo "::error::curl falhou com exit code $CURL_RC (nenhuma resposta HTTP)."
+            case $CURL_RC in
+              6)  echo "::error::Nao resolveu o host. Confira o valor de SUPABASE_URL." ;;
+              7)  echo "::error::Conexao recusada. Projeto pode estar pausado ou removido." ;;
+              28) echo "::error::Timeout. Projeto pode estar acordando de uma pausa." ;;
+            esac
+            cat /tmp/curl_err.txt
+            exit 1
+          fi
 
           echo "HTTP Status: $STATUS"
 
           if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 300 ]; then
-            echo "Supabase respondeu com sucesso."
-          else
-            echo "Supabase retornou status inesperado: $STATUS"
-            exit 1
+            echo "Supabase respondeu com sucesso - banco ativo."
+            exit 0
           fi
+
+          # Resposta HTTP fora do 2xx: o projeto esta de pe, mas o ping nao
+          # chegou ao banco. Nao serve como keep-alive.
+          case "$STATUS" in
+            401|403)
+              echo "::error::$STATUS - chave rejeitada ou sem permissao na tabela."
+              echo "::error::Confirme que SUPABASE_SERVICE_KEY e a service_role, nao a anon." ;;
+            404)
+              echo "::error::404 - tabela 'atestados' nao encontrada via PostgREST." ;;
+            5*)
+              echo "::error::$STATUS - erro do lado do Supabase." ;;
+            *)
+              echo "::error::Status inesperado: $STATUS" ;;
+          esac
+          cat /tmp/resposta.txt
+          exit 1
+
+      - name: Abrir issue se o ping falhou
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Evita empilhar uma issue a cada 3 dias: so abre se nao houver
+          # nenhuma aberta com o label.
+          ABERTAS=$(gh issue list --label keep-alive --state open --json number --jq 'length')
+
+          if [ "$ABERTAS" != "0" ]; then
+            echo "Ja existe issue aberta de keep-alive. Nada a fazer."
+            exit 0
+          fi
+
+          gh label create keep-alive --color B60205 \
+            --description "Ping que impede a pausa do Supabase" 2>/dev/null || true
+
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          cat > /tmp/issue.md <<EOF
+          O ping agendado que impede o projeto Free de pausar falhou.
+
+          **Se ninguem corrigir, o projeto pausa em ate 7 dias e a aplicacao sai do ar.**
+
+          Run com o diagnostico: $RUN_URL
+
+          O passo de ping identifica a causa na saida - URL errada, chave errada,
+          projeto ja pausado ou erro do Supabase.
+
+          Feche esta issue depois de corrigir; ela nao reabre sozinha.
+          EOF
+
+          gh issue create --label keep-alive \
+            --title "Keep-alive do Supabase esta falhando" \
+            --body-file /tmp/issue.md
